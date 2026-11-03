@@ -1,3 +1,5 @@
+import java.net.URI
+
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
@@ -40,7 +42,7 @@ val fetchFonts by tasks.registering {
         anekFont.parentFile.mkdirs()
         val url = "https://github.com/google/fonts/raw/main/ofl/aneklatin/AnekLatin%5Bwdth,wght%5D.ttf"
         try {
-            java.net.URI(url).toURL().openStream().use { input -> anekFont.outputStream().use { input.copyTo(it) } }
+            URI(url).toURL().openStream().use { input -> anekFont.outputStream().use { input.copyTo(it) } }
         } catch (e: Exception) {
             anekFont.delete()
             throw GradleException(
