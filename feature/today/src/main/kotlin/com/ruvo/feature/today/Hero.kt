@@ -56,12 +56,15 @@ import kotlin.math.PI
 import kotlin.math.sin
 
 /** "Next money in 19 days · 4 days spare", or the honest alternative. */
-fun runwaySubline(r: RunwayResult): String = when {
-    r.unlimited -> "Spending is near zero, so your runway has no end"
-    r.incomeOverdue -> "Your next money is late · runway is what counts"
-    r.daysToNextIncome == null -> "At your usual pace · income comes when it comes"
-    r.makesIt -> "Next money in ${IndianFormat.days(r.daysToNextIncome)} · ${IndianFormat.days(r.spareDays)} spare"
-    else -> "Next money in ${IndianFormat.days(r.daysToNextIncome)} · ${IndianFormat.days(-(r.bufferDays ?: 0))} short"
+fun runwaySubline(r: RunwayResult): String {
+    val next = r.daysToNextIncome
+    return when {
+        r.unlimited -> "Spending is near zero, so your runway has no end"
+        r.incomeOverdue -> "Your next money is late · runway is what counts"
+        next == null -> "At your usual pace · income comes when it comes"
+        r.makesIt -> "Next money in ${IndianFormat.days(next)} · ${IndianFormat.days(r.spareDays)} spare"
+        else -> "Next money in ${IndianFormat.days(next)} · ${IndianFormat.days(-(r.bufferDays ?: 0))} short"
+    }
 }
 
 fun runwaySpoken(r: RunwayResult): String =
@@ -75,12 +78,14 @@ fun runwaySpoken(r: RunwayResult): String =
 fun RunwayHero(r: RunwayResult, onWhy: () -> Unit, modifier: Modifier = Modifier) {
     val c = Ruvo.colors
     val reduced = Ruvo.reducedMotion
-    val tight = !r.makesIt || (r.bufferDays != null && r.bufferDays < 3)
+    val buffer = r.bufferDays
+    val next = r.daysToNextIncome
+    val tight = !r.makesIt || (buffer != null && buffer < 3)
     val health = when {
         r.unlimited -> 0.9f
-        r.daysToNextIncome == null -> (r.runwayDays / 30f).coerceIn(0.15f, 0.9f)
-        r.daysToNextIncome == 0 -> 0.8f
-        else -> (r.runwayDays.toFloat() / r.daysToNextIncome).coerceIn(0.12f, 1.2f) * 0.65f
+        next == null -> (r.runwayDays / 30f).coerceIn(0.15f, 0.9f)
+        next == 0 -> 0.8f
+        else -> (r.runwayDays.toFloat() / next).coerceIn(0.12f, 1.2f) * 0.65f
     }
     val level by animateFloatAsState(health, Motion.soft(), label = "level")
     val wave = rememberInfiniteTransition(label = "wave")

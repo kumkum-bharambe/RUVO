@@ -68,16 +68,18 @@ data class OrbMood(
 ) {
     companion object {
         fun from(r: RunwayResult, anyGoalComplete: Boolean): OrbMood {
+            val next = r.daysToNextIncome
+            val buffer = r.bufferDays
             val level = when {
                 r.unlimited -> 0.85f
                 r.fuel <= 0 -> 0.06f
-                r.daysToNextIncome == null -> (r.runwayDays / 30f).coerceIn(0.1f, 0.9f)
-                r.daysToNextIncome == 0 -> 0.8f
-                else -> (r.runwayDays.toFloat() / r.daysToNextIncome * 0.7f).coerceIn(0.08f, 0.92f)
+                next == null -> (r.runwayDays / 30f).coerceIn(0.1f, 0.9f)
+                next == 0 -> 0.8f
+                else -> (r.runwayDays.toFloat() / next * 0.7f).coerceIn(0.08f, 0.92f)
             }
             val energy = when {
                 !r.makesIt -> 1f
-                r.bufferDays != null && r.bufferDays < 3 -> 0.55f
+                buffer != null && buffer < 3 -> 0.55f
                 else -> 0.1f
             }
             return OrbMood(level, energy, anyGoalComplete)
