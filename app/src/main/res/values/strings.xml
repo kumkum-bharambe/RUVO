@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Ruvo</string>
+    <string name="shortcut_add">Add a spend</string>
+    <string name="shortcut_ask">Ask Ruvo</string>
+</resources>

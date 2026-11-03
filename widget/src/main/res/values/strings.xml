@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_label">Ruvo runway</string>
+    <string name="widget_description">Your runway in days, at a glance</string>
+    <string name="tile_label">Add a spend</string>
+</resources>

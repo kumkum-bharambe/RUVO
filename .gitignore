@@ -12,3 +12,4 @@ build/
 secrets.properties
 # Screenshots and recordings from test runs
 /artifacts/
+ruvo-sync.zip

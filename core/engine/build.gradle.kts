@@ -9,7 +9,8 @@ java {
 }
 
 kotlin {
-    jvmToolchain(17)
+    // Target Java 17 bytecode with whatever JDK Android Studio ships; no separate JDK 17 install needed.
+    compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) }
 }
 
 dependencies {

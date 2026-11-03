@@ -1,0 +1,402 @@
+package com.ruvo.data
+
+import com.ruvo.data.db.CommitmentEntity
+import com.ruvo.data.db.GoalEntity
+import com.ruvo.data.db.MerchantLearnedEntity
+import com.ruvo.data.db.RuvoDao
+import com.ruvo.data.db.SnapshotEntity
+import com.ruvo.data.db.Source
+import com.ruvo.data.db.SplitShareEntity
+import com.ruvo.data.db.TxnEntity
+import com.ruvo.engine.Bucket
+import com.ruvo.engine.Cadence
+import com.ruvo.engine.Commitment
+import com.ruvo.engine.Direction
+import com.ruvo.engine.Goal
+import com.ruvo.engine.IncomePlan
+import com.ruvo.engine.Paise
+import com.ruvo.engine.RunwayEngine
+import com.ruvo.engine.RunwayInput
+import com.ruvo.engine.RunwayResult
+import com.ruvo.engine.SpendBasis
+import com.ruvo.engine.Splits
+import com.ruvo.engine.Txn
+import com.ruvo.engine.TxnKind
+import com.ruvo.engine.TxnStatus
+import com.ruvo.engine.demo.DemoPersonas
+import com.ruvo.engine.demo.Persona
+import com.ruvo.sms.Deduper
+import com.ruvo.sms.MerchantDictionary
+import com.ruvo.sms.ParsedTxn
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
+import java.time.LocalDate
+import java.time.ZoneId
+import java.util.UUID
+
+data class ActivityItem(
+    val txn: Txn,
+    val source: Source,
+    val shares: List<SplitShareEntity>,
+    val note: String,
+)
+
+data class OwedItem(val shareId: Long, val person: String, val amount: Paise, val merchant: String, val date: LocalDate)
+
+/** Everything the screens need, recalculated whenever any stored value changes. */
+data class AppState(
+    val ready: Boolean,
+    val settings: UserSettings,
+    val today: LocalDate,
+    val input: RunwayInput,
+    val runway: RunwayResult,
+    val activity: List<ActivityItem>,
+    val toSort: List<ActivityItem>,
+    val goals: List<Goal>,
+    val goalShapes: Map<String, Int>,
+    val commitments: List<Commitment>,
+    val owed: List<OwedItem>,
+    val persona: Persona?,
+) {
+    val owedToYou: Paise get() = owed.sumOf { it.amount }
+    val isDemo: Boolean get() = settings.demoPersona != null
+    val displayName: String get() = persona?.name ?: settings.name.ifBlank { "there" }
+
+    companion object {
+        fun empty(today: LocalDate): AppState {
+            val input = RunwayInput(today, 0, IncomePlan(Cadence.MONTHLY, 0, null))
+            return AppState(false, UserSettings(), today, input, RunwayEngine.calculate(input), emptyList(), emptyList(), emptyList(), emptyMap(), emptyList(), emptyList(), null)
+        }
+    }
+}
+
+/** Answers from the 90-second first run. */
+data class OnboardingAnswers(
+    val name: String,
+    val cadence: Cadence,
+    val balance: Paise,
+    val expectedIncome: Paise,
+    val nextIncome: LocalDate?,
+    val commitments: List<Commitment>,
+)
+
+class RuvoRepository(
+    private val dao: RuvoDao,
+    private val settingsStore: SettingsStore,
+    private val scope: CoroutineScope,
+    private val clock: () -> Long = System::currentTimeMillis,
+) {
+    private val zone: ZoneId = ZoneId.systemDefault()
+    private val todayFlow = MutableStateFlow(LocalDate.now(zone))
+
+    /** Call when the app comes to the foreground, so a new day is picked up. */
+    fun refreshDay() {
+        todayFlow.value = LocalDate.now(zone)
+    }
+
+    val state: StateFlow<AppState> = combine(
+        settingsStore.settings, dao.txns(), dao.commitments(), dao.goals(), dao.shares(),
+    ) { s, txns, commitments, goals, shares -> listOf(s, txns, commitments, goals, shares) }
+        .combine(todayFlow) { parts, today ->
+            @Suppress("UNCHECKED_CAST")
+            build(
+                parts[0] as UserSettings, parts[1] as List<TxnEntity>, parts[2] as List<CommitmentEntity>,
+                parts[3] as List<GoalEntity>, parts[4] as List<SplitShareEntity>, today,
+            )
+        }
+        .stateIn(scope, SharingStarted.Eagerly, AppState.empty(LocalDate.now(zone)))
+
+    private fun build(
+        s: UserSettings,
+        txnRows: List<TxnEntity>,
+        commitmentRows: List<CommitmentEntity>,
+        goalRows: List<GoalEntity>,
+        shareRows: List<SplitShareEntity>,
+        today: LocalDate,
+    ): AppState {
+        val sharesByTxn = shareRows.groupBy { it.txnId }
+        val txns = txnRows.map { it.toEngine(sharesByTxn[it.id]) }
+        val balance = s.anchorAmount + txnRows
+            .filter { it.createdAtMillis > s.anchorMillis && it.status != TxnStatus.IGNORED.name }
+            .sumOf { if (it.direction == Direction.CREDIT.name) it.amount else -it.amount }
+        val commitments = commitmentRows.map { it.toEngine() }
+        val goals = goalRows.map { it.toEngine() }
+        val income = IncomePlan(s.cadence, s.expectedIncome, s.nextIncomeEpochDay?.let(LocalDate::ofEpochDay), s.cycleDays)
+        val input = RunwayInput(today, balance, income, commitments, goals, txns, s.spendBasis)
+        val result = RunwayEngine.calculate(input)
+        val activity = txnRows.zip(txns).map { (row, t) ->
+            ActivityItem(t, runCatching { Source.valueOf(row.source) }.getOrDefault(Source.MANUAL), sharesByTxn[row.id].orEmpty(), row.note)
+        }
+        val owed = shareRows.filter { !it.paid }.mapNotNull { sh ->
+            val t = txnRows.firstOrNull { it.id == sh.txnId } ?: return@mapNotNull null
+            OwedItem(sh.id, sh.person, sh.amount, t.merchant, LocalDate.ofEpochDay(t.dateEpochDay))
+        }
+        val persona = s.demoPersona?.let { DemoPersonas.byId(it, today) }
+        return AppState(
+            ready = true, settings = s, today = today, input = input, runway = result,
+            activity = activity, toSort = activity.filter { it.txn.status == TxnStatus.TO_SORT },
+            goals = goals, goalShapes = goalRows.associate { it.id to it.jarShape },
+            commitments = commitments, owed = owed, persona = persona,
+        )
+    }
+
+    // --- Capture ---
+
+    suspend fun addManual(
+        amount: Paise,
+        merchant: String,
+        category: String,
+        bucket: Bucket = Bucket.FUEL,
+        direction: Direction = Direction.DEBIT,
+        date: LocalDate = todayFlow.value,
+        note: String = "",
+    ): String {
+        val id = newId()
+        dao.upsertTxn(
+            TxnEntity(
+                id = id, amount = amount, direction = direction.name, dateEpochDay = date.toEpochDay(),
+                kind = (if (direction == Direction.CREDIT) TxnKind.INCOME else TxnKind.SPEND).name,
+                bucket = bucket.name, status = TxnStatus.CONFIRMED.name, category = category,
+                merchant = merchant.ifBlank { category }, source = Source.MANUAL.name, note = note, createdAtMillis = clock(),
+            ),
+        )
+        return id
+    }
+
+    /** Stores parsed SMS as "to sort", skipping any that duplicate a recent transaction. Returns the new ones. */
+    suspend fun importSms(parsed: List<ParsedTxn>): List<TxnEntity> {
+        if (parsed.isEmpty()) return emptyList()
+        val learned = dao.learned().associate { it.key to MerchantDictionary.Entry(it.name, it.category) }
+        val dict = MerchantDictionary(learned)
+        val recent = dao.txnsSince(parsed.minOf { it.date }.minusDays(1).toEpochDay())
+        val merged = Deduper.merge(parsed)
+        val added = mutableListOf<TxnEntity>()
+        for (p in merged) {
+            val received = p.receivedAt.atZone(zone).toInstant().toEpochMilli()
+            val dup = recent.any { r ->
+                r.amount == p.amount && r.direction == p.direction.name &&
+                    ((p.reference != null && r.reference == p.reference) ||
+                        (kotlin.math.abs(r.createdAtMillis - received) <= Deduper.WINDOW.toMillis()))
+            }
+            if (dup) continue
+            val entry = if (p.rawCounterparty.isNotEmpty()) dict.resolve(p.rawCounterparty) else MerchantDictionary.Entry(p.merchant, p.category)
+            val kind = when {
+                p.isRefund -> TxnKind.TRANSFER
+                p.direction == Direction.CREDIT -> TxnKind.INCOME
+                else -> TxnKind.SPEND
+            }
+            val row = TxnEntity(
+                id = newId(), amount = p.amount, direction = p.direction.name, dateEpochDay = p.date.toEpochDay(),
+                kind = kind.name, bucket = Bucket.FUEL.name, status = TxnStatus.TO_SORT.name,
+                category = if (entry.category == "Other") p.category else entry.category,
+                merchant = if (entry.category == "Other") p.merchant else entry.name,
+                source = Source.SMS.name, rawCounterparty = p.rawCounterparty, reference = p.reference,
+                // The SMS time, not now: messages from before the balance was entered must not move it.
+                createdAtMillis = received,
+            )
+            dao.upsertTxn(row)
+            added += row
+        }
+        return added
+    }
+
+    // --- Weekly sort ---
+
+    suspend fun confirm(id: String) = edit(id) { it.copy(status = TxnStatus.CONFIRMED.name) }
+    suspend fun ignore(id: String) = edit(id) { it.copy(status = TxnStatus.IGNORED.name) }
+    suspend fun restore(id: String) = edit(id) { it.copy(status = TxnStatus.TO_SORT.name) }
+    suspend fun setBucket(id: String, bucket: Bucket) = edit(id) { it.copy(bucket = bucket.name) }
+    suspend fun delete(id: String) {
+        dao.deleteSharesFor(id); dao.deleteTxn(id)
+    }
+
+    /** Re-files a transaction and remembers the correction for that counterparty. */
+    suspend fun recategorise(id: String, merchant: String, category: String) {
+        val t = dao.txn(id) ?: return
+        dao.upsertTxn(t.copy(merchant = merchant, category = category))
+        val key = MerchantDictionary.normalise(t.rawCounterparty.ifEmpty { t.merchant })
+        if (key.isNotEmpty()) dao.learn(MerchantLearnedEntity(key, merchant, category))
+    }
+
+    private suspend fun edit(id: String, change: (TxnEntity) -> TxnEntity) {
+        dao.txn(id)?.let { dao.upsertTxn(change(it)) }
+    }
+
+    // --- Splits ---
+
+    suspend fun split(txnId: String, people: List<String>) {
+        val t = dao.txn(txnId) ?: return
+        val split = Splits.equal(txnId, t.amount, people)
+        dao.deleteSharesFor(txnId)
+        dao.insertShares(split.shares.map { SplitShareEntity(txnId = txnId, person = it.person, amount = it.amount) })
+        dao.upsertTxn(t.copy(othersShare = split.othersTotal))
+    }
+
+    suspend fun unsplit(txnId: String) {
+        dao.deleteSharesFor(txnId)
+        edit(txnId) { it.copy(othersShare = 0) }
+    }
+
+    /** A friend paid you back: the share is settled and the money arrives as a settlement, not income. */
+    suspend fun markSharePaid(shareId: Long) {
+        val share = dao.share(shareId) ?: return
+        dao.setSharePaid(shareId, true)
+        addManual(share.amount, "${share.person} paid back", "Settlement", direction = Direction.CREDIT)
+            .let { id -> edit(id) { it.copy(kind = TxnKind.SETTLEMENT.name) } }
+    }
+
+    fun upiLink(amount: Paise, note: String): String? {
+        val vpa = state.value.settings.upiVpa.ifBlank { return null }
+        return Splits.upiLink(vpa, state.value.displayName, amount, note)
+    }
+
+    // --- Goals ---
+
+    suspend fun addGoal(name: String, target: Paise, targetDate: LocalDate?, monthly: Paise, shape: Int = 0) {
+        dao.upsertGoal(GoalEntity(newId(), name, target, 0, targetDate?.toEpochDay(), monthly, shape, clock()))
+    }
+
+    /** Moves money from Fuel into a goal. The money stays yours; it just stops counting as spendable. */
+    suspend fun pour(goalId: String, amount: Paise) {
+        val g = dao.goal(goalId) ?: return
+        val fuel = state.value.runway.fuel
+        val move = amount.coerceAtMost(fuel.coerceAtLeast(0))
+        if (move <= 0) return
+        dao.upsertGoal(g.copy(protectedAmount = g.protectedAmount + move))
+    }
+
+    suspend fun release(goalId: String, amount: Paise) {
+        val g = dao.goal(goalId) ?: return
+        dao.upsertGoal(g.copy(protectedAmount = (g.protectedAmount - amount).coerceAtLeast(0)))
+    }
+
+    suspend fun deleteGoal(goalId: String) = dao.deleteGoal(goalId)
+
+    // --- Commitments ---
+
+    suspend fun addCommitment(name: String, amount: Paise, dueDay: Int) {
+        dao.upsertCommitment(CommitmentEntity(newId(), name, amount, dueDay, null, true, null))
+    }
+
+    suspend fun removeCommitment(id: String) = dao.deleteCommitment(id)
+
+    /** Records paying a commitment: a Fixed-bucket spend, and the commitment is marked paid. */
+    suspend fun payCommitment(c: Commitment) {
+        val today = todayFlow.value
+        val id = addManual(c.amount, c.name, "Bills", Bucket.FIXED)
+        edit(id) { it.copy(kind = TxnKind.SPEND.name) }
+        dao.upsertCommitment(CommitmentEntity(c.id, c.name, c.amount, c.dueDayOfMonth, c.dueDate?.toEpochDay(), c.recurring, today.toEpochDay()))
+    }
+
+    // --- Settings ---
+
+    suspend fun setTheme(theme: String) = settingsStore.update { it.copy(theme = theme) }
+    suspend fun setSpendBasis(b: SpendBasis) = settingsStore.update { it.copy(spendBasis = b) }
+    suspend fun setRealSms(on: Boolean) = settingsStore.update { it.copy(realSms = on) }
+    suspend fun setDemoSms(on: Boolean) = settingsStore.update { it.copy(demoSms = on) }
+    suspend fun setSpokenReplies(on: Boolean) = settingsStore.update { it.copy(spokenReplies = on) }
+    suspend fun setUpiVpa(vpa: String) = settingsStore.update { it.copy(upiVpa = vpa.trim()) }
+
+    /** "How much do you have right now?": resets the balance anchor to now. */
+    suspend fun setBalance(amount: Paise) = settingsStore.update { it.copy(anchorAmount = amount, anchorMillis = clock()) }
+
+    suspend fun setNextIncome(date: LocalDate?, amount: Paise? = null) = settingsStore.update {
+        it.copy(nextIncomeEpochDay = date?.toEpochDay(), expectedIncome = amount ?: it.expectedIncome)
+    }
+
+    // --- First run and demo ---
+
+    suspend fun completeOnboarding(a: OnboardingAnswers) {
+        dao.clearAll()
+        dao.upsertCommitments(a.commitments.map { it.toEntity() })
+        val now = clock()
+        settingsStore.update {
+            it.copy(
+                onboarded = true, ageConfirmed = true, name = a.name.trim(), demoPersona = null, cadence = a.cadence,
+                expectedIncome = a.expectedIncome, nextIncomeEpochDay = a.nextIncome?.toEpochDay(),
+                cycleDays = IncomePlan.defaultCycleDays(a.cadence), anchorAmount = a.balance, anchorMillis = now,
+            )
+        }
+    }
+
+    /** Replaces everything with one of the five sample students. */
+    suspend fun loadPersona(id: String) {
+        val today = LocalDate.now(zone)
+        val p = DemoPersonas.byId(id, today)
+        val now = clock()
+        dao.clearAll()
+        dao.upsertCommitments(p.input.commitments.map { it.toEntity() })
+        dao.upsertGoals(p.input.goals.mapIndexed { i, g -> g.toEntity(i % 3, now - 1_000L * (10 - i)) })
+        dao.upsertTxns(
+            p.input.transactions.map { t ->
+                val daysAgo = today.toEpochDay() - t.date.toEpochDay()
+                t.toEntity(Source.DEMO, now - (daysAgo + 1) * 86_400_000L)
+            },
+        )
+        // Shared demo spends get a flatmate who still owes their part, so "Owed to you" has something to show.
+        val friends = listOf("Isha", "Kunal", "Sana")
+        dao.insertShares(
+            p.input.transactions.filter { it.othersShare > 0 }.mapIndexed { i, t ->
+                SplitShareEntity(txnId = t.id, person = friends[i % friends.size], amount = t.othersShare, paid = i % 3 == 2)
+            },
+        )
+        settingsStore.update {
+            it.copy(
+                onboarded = true, ageConfirmed = true, demoPersona = p.id, cadence = p.input.income.cadence,
+                expectedIncome = p.input.income.expectedAmount, nextIncomeEpochDay = p.input.income.nextDate?.toEpochDay(),
+                cycleDays = p.input.income.cycleDays, anchorAmount = p.input.balance, anchorMillis = now,
+            )
+        }
+    }
+
+    /** Settings → Delete everything. */
+    suspend fun deleteEverything() {
+        dao.clearAll()
+        settingsStore.update { UserSettings(onboarded = false, demoPersona = "aarav", theme = it.theme) }
+    }
+
+    suspend fun recordSnapshot() {
+        val s = state.value
+        if (!s.ready) return
+        dao.snapshot(SnapshotEntity(s.today.toEpochDay(), s.runway.runwayDays, s.runway.bufferDays, s.runway.fuel))
+    }
+
+    private fun newId() = UUID.randomUUID().toString()
+}
+
+// --- Mapping between stored rows and engine models ---
+
+internal fun TxnEntity.toEngine(shares: List<SplitShareEntity>?): Txn = Txn(
+    id = id, amount = amount,
+    direction = runCatching { Direction.valueOf(direction) }.getOrDefault(Direction.DEBIT),
+    date = LocalDate.ofEpochDay(dateEpochDay),
+    kind = runCatching { TxnKind.valueOf(kind) }.getOrDefault(TxnKind.SPEND),
+    bucket = runCatching { Bucket.valueOf(bucket) }.getOrDefault(Bucket.FUEL),
+    status = runCatching { TxnStatus.valueOf(status) }.getOrDefault(TxnStatus.CONFIRMED),
+    category = category, merchant = merchant,
+    othersShare = shares?.sumOf { it.amount } ?: othersShare,
+)
+
+internal fun Txn.toEntity(source: Source, createdAt: Long) = TxnEntity(
+    id = id, amount = amount, direction = direction.name, dateEpochDay = date.toEpochDay(), kind = kind.name,
+    bucket = bucket.name, status = status.name, category = category, merchant = merchant, othersShare = othersShare,
+    source = source.name, createdAtMillis = createdAt,
+)
+
+internal fun CommitmentEntity.toEngine() = Commitment(
+    id, name, amount, dueDayOfMonth, dueDateEpochDay?.let(LocalDate::ofEpochDay), recurring, lastPaidEpochDay?.let(LocalDate::ofEpochDay),
+)
+
+internal fun Commitment.toEntity() = CommitmentEntity(
+    id, name, amount, dueDayOfMonth, dueDate?.toEpochDay(), recurring, lastPaidOn?.toEpochDay(),
+)
+
+internal fun GoalEntity.toEngine() = Goal(id, name, target, protectedAmount, targetDateEpochDay?.let(LocalDate::ofEpochDay), monthlyContribution)
+
+internal fun Goal.toEntity(shape: Int, createdAt: Long) = GoalEntity(
+    id, name, target, protectedAmount, targetDate?.toEpochDay(), monthlyContribution, shape, createdAt,
+)

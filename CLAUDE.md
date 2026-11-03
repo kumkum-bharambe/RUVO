@@ -70,20 +70,36 @@ adb exec-out screencap -p > artifacts\screen.png  # screenshot
 
 | Milestone | State |
 | --- | --- |
-| 0 Design | Style chosen by Claude under full creative liberty; Kumkum reviews on the emulator |
-| 1 Foundation | Written, not yet compiled: modules, tokens, themes, dock, navigation |
-| 2 Engine and data | `core/engine` done: 54 tests pass. Database layer written, not yet compiled |
-| 3 Onboarding and Today | Written, not yet compiled |
-| 4 Capture | `core/sms` done: parser 100% on 39 samples, 11 tests pass. Receiver, quick-add and sort stack written, not yet compiled |
-| 5 Money | Written, not yet compiled |
-| 6 Goals and Perks | Written, not yet compiled |
-| 7 Orb and Ruvo | Written, not yet compiled |
-| 8 Outside the app | Widget and tile written, not yet compiled; lessons partly done |
+| 0 Design | Style chosen by Claude under full creative liberty (Daybreak / Night swim, Anek Latin, liquid Orb). Kumkum reviews on the emulator |
+| 1 Foundation | Written, not yet compiled: modules, tokens, two themes, custom icons, floating dock, navigation |
+| 2 Engine and data | `core/engine` **done and tested** (runway maths, buckets, daily-spend rule, Before you buy, splits, day strip, personas). Room + SQLCipher layer written, not yet compiled |
+| 3 Onboarding and Today | Written, not yet compiled: 90-second first run with reveal, Today with hero, day strip, buckets, lesson and perk cards |
+| 4 Capture | `core/sms` **done and tested** (parser 100% on 39 sample SMS). Receiver, 90-day scan, notification, quick-add and swipe sort stack written, not yet compiled |
+| 5 Money | Written, not yet compiled: activity, buckets with Paid, Owed to you with UPI link, transaction sheet with split |
+| 6 Goals and Perks | Written, not yet compiled: liquid jars with tilt, pour and release, new goal, perks shelf, monthly review |
+| 7 Orb and Ruvo | Scripted voice **done and tested** (20 common questions). AGSL Orb with canvas fallback, chat, live AI, TTS written, not yet compiled |
+| 8 Outside the app | Written, not yet compiled: Glance widget, Quick Settings tile, app shortcuts, 8 lessons |
 | 9 Polish and proof | Not started |
+
+Tests that already pass (run in the cloud with a stand-in JUnit): `core/engine` 61, `core/sms` 11.
 
 The Android modules were written in a cloud workspace that cannot reach Google's Maven, so they have never
 been compiled. **First job on the PC: run `.\gradlew.bat assembleDebug`, fix every compile error, then run
-the tests.** Keep fixes minimal and in the spirit of the existing code. Update this table as milestones pass.
+`.\gradlew.bat test` and `.\gradlew.bat connectedCheck` (SmokeTest).** Keep fixes minimal and in the spirit of
+the existing code. Update this table as milestones pass.
+
+### Decisions made while writing the code (tell Kumkum if any need changing)
+
+- Hilt replaced by `RuvoGraph`, a small hand-written graph, to cut build complexity.
+- `core/sms` is plain Kotlin; the Android SMS receiver and inbox scan live in `core/data/sms`.
+- Ruvo's scripted voice, the 8 lessons and the perks are plain Kotlin in `core/engine/guide`, so they are tested.
+- Balance = the amount entered at a point in time plus every transaction recorded after it. Past SMS from the
+  90-day scan do not move it. Users can reset it from Money → "You have".
+- A past bill date only stays reserved in Fixed when we know it was missed; with no payment history it is
+  assumed handled (avoids new users seeing last month's rent).
+- The Orb floats above the right end of the dock, high enough to be pulled down 64 dp to quick-add.
+- Versions pinned in `gradle/libs.versions.toml` (AGP 8.7.3, Kotlin 2.1.0, Compose BOM 2024.12.01) were chosen
+  without network access. If Android Studio offers upgrades, accept them only after the first green build.
 
 ## How to work here
 
