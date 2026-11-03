@@ -51,7 +51,13 @@ build simple. Switch to Hilt later only if Kumkum asks.
 ## Build machine
 
 Kumkum's Windows PC (DESKTOP-73AVRJU). Project folder: `C:\dev\RUVO` (outside OneDrive, plain English path).
-If the repo is still inside OneDrive's `문서` folder, move it to `C:\dev\RUVO` before the first build.
+
+- Gradle runs on **JDK 21** (Temurin, `JAVA_HOME` set for the user). Android Studio's bundled JBR is Java 25,
+  which Gradle 8.11 / Kotlin 2.1 cannot read. In Android Studio set Settings → Build Tools → Gradle → Gradle JDK
+  to the Temurin 21 JDK.
+- Test phone: Kumkum's OnePlus Nord CE 3 Lite (CPH2467, Android 15), connected by **Wi-Fi debugging** because
+  USB drops out. If `adb devices` is empty, re-pair from Developer options → Wireless debugging.
+- No emulator yet. Create a Pixel 8 one before Milestone 4 (`adb emu sms send` only works on an emulator).
 
 ## Commands (PowerShell, from the project root)
 
@@ -81,12 +87,11 @@ adb exec-out screencap -p > artifacts\screen.png  # screenshot
 | 8 Outside the app | Written, not yet compiled: Glance widget, Quick Settings tile, app shortcuts, 8 lessons |
 | 9 Polish and proof | Not started |
 
-Tests that already pass (run in the cloud with a stand-in JUnit): `core/engine` 61, `core/sms` 11.
-
-The Android modules were written in a cloud workspace that cannot reach Google's Maven, so they have never
-been compiled. **First job on the PC: run `.\gradlew.bat assembleDebug`, fix every compile error, then run
-`.\gradlew.bat test` and `.\gradlew.bat connectedCheck` (SmokeTest).** Keep fixes minimal and in the spirit of
-the existing code. Update this table as milestones pass.
+**First PC build done (3 Nov 2026).** `assembleDebug` green, `test` green (`core/engine` 61, `core/sms` 11),
+SmokeTest passes on the OnePlus. Fixes needed: a build-script import, six cross-module smart casts, the Orb clock
+(`withInfiniteAnimationFrameNanos`) and a tilt dead-band so a still phone lets the UI go idle. Every module above
+now compiles and the app runs, but each milestone still needs its own on-device check and Kumkum's review.
+Update this table as milestones pass.
 
 ### Decisions made while writing the code (tell Kumkum if any need changing)
 

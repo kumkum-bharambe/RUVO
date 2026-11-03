@@ -81,6 +81,7 @@ import com.ruvo.engine.guide.Perks
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import kotlin.math.PI
+import kotlin.math.abs
 import kotlin.math.sin
 
 /** Phone tilt from the accelerometer, -1 (left) to 1 (right). Zero when reduced motion is on. */
@@ -93,11 +94,14 @@ fun rememberTilt(): State<Float> {
         if (reduced) return@DisposableEffect onDispose { }
         val sm = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
         val sensor = sm.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+        var smoothed = tilt.floatValue
         val listener = object : SensorEventListener {
             override fun onSensorChanged(e: SensorEvent) {
                 // Low-pass filter so the liquid settles instead of jittering.
                 val raw = (-e.values[0] / SensorManager.GRAVITY_EARTH).coerceIn(-1f, 1f)
-                tilt.floatValue = tilt.floatValue * 0.85f + raw * 0.15f
+                smoothed = smoothed * 0.85f + raw * 0.15f
+                // Ignore sensor noise (about 1°) so a phone at rest lets the liquid settle completely.
+                if (abs(smoothed - tilt.floatValue) > 0.02f) tilt.floatValue = smoothed
             }
             override fun onAccuracyChanged(s: Sensor?, a: Int) {}
         }

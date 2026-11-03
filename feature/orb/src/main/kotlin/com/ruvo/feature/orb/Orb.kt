@@ -27,6 +27,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
+import androidx.compose.animation.core.withInfiniteAnimationFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -174,7 +175,8 @@ private fun rememberTime(): Float {
     var t by remember { mutableFloatStateOf(0f) }
     LaunchedEffect(Unit) {
         val start = withFrameNanos { it }
-        while (true) withFrameNanos { now -> t = (now - start) / 1_000_000_000f }
+        // The infinite variant lets UI tests treat the endless ripple as idle.
+        while (true) withInfiniteAnimationFrameNanos { now -> t = (now - start) / 1_000_000_000f }
     }
     return t
 }
