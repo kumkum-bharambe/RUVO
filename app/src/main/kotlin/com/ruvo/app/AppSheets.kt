@@ -97,11 +97,11 @@ fun QuickAddSheet(onDismiss: () -> Unit) {
             Chip("Received", moneyIn, { moneyIn = true }, accent = c.fuel)
         }
         Spacer(Modifier.height(Space.md))
-        RuvoField(amount, { amount = it }, "Amount", number = true, prefix = "Ã¢â€šÂ¹ ")
+        RuvoField(amount, { amount = it }, "Amount", number = true, prefix = "₹ ")
         if (paise > 0 && !moneyIn) {
             val b = BeforeYouBuy.evaluate(state.runway, paise)
             Text(
-                "About ${if (b.costDays == Math.floor(b.costDays)) IndianFormat.days(b.costDays.toInt()) else "${b.costDays} days"} of spending Ã‚Â· runway ${state.runway.runwayDays} Ã¢â€ â€™ ${b.runwayAfter}",
+                "About ${if (b.costDays == Math.floor(b.costDays)) IndianFormat.days(b.costDays.toInt()) else "${b.costDays} days"} of spending · runway ${state.runway.runwayDays} → ${b.runwayAfter}",
                 Modifier.padding(top = Space.xs), style = Ruvo.type.caption, color = c.inkSoft,
             )
         }
@@ -199,7 +199,7 @@ fun SettingsSheet(state: AppState, onDismiss: () -> Unit, onPersonas: () -> Unit
         Toggle("Goal moments", "When a goal is reached or falls behind", s.notifyGoals) { on -> scope.launch { repo.setNotifications(goals = on) } }
 
         SectionTitle("Money view")
-        Toggle("Hide my balance", "Shows â€¢â€¢â€¢â€¢ on Money until you tap to reveal", s.hideBalance) { on -> scope.launch { repo.setHideBalance(on) } }
+        Toggle("Hide my balance", "Shows •••• on Money until you tap to reveal", s.hideBalance) { on -> scope.launch { repo.setHideBalance(on) } }
 
         SectionTitle("Splits")
         RuvoField(vpa, { vpa = it }, "Your UPI ID, for payment links")
@@ -249,8 +249,30 @@ fun SettingsSheet(state: AppState, onDismiss: () -> Unit, onPersonas: () -> Unit
                 }
             }
         }
-        Spacer(Modifier.height(Space.md))
-        Text("Ruvo Ã‚Â· portfolio build Ã‚Â· sample perks use made-up brands", style = Ruvo.type.caption, color = c.inkFaint)
+        SectionTitle("Help and support")
+        listOf(
+            "What is runway?" to "How many days your Fuel lasts at your usual daily spend. Next to it, Ruvo shows when your next money arrives and how many days spare you have.",
+            "Why does Ruvo not count my goal money?" to "Money in a goal is protected for its purpose. Leaving it out of Fuel means a goal can never quietly shrink without you deciding.",
+            "Does Ruvo read my messages?" to "Only if you switch on Read payment SMS. Then it reads bank and UPI senders on this phone only, and never uploads them.",
+            "Can Ruvo move or hold my money?" to "No. Ruvo never holds, moves or invests money. It explains your own numbers.",
+            "Will Ruvo stop me buying something?" to "Never. Before you buy shows what a purchase changes. The choice is always yours.",
+        ).forEachIndexed { i, (q, a) ->
+            val open = openFaq == i
+            RuvoCard(Modifier.fillMaxWidth().padding(bottom = Space.xs), onClick = { openFaq = if (open) null else i }, onClickLabel = if (open) "Hide answer" else "Show answer", padding = androidx.compose.foundation.layout.PaddingValues(Space.md)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(q, Modifier.weight(1f), style = Ruvo.type.bodyStrong, color = c.ink)
+                    Text(if (open) "–" else "+", style = Ruvo.type.title, color = c.inkSoft)
+                }
+                androidx.compose.animation.AnimatedVisibility(open) {
+                    Text(a, Modifier.padding(top = Space.xs), style = Ruvo.type.body, color = c.inkSoft)
+                }
+            }
+        }
+
+        SectionTitle("About Ruvo")
+        Text("Your money, without the mental load. Ruvo helps you see what you have, what you can spend, and what matters next.", style = Ruvo.type.body, color = c.inkSoft)
+        Spacer(Modifier.height(Space.xs))
+        Text("Ruvo 1.0 · made for students · portfolio build · sample perks use made-up brands", style = Ruvo.type.caption, color = c.inkFaint)
     }
 }
 

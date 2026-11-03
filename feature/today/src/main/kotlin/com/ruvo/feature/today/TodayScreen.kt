@@ -108,7 +108,7 @@ fun TodayContent(state: AppState, a: TodayActions) {
             Row(Modifier.padding(horizontal = Space.gutter).padding(top = Space.sm).reveal(2), horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
                 val promised = r.reservedCommitments.size
                 BucketCard(Bucket.FIXED, r.fixedReserved, if (promised == 1) "1 planned" else "$promised planned", Modifier.weight(1f), a.openMoney)
-                BucketCard(Bucket.FUEL, r.fuel.coerceAtLeast(0), "Yours to spend", Modifier.weight(1f), a.openWhy)
+                BucketCard(Bucket.FUEL, r.fuel.coerceAtLeast(0), "To spend", Modifier.weight(1f), a.openWhy)
                 val goals = state.goals.size
                 BucketCard(Bucket.FUTURE, r.futureProtected, if (goals == 1) "1 goal" else "$goals goals", Modifier.weight(1f), a.openGoals)
             }
@@ -326,7 +326,7 @@ private fun Header(state: AppState, a: TodayActions) {
             Text("$hello, ${state.displayName}", style = Ruvo.type.headline, color = c.ink)
             if (state.isDemo) {
                 Text(
-                    "Sample student Â· tap to switch",
+                    "Sample student · tap to switch",
                     Modifier.padding(top = 4.dp).clip(RoundedCornerShape(Radius.chip))
                         .background(c.fixed.copy(alpha = 0.14f))
                         .clickable(role = Role.Button, onClick = a.openPersonas)
@@ -388,10 +388,10 @@ fun ActivityLine(item: ActivityItem, state: AppState, open: (String) -> Unit) {
         item.source == com.ruvo.data.db.Source.DEMO -> "Sample"
         else -> "Added by you"
     }
-    val shared = if (t.othersShare > 0) " Â· shared" else ""
+    val shared = if (t.othersShare > 0) " · shared" else ""
     ListRow(
         title = t.merchant,
-        subtitle = "${IndianFormat.relativeDay(t.date, state.today)} Â· ${t.category}$shared Â· $tag",
+        subtitle = "${IndianFormat.relativeDay(t.date, state.today)} · ${t.category}$shared · $tag",
         modifier = Modifier.padding(horizontal = Space.gutter),
         leading = { MerchantTile(t.merchant, if (credit) c.future else c.bucket(t.bucket)) },
         onClick = { open(t.id) },

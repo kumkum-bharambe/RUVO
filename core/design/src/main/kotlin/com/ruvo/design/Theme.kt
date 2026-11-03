@@ -1,6 +1,11 @@
 package com.ruvo.design
 
+import android.app.Activity
+import android.content.ContextWrapper
 import android.provider.Settings
+import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
 import android.view.HapticFeedbackConstants
 import android.view.View
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -47,6 +52,20 @@ fun RuvoTheme(choice: ThemeChoice = ThemeChoice.SYSTEM, content: @Composable () 
             surfaceVariant = colors.raised, onSurfaceVariant = colors.inkSoft, outline = colors.hairline, error = colors.warning,
             surfaceContainerLow = colors.surface, surfaceContainer = colors.surface, surfaceContainerHigh = colors.raised,
         )
+    }
+    // Status and navigation bar icons follow the app's mood, not the phone's: dark icons on Daybreak.
+    val view = LocalView.current
+    if (!view.isInEditMode) {
+        SideEffect {
+            var ctx = view.context
+            while (ctx is ContextWrapper && ctx !is Activity) ctx = ctx.baseContext
+            (ctx as? Activity)?.window?.let { w ->
+                WindowCompat.getInsetsController(w, view).apply {
+                    isAppearanceLightStatusBars = !dark
+                    isAppearanceLightNavigationBars = !dark
+                }
+            }
+        }
     }
     CompositionLocalProvider(
         LocalRuvoColors provides colors,

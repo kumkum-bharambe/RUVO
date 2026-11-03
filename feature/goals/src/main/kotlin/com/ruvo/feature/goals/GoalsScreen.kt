@@ -103,7 +103,7 @@ fun rememberTilt(): State<Float> {
                 // Low-pass filter so the liquid settles instead of jittering.
                 val raw = (-e.values[0] / SensorManager.GRAVITY_EARTH).coerceIn(-1f, 1f)
                 smoothed = smoothed * 0.85f + raw * 0.15f
-                // Ignore sensor noise (about 1Ã‚Â°) so a phone at rest lets the liquid settle completely.
+                // Ignore sensor noise (about 1°) so a phone at rest lets the liquid settle completely.
                 if (abs(smoothed - tilt.floatValue) > 0.02f) tilt.floatValue = smoothed
             }
             override fun onAccuracyChanged(s: Sensor?, a: Int) {}
@@ -323,7 +323,7 @@ private fun PerkCard(p: Perks.Perk, daily: Long) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(RuvoIcons.Perk, null, Modifier.size(18.dp), tint = c.fuelInk)
             Spacer(Modifier.width(Space.xxs))
-            Eyebrow("${p.kind} Ã‚Â· sample")
+            Eyebrow("${p.kind} · sample")
         }
         Spacer(Modifier.height(Space.xs))
         Text(p.brand, style = Ruvo.type.title, color = c.ink)
@@ -362,14 +362,14 @@ private fun GoalSheet(id: String, state: AppState, onDismiss: () -> Unit) {
                 listOf(100, 500, 1_000).forEach { v ->
                     val paise = v * 100L
                     val days = if (daily > 0) (paise / daily).toInt() else 0
-                    Chip("${IndianFormat.rupees(paise)} Ã‚Â· ${days}d", false, {
+                    Chip("${IndianFormat.rupees(paise)} · ${days}d", false, {
                         Haptics.confirm(view)
                         scope.launch { RuvoGraph.repository.pour(g.id, paise) }
                     }, accent = c.future)
                 }
             }
             Spacer(Modifier.height(Space.sm))
-            RuvoField(custom, { custom = it }, "Another amount", number = true, prefix = "Ã¢â€šÂ¹ ")
+            RuvoField(custom, { custom = it }, "Another amount", number = true, prefix = "₹ ")
             Spacer(Modifier.height(Space.sm))
             val amount = parseRupees(custom) ?: 0
             PrimaryButton(
@@ -386,9 +386,9 @@ private fun GoalSheet(id: String, state: AppState, onDismiss: () -> Unit) {
             val take = (parseRupees(custom) ?: 0).coerceAtMost(g.protectedAmount)
             Text("It is your money and your call. Moving it back to Fuel adds to your runway and moves the goal back.", style = Ruvo.type.body, color = c.ink)
             Spacer(Modifier.height(Space.sm))
-            RuvoField(custom, { custom = it }, "How much?", number = true, prefix = "Ã¢â€šÂ¹ ")
+            RuvoField(custom, { custom = it }, "How much?", number = true, prefix = "₹ ")
             if (take > 0 && daily > 0) {
-                Text("Runway +${IndianFormat.days((take / daily).toInt())} Ã‚Â· ${g.name} back to ${IndianFormat.rupees(g.protectedAmount - take)}", Modifier.padding(top = Space.xs), style = Ruvo.type.caption, color = c.inkSoft)
+                Text("Runway +${IndianFormat.days((take / daily).toInt())} · ${g.name} back to ${IndianFormat.rupees(g.protectedAmount - take)}", Modifier.padding(top = Space.xs), style = Ruvo.type.caption, color = c.inkSoft)
             }
             Spacer(Modifier.height(Space.md))
             Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
@@ -419,9 +419,9 @@ fun NewGoalSheet(onDismiss: () -> Unit) {
         Spacer(Modifier.height(Space.sm))
         RuvoField(name, { name = it }, "Goal name")
         Spacer(Modifier.height(Space.sm))
-        RuvoField(target, { target = it }, "Target", number = true, prefix = "Ã¢â€šÂ¹ ")
+        RuvoField(target, { target = it }, "Target", number = true, prefix = "₹ ")
         Spacer(Modifier.height(Space.sm))
-        RuvoField(monthly, { monthly = it }, "Each month (optional)", number = true, prefix = "Ã¢â€šÂ¹ ")
+        RuvoField(monthly, { monthly = it }, "Each month (optional)", number = true, prefix = "₹ ")
         Spacer(Modifier.height(Space.md))
         Eyebrow("By when")
         Spacer(Modifier.height(Space.xs))

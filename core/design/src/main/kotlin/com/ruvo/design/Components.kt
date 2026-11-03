@@ -436,11 +436,12 @@ fun MerchantTile(name: String, accent: Color, size: Dp = 44.dp) {
 
 /** A rounded progress bar with an animated fill. */
 @Composable
-fun FillBar(progress: Float, accent: Color, modifier: Modifier = Modifier, height: Dp = 10.dp) {
+fun FillBar(progress: Float, accent: Color, modifier: Modifier = Modifier, height: Dp = 10.dp, track: Color = Color.Unspecified) {
     val reduced = Ruvo.reducedMotion
     val c = Ruvo.colors
     val p by animateFloatAsState(progress.coerceIn(0f, 1f), if (reduced) spring(stiffness = Spring.StiffnessHigh) else Motion.gentle(), label = "fill")
-    Box(modifier.fillMaxWidth().height(height).clip(RoundedCornerShape(Radius.chip)).background(c.ink.copy(alpha = if (c.isDark) 0.14f else 0.08f))) {
+    val trackColor = if (track != Color.Unspecified) track else c.ink.copy(alpha = if (c.isDark) 0.14f else 0.08f)
+    Box(modifier.fillMaxWidth().height(height).clip(RoundedCornerShape(Radius.chip)).background(trackColor)) {
         Box(Modifier.fillMaxWidth(p).height(height).clip(RoundedCornerShape(Radius.chip)).background(accent))
     }
 }

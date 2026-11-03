@@ -167,7 +167,7 @@ fun OnboardingFlow(onDone: () -> Unit) {
                     }
                     2 -> {
                         Title("How much do you have right now?", "Bank plus cash. A rough number is fine.")
-                        RuvoField(balance, { balance = it }, "Right now", number = true, prefix = "Ã¢â€šÂ¹ ")
+                        RuvoField(balance, { balance = it }, "Right now", number = true, prefix = "₹ ")
                     }
                     3 -> {
                         if (cadence == Cadence.IRREGULAR) {
@@ -180,7 +180,7 @@ fun OnboardingFlow(onDone: () -> Unit) {
                                 listOf(7, 15, 30, 60, 120).forEach { d -> Chip("In $d days", nextIn == d, { nextIn = d }) }
                             }
                             Spacer(Modifier.height(Space.md))
-                            RuvoField(expected, { expected = it }, "Usually how much? (optional)", number = true, prefix = "Ã¢â€šÂ¹ ")
+                            RuvoField(expected, { expected = it }, "Usually how much? (optional)", number = true, prefix = "₹ ")
                         }
                     }
                     4 -> {
@@ -201,7 +201,7 @@ fun OnboardingFlow(onDone: () -> Unit) {
                         Spacer(Modifier.height(Space.md))
                         RuvoField(goalName, { goalName = it }, "Goal name")
                         Spacer(Modifier.height(Space.sm))
-                        RuvoField(goalTarget, { goalTarget = it }, "How much do you need?", number = true, prefix = "â‚¹ ")
+                        RuvoField(goalTarget, { goalTarget = it }, "How much do you need?", number = true, prefix = "₹ ")
                         Text("Ruvo never counts goal money as spendable.", Modifier.padding(top = Space.sm), style = Ruvo.type.caption, color = c.inkFaint)
                     }
                     6 -> Reveal(answers(), today)
@@ -377,7 +377,7 @@ private fun SlideGoal() {
             Spacer(Modifier.height(Space.md))
             com.ruvo.design.FillBar(0.5f, c.future, height = 12.dp)
             Spacer(Modifier.height(Space.sm))
-            Text("â‚¹4,000 of â‚¹8,000 Â· protected", style = Ruvo.type.caption, color = c.inkSoft)
+            Text("₹4,000 of ₹8,000 · protected", style = Ruvo.type.caption, color = c.inkSoft)
         }
     }
 }
@@ -460,11 +460,11 @@ fun PersonaPicker(onDismiss: () -> Unit, onPicked: () -> Unit) {
             }, onClickLabel = "Use ${p.name}") {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text("${p.name}, ${p.age} Ã‚Â· ${p.livesIn}", style = Ruvo.type.title, color = c.ink)
+                        Text("${p.name}, ${p.age} · ${p.livesIn}", style = Ruvo.type.title, color = c.ink)
                         Text(p.story, style = Ruvo.type.caption, color = c.inkSoft)
                     }
                     Column(horizontalAlignment = Alignment.End) {
-                        Text(if (r.unlimited) "Ã¢Ë†Å¾" else r.runwayDays.toString(), style = Ruvo.type.display, color = if (r.makesIt) c.ink else c.warning)
+                        Text(if (r.unlimited) "∞" else r.runwayDays.toString(), style = Ruvo.type.display, color = if (r.makesIt) c.ink else c.warning)
                         Text("days", style = Ruvo.type.caption, color = c.inkFaint)
                     }
                 }

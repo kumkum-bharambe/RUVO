@@ -99,7 +99,7 @@ fun GuideScreen(a: GuideActions) {
                     Text("No streaks, no pressure", style = Ruvo.type.caption, color = c.onHero.copy(alpha = 0.55f))
                 }
                 Spacer(Modifier.height(Space.xs))
-                FillBar(done / total.toFloat(), c.fuel)
+                FillBar(done / total.toFloat(), c.fuel, track = c.onHero.copy(alpha = 0.16f))
             }
 
             // New this week: the first unread fresh book, highlighted with a slow glow.

@@ -59,20 +59,20 @@ import com.ruvo.engine.RunwayResult
 import kotlin.math.PI
 import kotlin.math.sin
 
-/** "Next money in 19 days Â· 4 days spare", or the honest alternative. */
+/** "Next money in 19 days · 4 days spare", or the honest alternative. */
 fun runwaySubline(r: RunwayResult): String {
     val next = r.daysToNextIncome
     return when {
         r.unlimited -> "Spending is near zero, so your runway has no end"
-        r.incomeOverdue -> "Your next money is late Â· runway is what counts"
-        next == null -> "At your usual pace Â· income comes when it comes"
-        r.makesIt -> "Next money in ${IndianFormat.days(next)} Â· ${IndianFormat.days(r.spareDays)} spare"
-        else -> "Next money in ${IndianFormat.days(next)} Â· ${IndianFormat.days(-(r.bufferDays ?: 0))} short"
+        r.incomeOverdue -> "Your next money is late · runway is what counts"
+        next == null -> "At your usual pace · income comes when it comes"
+        r.makesIt -> "Next money in ${IndianFormat.days(next)} · ${IndianFormat.days(r.spareDays)} spare"
+        else -> "Next money in ${IndianFormat.days(next)} · ${IndianFormat.days(-(r.bufferDays ?: 0))} short"
     }
 }
 
 fun runwaySpoken(r: RunwayResult): String =
-    if (r.unlimited) "Runway: no end at current spending." else "Runway ${IndianFormat.days(r.runwayDays)}. ${runwaySubline(r).replace("Â·", ".")}"
+    if (r.unlimited) "Runway: no end at current spending." else "Runway ${IndianFormat.days(r.runwayDays)}. ${runwaySubline(r).replace("·", ".")}"
 
 /**
  * The hero: a deep navy card with the runway number set huge and tight in white. Its lower part is a slow
@@ -114,7 +114,7 @@ fun RunwayHero(r: RunwayResult, onWhy: () -> Unit, modifier: Modifier = Modifier
             // Warm light in the top-right corner, breathing slowly.
             val g = if (reduced) 0.85f else glow
             drawRect(Brush.radialGradient(listOf(liquid.copy(alpha = 0.42f * g), Color.Transparent), Offset(size.width * 0.95f, 0f), size.width * 0.75f))
-            val top = size.height * (1f - level.coerceIn(0f, 1f) * 0.6f)
+            val top = size.height * (1f - level.coerceIn(0f, 1f) * 0.42f)
             val amp = if (reduced) 0f else size.height * (if (tight) 0.035f else 0.02f)
             fun surface(offset: Float, alpha: Float) {
                 val p = Path().apply {

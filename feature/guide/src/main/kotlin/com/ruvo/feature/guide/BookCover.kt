@@ -73,7 +73,7 @@ fun BookCover(
             drawRect(Color.Black.copy(alpha = 0.16f), size = Size(size.width * 0.045f, size.height))
             drawRect(Brush.horizontalGradient(listOf(Color.White.copy(alpha = 0.18f), Color.Transparent), startX = size.width * 0.045f, endX = size.width * 0.16f))
         }
-        Text(
+        if (width >= 100.dp) Text(
             if (read) "Read" else "${book.pages.size} pages",
             Modifier.align(Alignment.TopEnd).padding(8.dp).clip(RoundedCornerShape(99.dp)).background(Covers.labelInk).padding(horizontal = 8.dp, vertical = 3.dp),
             style = Ruvo.type.eyebrow, color = Covers.label,

@@ -155,7 +155,7 @@ private fun BalanceCard(state: AppState, modifier: Modifier, onUpdate: () -> Uni
                 else Amount(r.balance, style = Ruvo.type.display, color = c.onHero)
             }
             IconCircle(
-                if (hidden) RuvoIcons.Lock else RuvoIcons.Check, if (hidden) "Show balance" else "Hide balance",
+                if (hidden) RuvoIcons.Eye else RuvoIcons.EyeOff, if (hidden) "Show balance" else "Hide balance",
                 { scope.launch { RuvoGraph.repository.setHideBalance(!hidden) } },
                 tint = c.onHero, background = c.onHero.copy(alpha = 0.12f),
             )
@@ -274,7 +274,7 @@ private fun TxnRow(entry: com.ruvo.data.ActivityItem, state: AppState, open: (St
         if (t.othersShare > 0) add("shared")
         if (t.status == TxnStatus.TO_SORT) add("to sort")
         if (ignored) add("ignored")
-    }.joinToString(" Â· ")
+    }.joinToString(" · ")
     ListRow(
         title = t.merchant, subtitle = tags, modifier = Modifier.padding(horizontal = Space.gutter),
         leading = { MerchantTile(t.merchant, if (credit) c.future else c.bucket(t.bucket)) },
@@ -348,7 +348,7 @@ private fun Owed(state: AppState) {
         SectionTitle("Waiting")
         state.owed.forEach { o ->
             ListRow(
-                title = o.person, subtitle = "${o.merchant} Â· ${IndianFormat.relativeDay(o.date, state.today)}",
+                title = o.person, subtitle = "${o.merchant} · ${IndianFormat.relativeDay(o.date, state.today)}",
                 leading = { MerchantTile(o.person, c.fixed) },
             ) { Amount(o.amount) }
             Row(Modifier.fillMaxWidth().padding(bottom = Space.sm), horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
@@ -374,7 +374,7 @@ private fun BalanceSheet(state: AppState, onDismiss: () -> Unit) {
     RuvoSheet("How much do you have right now?", onDismiss, eyebrow = "Update balance") {
         Text("Add up your bank balance and cash. Ruvo counts from here.", style = Ruvo.type.body, color = Ruvo.colors.inkSoft)
         Spacer(Modifier.height(Space.md))
-        RuvoField(text, { text = it }, "Total", number = true, prefix = "â‚¹ ")
+        RuvoField(text, { text = it }, "Total", number = true, prefix = "₹ ")
         Spacer(Modifier.height(Space.lg))
         PrimaryButton("Save", {
             parseRupees(text)?.let { v -> scope.launch { RuvoGraph.repository.setBalance(v) } }
@@ -398,7 +398,7 @@ fun TxnSheet(id: String, startWithSplit: Boolean, onDismiss: () -> Unit) {
     var people by remember(id) { mutableStateOf(item.shares.joinToString(", ") { it.person }) }
     val categories = listOf("Food", "Groceries", "Transport", "Shopping", "Entertainment", "Subscriptions", "Bills", "Education", "Health", "Other")
 
-    RuvoSheet(IndianFormat.rupees(t.amount), onDismiss, eyebrow = "${IndianFormat.relativeDay(t.date, state.today)} Â· ${if (t.direction == Direction.CREDIT) "money in" else "payment"}") {
+    RuvoSheet(IndianFormat.rupees(t.amount), onDismiss, eyebrow = "${IndianFormat.relativeDay(t.date, state.today)} · ${if (t.direction == Direction.CREDIT) "money in" else "payment"}") {
         RuvoField(name, { name = it }, "Name")
         Spacer(Modifier.height(Space.md))
         Eyebrow("Category")
@@ -417,7 +417,7 @@ fun TxnSheet(id: String, startWithSplit: Boolean, onDismiss: () -> Unit) {
             }
             Spacer(Modifier.height(Space.md))
             RuvoCard {
-                Text(if (t.othersShare > 0) "Shared Â· your part ${IndianFormat.rupees(t.yourShare)}" else "Shared with friends?", style = Ruvo.type.bodyStrong, color = c.ink)
+                Text(if (t.othersShare > 0) "Shared · your part ${IndianFormat.rupees(t.yourShare)}" else "Shared with friends?", style = Ruvo.type.bodyStrong, color = c.ink)
                 if (!splitOpen) {
                     Spacer(Modifier.height(Space.xs))
                     GhostButton(if (t.othersShare > 0) "Change split" else "Split it", { splitOpen = true }, Modifier.fillMaxWidth())
