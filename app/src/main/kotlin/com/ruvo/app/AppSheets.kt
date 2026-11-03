@@ -29,6 +29,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
@@ -96,11 +97,11 @@ fun QuickAddSheet(onDismiss: () -> Unit) {
             Chip("Received", moneyIn, { moneyIn = true }, accent = c.fuel)
         }
         Spacer(Modifier.height(Space.md))
-        RuvoField(amount, { amount = it }, "Amount", number = true, prefix = "₹ ")
+        RuvoField(amount, { amount = it }, "Amount", number = true, prefix = "Ã¢â€šÂ¹ ")
         if (paise > 0 && !moneyIn) {
             val b = BeforeYouBuy.evaluate(state.runway, paise)
             Text(
-                "About ${if (b.costDays == Math.floor(b.costDays)) IndianFormat.days(b.costDays.toInt()) else "${b.costDays} days"} of spending · runway ${state.runway.runwayDays} → ${b.runwayAfter}",
+                "About ${if (b.costDays == Math.floor(b.costDays)) IndianFormat.days(b.costDays.toInt()) else "${b.costDays} days"} of spending Ã‚Â· runway ${state.runway.runwayDays} Ã¢â€ â€™ ${b.runwayAfter}",
                 Modifier.padding(top = Space.xs), style = Ruvo.type.caption, color = c.inkSoft,
             )
         }
@@ -133,6 +134,9 @@ fun SettingsSheet(state: AppState, onDismiss: () -> Unit, onPersonas: () -> Unit
     val s = state.settings
     var vpa by remember { mutableStateOf(s.upiVpa) }
     var confirmDelete by remember { mutableStateOf(false) }
+    var confirmClear by remember { mutableStateOf(false) }
+    var name by remember { mutableStateOf(s.name) }
+    var openFaq by remember { mutableStateOf<Int?>(null) }
     var scanned by remember { mutableStateOf<Int?>(null) }
     val smsLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
         if (granted[Manifest.permission.READ_SMS] == true) scope.launch {
@@ -145,15 +149,22 @@ fun SettingsSheet(state: AppState, onDismiss: () -> Unit, onPersonas: () -> Unit
         Eyebrow("Mood")
         Spacer(Modifier.height(Space.xs))
         Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
-            MoodCard("Daybreak", "Warm paper, printed colour", Daybreak, s.theme == ThemeChoice.DAYBREAK.name, Modifier.weight(1f)) {
+            MoodCard("Daybreak", "Soft light, amber dawn glow", Daybreak, s.theme == ThemeChoice.DAYBREAK.name, Modifier.weight(1f)) {
                 scope.launch { repo.setTheme(ThemeChoice.DAYBREAK.name) }
             }
-            MoodCard("Night swim", "Deep blue, glowing liquid", NightSwim, s.theme == ThemeChoice.NIGHT_SWIM.name, Modifier.weight(1f)) {
+            MoodCard("Night swim", "Deep navy, glowing liquid", NightSwim, s.theme == ThemeChoice.NIGHT_SWIM.name, Modifier.weight(1f)) {
                 scope.launch { repo.setTheme(ThemeChoice.NIGHT_SWIM.name) }
             }
         }
         Spacer(Modifier.height(Space.xs))
         Chip("Follow my phone", s.theme == ThemeChoice.SYSTEM.name, { scope.launch { repo.setTheme(ThemeChoice.SYSTEM.name) } })
+
+        if (!state.isDemo) {
+            SectionTitle("Profile")
+            RuvoField(name, { name = it }, "What should Ruvo call you?")
+            Spacer(Modifier.height(Space.xs))
+            GhostButton("Save name", { scope.launch { repo.setName(name) } }, Modifier.fillMaxWidth())
+        }
 
         SectionTitle("Your data")
         if (state.isDemo) {
@@ -181,6 +192,15 @@ fun SettingsSheet(state: AppState, onDismiss: () -> Unit, onPersonas: () -> Unit
         Toggle("Demo SMS", "Accept test messages from any sender, for emulator demos", s.demoSms) { on -> scope.launch { repo.setDemoSms(on) } }
         Toggle("Spoken replies", "Ruvo reads answers aloud in Indian English", s.spokenReplies) { on -> scope.launch { repo.setSpokenReplies(on) } }
 
+        SectionTitle("Notifications")
+        Text("Calm and occasional. Each one can be switched off.", style = Ruvo.type.caption, color = c.inkSoft)
+        Toggle("New payments found", "When an SMS payment is tracked", s.notifyCapture) { on -> scope.launch { repo.setNotifications(capture = on) } }
+        Toggle("Weekly review", "A Sunday nudge to sort and review your week", s.notifyWeekly) { on -> scope.launch { repo.setNotifications(weekly = on) } }
+        Toggle("Goal moments", "When a goal is reached or falls behind", s.notifyGoals) { on -> scope.launch { repo.setNotifications(goals = on) } }
+
+        SectionTitle("Money view")
+        Toggle("Hide my balance", "Shows â€¢â€¢â€¢â€¢ on Money until you tap to reveal", s.hideBalance) { on -> scope.launch { repo.setHideBalance(on) } }
+
         SectionTitle("Splits")
         RuvoField(vpa, { vpa = it }, "Your UPI ID, for payment links")
         Spacer(Modifier.height(Space.xs))
@@ -193,6 +213,29 @@ fun SettingsSheet(state: AppState, onDismiss: () -> Unit, onPersonas: () -> Unit
                 "never transactions or messages. Ruvo explains your own numbers; it does not give investment, tax or legal advice.",
             style = Ruvo.type.body, color = c.inkSoft,
         )
+        Spacer(Modifier.height(Space.md))
+        GhostButton("Export my data", {
+            val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(android.content.Intent.EXTRA_SUBJECT, "My Ruvo data")
+                putExtra(android.content.Intent.EXTRA_TEXT, repo.exportText())
+            }
+            context.startActivity(android.content.Intent.createChooser(send, "Export my Ruvo data"))
+        }, Modifier.fillMaxWidth())
+        Text("A plain-text copy of your transactions, goals and bills, made on this phone. You choose where it goes.", Modifier.padding(top = Space.xxs), style = Ruvo.type.caption, color = c.inkFaint)
+        Spacer(Modifier.height(Space.md))
+        if (!confirmClear) {
+            GhostButton("Clear all transactions", { confirmClear = true }, Modifier.fillMaxWidth())
+        } else {
+            RuvoCard(color = c.warning.copy(alpha = 0.12f), border = null) {
+                Text("Removes every transaction record. Your balance, goals and bills stay as they are.", style = Ruvo.type.body, color = c.ink)
+                Spacer(Modifier.height(Space.sm))
+                Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
+                    GhostButton("Keep them", { confirmClear = false }, Modifier.weight(1f))
+                    PrimaryButton("Clear", { scope.launch { repo.clearTransactions() }; confirmClear = false }, Modifier.weight(1f))
+                }
+            }
+        }
         Spacer(Modifier.height(Space.md))
         if (!confirmDelete) {
             GhostButton("Delete everything", { confirmDelete = true }, Modifier.fillMaxWidth())
@@ -207,7 +250,7 @@ fun SettingsSheet(state: AppState, onDismiss: () -> Unit, onPersonas: () -> Unit
             }
         }
         Spacer(Modifier.height(Space.md))
-        Text("Ruvo · portfolio build · sample perks use made-up brands", style = Ruvo.type.caption, color = c.inkFaint)
+        Text("Ruvo Ã‚Â· portfolio build Ã‚Â· sample perks use made-up brands", style = Ruvo.type.caption, color = c.inkFaint)
     }
 }
 
@@ -221,7 +264,7 @@ private fun Toggle(title: String, subtitle: String, on: Boolean, onChange: (Bool
         }
         Switch(
             on, onChange,
-            colors = SwitchDefaults.colors(checkedThumbColor = c.canvas, checkedTrackColor = c.ink, uncheckedThumbColor = c.inkSoft, uncheckedTrackColor = c.hairline, uncheckedBorderColor = c.hairline),
+            colors = SwitchDefaults.colors(checkedThumbColor = c.onAccent, checkedTrackColor = c.fuel, checkedBorderColor = c.fuel, uncheckedThumbColor = c.inkSoft, uncheckedTrackColor = c.hairline, uncheckedBorderColor = c.hairline),
         )
     }
 }
@@ -231,7 +274,7 @@ private fun Toggle(title: String, subtitle: String, on: Boolean, onChange: (Bool
 private fun MoodCard(name: String, line: String, palette: RuvoColors, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
     val c = Ruvo.colors
     val shape = RoundedCornerShape(Radius.inner)
-    RuvoCard(modifier, color = palette.canvas, border = if (selected) c.ink else c.hairline, onClick = onClick, onClickLabel = "Use $name", padding = androidx.compose.foundation.layout.PaddingValues(Space.md)) {
+    RuvoCard(modifier, brush = androidx.compose.ui.graphics.Brush.linearGradient(listOf(palette.glowWarm.compositeOver(palette.canvas), palette.canvas)), border = if (selected) c.fuel else c.hairline, onClick = onClick, onClickLabel = "Use $name", padding = androidx.compose.foundation.layout.PaddingValues(Space.md)) {
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             listOf(palette.fixed, palette.fuel, palette.future).forEach { col ->
                 Box(Modifier.size(18.dp).clip(CircleShape).background(col))

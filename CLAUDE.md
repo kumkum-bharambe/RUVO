@@ -19,27 +19,29 @@ Everything is organised around one number: **Runway**, in days.
 | Area | Decision |
 | --- | --- |
 | Platform | Android only, Kotlin + Jetpack Compose, min SDK 26, no backend, no login |
-| Navigation | Three tabs (Today, Money, Goals) on a custom floating dock; not a stock Material bar |
+| Navigation | Four tabs (Today, Money, Goals, Guide) on a custom floating dock with a sliding amber pill; not a stock Material bar. Guide added 3 Nov 2026 at Kumkum's request |
 | Companion | The **Ruvo Orb**: a liquid sphere, no face. Fill = Fuel; ripples faster when money is tight; glows when a goal completes. Poke, drag, tilt. Tap = talk to Ruvo, pull down = quick-add. Replaces mascot, AI button and capture button |
-| Visual | Two moods with a switch: light "Daybreak" and dark "Night swim". Brand palette used freely. Custom icons, no emoji. Indian number grouping (₹1,25,000), dates like "3 Nov". Identical bucket cards, each with name and icon so colour is never the only cue |
-| Typeface | Anek Latin (variable width and weight, includes ₹). Display uses the expanded width. Downloaded at build time by `core/design` |
+| Visual | Navy and amber, refined from the HTML prototype's final look (3 Nov 2026). Daybreak: soft cool canvas with drifting amber and lavender glows, navy ink, frosted glass cards. Night swim: deep navy. Buckets: Fuel amber, Future sky blue, Fixed lavender; filled gradient bucket cards of equal height, each with name and icon so colour is never the only cue. Navy hero cards, amber glowing pill buttons. Custom icons, no emoji. Indian number grouping (₹1,25,000), dates like "3 Nov" |
+| Motion | Mature and calm: springs that settle (`Motion.gentle/soft/snappy`), staggered `reveal()` entrances, drifting `AmbientBackdrop`, 3D page turns in the Guide reader. Every infinite loop uses an infinite transition or `withInfiniteAnimationFrameNanos` so UI tests can go idle. Reduced motion stills everything |
+| Typeface | Outfit (variable weight), like the HTML prototype. Outfit has no ₹, so on Android 10+ each weight falls back to Anek Latin for ₹ only (`Type.kt`). Both downloaded at build time by `core/design` |
 | Voice | Written persona: mature, warm, insightful Indian woman's voice in English. Optional spoken replies via the phone's Indian English TTS |
 | AI | Scripted offline answers by default so the demo never fails. Optional live Claude API with the user's own key, sending only a summary (totals, runway), never raw transactions |
 | Data | On the phone only, encrypted (Room + SQLCipher). SMS read on-device; only known bank sender IDs; raw text never uploaded |
 | Demo | Five sample personas and sample bank SMS on by default. Real SMS behind a switch in Settings |
-| Perks | Shelf inside Goals plus an occasional card on Today. Made-up brands only, each perk shows its saving in days |
+| Perks | Marketplace in Guide, shelf inside Goals, plus an occasional card on Today. Made-up brands only, each perk shows its saving in days |
+| Guide | 24 five-minute books on six shelves (`core/engine/guide/Library.kt`), seven pages each: idea, situation, why, reflect, try it, a check, apply in Ruvo. No streaks, no named investments. The eight Today lessons are books with the same ids |
 | Never | Hold money, show ads, sell data, shame spending, recommend specific investments, block a purchase |
-| Old design | The earlier HTML prototype ("Ruvo — Student money companion") is a separate older version. Do not copy its screens, tabs or styling |
+| Old design | The HTML prototype ("Ruvo — Student money companion") is now the style reference (3 Nov 2026): follow its look and features, but do not copy it screen for screen. Its mascot and phone/OTP login stay out; the Orb stays and there is no login |
 
 ## Modules
 
 | Module | Kind | What it holds |
 | --- | --- | --- |
-| `core/engine` | Plain Kotlin | Runway maths, buckets, daily-spend rule, Before you buy, splits, money arrives, day strip, Indian formatting, demo personas |
+| `core/engine` | Plain Kotlin | Runway maths, buckets, daily-spend rule, Before you buy, splits, money arrives, day strip, Indian formatting, demo personas, Insights (daily, week, months, mood), Guide library |
 | `core/sms` | Plain Kotlin | SMS parser, merchant dictionary that learns, duplicate merging, sample SMS set |
 | `core/design` | Android library | Tokens, two themes, typography, custom icons, shared components (cards, rolling digits, sheets, dock) |
 | `core/data` | Android library | Room + SQLCipher database, repository, settings, demo seeding, SMS receiver and inbox scan, app graph (manual DI) |
-| `feature/today` `feature/money` `feature/goals` | Android library | One module per tab |
+| `feature/today` `feature/money` `feature/goals` `feature/guide` | Android library | One module per tab. Guide holds the shelf, book covers and the book reader |
 | `feature/orb` | Android library | The Orb, chat, scripted answers, optional live AI and TTS |
 | `feature/onboarding` | Android library | 90-second first run |
 | `widget` | Android library | Glance home-screen widget and Quick Settings tile |
@@ -91,7 +93,10 @@ adb exec-out screencap -p > artifacts\screen.png  # screenshot
 SmokeTest passes on the OnePlus. Fixes needed: a build-script import, six cross-module smart casts, the Orb clock
 (`withInfiniteAnimationFrameNanos`) and a tilt dead-band so a still phone lets the UI go idle. Every module above
 now compiles and the app runs, but each milestone still needs its own on-device check and Kumkum's review.
-Update this table as milestones pass.
+**Redesign (3 Nov 2026):** navy and amber design system, Outfit, Guide tab, and the HTML prototype's missing
+features (weekly review, insights, plan card, coming up, Money overview and history, goal insights, settings extras).
+Unit tests: `core/engine` 71, `core/sms` 11. Not yet checked on the phone: take screenshots of every screen in both
+themes and rerun the SmokeTest before Kumkum's review. Update this table as milestones pass.
 
 ### Decisions made while writing the code (tell Kumkum if any need changing)
 
