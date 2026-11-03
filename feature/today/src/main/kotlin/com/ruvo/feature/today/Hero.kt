@@ -19,9 +19,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -30,6 +32,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -51,28 +54,30 @@ import com.ruvo.design.RuvoIcons
 import com.ruvo.design.Space
 import com.ruvo.engine.DayStrip
 import com.ruvo.engine.IndianFormat
+import com.ruvo.engine.Insights
 import com.ruvo.engine.RunwayResult
 import kotlin.math.PI
 import kotlin.math.sin
 
-/** "Next money in 19 days · 4 days spare", or the honest alternative. */
+/** "Next money in 19 days Â· 4 days spare", or the honest alternative. */
 fun runwaySubline(r: RunwayResult): String {
     val next = r.daysToNextIncome
     return when {
         r.unlimited -> "Spending is near zero, so your runway has no end"
-        r.incomeOverdue -> "Your next money is late · runway is what counts"
-        next == null -> "At your usual pace · income comes when it comes"
-        r.makesIt -> "Next money in ${IndianFormat.days(next)} · ${IndianFormat.days(r.spareDays)} spare"
-        else -> "Next money in ${IndianFormat.days(next)} · ${IndianFormat.days(-(r.bufferDays ?: 0))} short"
+        r.incomeOverdue -> "Your next money is late Â· runway is what counts"
+        next == null -> "At your usual pace Â· income comes when it comes"
+        r.makesIt -> "Next money in ${IndianFormat.days(next)} Â· ${IndianFormat.days(r.spareDays)} spare"
+        else -> "Next money in ${IndianFormat.days(next)} Â· ${IndianFormat.days(-(r.bufferDays ?: 0))} short"
     }
 }
 
 fun runwaySpoken(r: RunwayResult): String =
-    if (r.unlimited) "Runway: no end at current spending." else "Runway ${IndianFormat.days(r.runwayDays)}. ${runwaySubline(r).replace("·", ".")}"
+    if (r.unlimited) "Runway: no end at current spending." else "Runway ${IndianFormat.days(r.runwayDays)}. ${runwaySubline(r).replace("Â·", ".")}"
 
 /**
- * The hero: the number big and wide, sitting in a card whose bottom is a slow liquid surface.
- * The liquid level follows how comfortable the buffer is; it ripples faster when money is tight.
+ * The hero: a deep navy card with the runway number set huge and tight in white. Its lower part is a slow
+ * amber liquid whose level follows how comfortable the buffer is; it ripples faster and turns coral when money
+ * is tight. A warm glow sits in the top corner, and a mood tag reads the month in three words.
  */
 @Composable
 fun RunwayHero(r: RunwayResult, onWhy: () -> Unit, modifier: Modifier = Modifier) {
@@ -87,22 +92,29 @@ fun RunwayHero(r: RunwayResult, onWhy: () -> Unit, modifier: Modifier = Modifier
         next == 0 -> 0.8f
         else -> (r.runwayDays.toFloat() / next).coerceIn(0.12f, 1.2f) * 0.65f
     }
-    val level by animateFloatAsState(health, Motion.soft(), label = "level")
+    val level by animateFloatAsState(health, Motion.gentle(), label = "level")
     val wave = rememberInfiniteTransition(label = "wave")
     val phase by wave.animateFloat(
         0f, (2 * PI).toFloat(),
         infiniteRepeatable(tween(if (tight) 2600 else 5200, easing = LinearEasing), RepeatMode.Restart), label = "phase",
     )
+    val glow by wave.animateFloat(0.75f, 1f, infiniteRepeatable(tween(3200), RepeatMode.Reverse), label = "glow")
     val liquid = if (tight) c.warning else c.fuel
     val shape = RoundedCornerShape(Radius.card + 6.dp)
+    val mood = Insights.mood(r)
 
     Box(
-        modifier.fillMaxWidth().clip(shape).background(c.surface).border(1.dp, c.hairline, shape)
+        modifier.fillMaxWidth()
+            .shadow(24.dp, shape, ambientColor = c.heroBottom, spotColor = c.heroBottom)
+            .clip(shape).background(c.heroBrush)
             .clickable(role = Role.Button, onClickLabel = "Why this many days", onClick = onWhy)
-            .semantics { contentDescription = runwaySpoken(r) },
+            .semantics { contentDescription = runwaySpoken(r) + ". " + mood.title },
     ) {
         Canvas(Modifier.matchParentSize()) {
-            val top = size.height * (1f - level.coerceIn(0f, 1f) * 0.62f)
+            // Warm light in the top-right corner, breathing slowly.
+            val g = if (reduced) 0.85f else glow
+            drawRect(Brush.radialGradient(listOf(liquid.copy(alpha = 0.42f * g), Color.Transparent), Offset(size.width * 0.95f, 0f), size.width * 0.75f))
+            val top = size.height * (1f - level.coerceIn(0f, 1f) * 0.6f)
             val amp = if (reduced) 0f else size.height * (if (tight) 0.035f else 0.02f)
             fun surface(offset: Float, alpha: Float) {
                 val p = Path().apply {
@@ -114,41 +126,59 @@ fun RunwayHero(r: RunwayResult, onWhy: () -> Unit, modifier: Modifier = Modifier
                     }
                     lineTo(size.width, size.height); close()
                 }
-                drawPath(p, Brush.verticalGradient(listOf(liquid.copy(alpha = alpha), liquid.copy(alpha = alpha * 0.35f)), startY = top, endY = size.height))
+                drawPath(p, Brush.verticalGradient(listOf(liquid.copy(alpha = alpha), liquid.copy(alpha = alpha * 0.3f)), startY = top, endY = size.height))
             }
-            surface(1.4f, if (c.isDark) 0.22f else 0.16f)
-            surface(0f, if (c.isDark) 0.34f else 0.26f)
+            surface(1.4f, 0.22f)
+            surface(0f, 0.36f)
         }
         Column(Modifier.fillMaxWidth().padding(Space.xl).clearAndSetSemantics { }) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Eyebrow("Runway", color = c.inkSoft)
+                Eyebrow("Runway", color = c.onHero.copy(alpha = 0.7f))
                 Spacer(Modifier.weight(1f))
                 Row(
-                    Modifier.clip(RoundedCornerShape(Radius.chip)).background(c.canvas.copy(alpha = 0.7f))
+                    Modifier.clip(RoundedCornerShape(Radius.chip)).background(c.onHero.copy(alpha = 0.14f))
                         .padding(horizontal = Space.sm, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("Why?", style = Ruvo.type.label, color = c.ink)
-                    Icon(RuvoIcons.Forward, null, Modifier.padding(start = 2.dp).width(14.dp), tint = c.ink)
+                    Text("Why ${if (r.unlimited) "no end" else IndianFormat.days(r.runwayDays)}?", style = Ruvo.type.label, color = c.onHero, maxLines = 1)
+                    Icon(RuvoIcons.Forward, null, Modifier.padding(start = 2.dp).width(14.dp), tint = c.onHero)
                 }
             }
             Spacer(Modifier.height(Space.xs))
+            // Three-digit runways step the number down so "days" always fits on the same line.
+            val heroStyle = if (r.runwayDays >= 100) Ruvo.type.hero.copy(fontSize = Ruvo.type.hero.fontSize * 0.78f) else Ruvo.type.hero
             Row(verticalAlignment = Alignment.Bottom) {
                 if (r.unlimited) {
-                    Text("∞", style = Ruvo.type.hero, color = c.ink)
+                    Text("∞", style = heroStyle, color = c.onHero)
                 } else {
-                    RollingNumber(r.runwayDays, Ruvo.type.hero, c.ink)
+                    RollingNumber(r.runwayDays, heroStyle, c.onHero)
                 }
                 Spacer(Modifier.width(Space.xs))
-                Text(if (r.runwayDays == 1) "day" else "days", Modifier.padding(bottom = 18.dp), style = Ruvo.type.display, color = c.ink)
+                Text(
+                    if (r.runwayDays == 1) "day" else "days", Modifier.padding(bottom = 16.dp),
+                    style = Ruvo.type.display, color = c.onHero, maxLines = 1, softWrap = false,
+                )
             }
-            Text(runwaySubline(r), style = Ruvo.type.bodyStrong, color = if (r.makesIt) c.ink else c.warning)
+            Text(runwaySubline(r), style = Ruvo.type.bodyStrong, color = if (r.makesIt) c.onHero else c.sun)
             Spacer(Modifier.height(Space.xxs))
-            Text("${IndianFormat.rupees(r.fuel.coerceAtLeast(0))} of Fuel at about ${IndianFormat.rupees(r.dailySpend)} a day", style = Ruvo.type.caption, color = c.inkSoft)
+            Text("${IndianFormat.rupees(r.fuel.coerceAtLeast(0))} of Fuel at about ${IndianFormat.rupees(r.dailySpend)} a day", style = Ruvo.type.caption, color = c.onHero.copy(alpha = 0.7f))
+            Spacer(Modifier.height(Space.md))
+            Row(
+                Modifier.clip(RoundedCornerShape(Radius.chip)).background(c.onHero.copy(alpha = 0.12f)).padding(horizontal = Space.sm, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                val dot = when (mood.level) {
+                    Insights.MoodLevel.COMFORTABLE -> c.future
+                    Insights.MoodLevel.WATCH -> c.fuel
+                    Insights.MoodLevel.PLAN -> c.warning
+                }
+                Box(Modifier.size(8.dp).clip(CircleShape).background(dot))
+                Spacer(Modifier.width(6.dp))
+                Text(mood.title, style = Ruvo.type.label, color = c.onHero)
+            }
         }
     }
 }
-
 /**
  * The day strip: one liquid-filled pill per day to the next money. Covered days are full, the day money runs
  * out is part-filled, days after it are empty and outlined, and the income day glows.

@@ -191,4 +191,33 @@ object Radius {
     val sheet = 34.dp
 }
 
+/**
+ * Book-cover palettes for the Guide shelf: background, shape, highlight. Printed-poster colours from the
+ * brand, the same in both moods, because covers are objects, not surfaces.
+ */
+object Covers {
+    private val Navy = Color(0xFF0F1B3D)
+    private val White = Color(0xFFFFFFFF)
+    private val Amber = Color(0xFFFDB913)
+    private val Sky = Color(0xFF4A9BEA)
+    private val Lavender = Color(0xFFB79CF2)
+    private val Coral = Color(0xFFF26B1D)
+    private val Cream = Color(0xFFFFE2B8)
+    private val Ice = Color(0xFFCFE6FA)
+
+    val palettes: List<Triple<Color, Color, Color>> = listOf(
+        Triple(Amber, Navy, White),
+        Triple(Navy, Amber, Sky),
+        Triple(Sky, Navy, White),
+        Triple(Lavender, Navy, Amber),
+        Triple(Coral, Navy, Cream),
+        Triple(White, Navy, Coral),
+        Triple(Navy, Lavender, Amber),
+        Triple(Ice, Navy, Amber),
+        Triple(Cream, Coral, Navy),
+    )
+    val label: Color = White
+    val labelInk: Color = Navy
+}
+
 val LocalRuvoColors = staticCompositionLocalOf { Daybreak }

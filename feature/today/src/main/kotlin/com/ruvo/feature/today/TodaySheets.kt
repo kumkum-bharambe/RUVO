@@ -92,7 +92,96 @@ fun WhySheet(onDismiss: () -> Unit) {
             }
         }
         Spacer(Modifier.height(Space.lg))
+        Eyebrow("What can change it?")
+        Spacer(Modifier.height(Space.xs))
+        listOf(
+            "New income" to "Adds to Fuel the day it arrives",
+            "A large purchase" to "Uses Fuel all at once",
+            "A new commitment" to "Moves money from Fuel to Fixed",
+            "Your spending pattern" to "A higher daily spend shortens it",
+        ).forEach { (what, how) ->
+            RuvoCard(Modifier.fillMaxWidth().padding(bottom = Space.xs), padding = androidx.compose.foundation.layout.PaddingValues(Space.md)) {
+                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    Text(what, Modifier.weight(1f), style = Ruvo.type.bodyStrong, color = c.ink)
+                    Text(how, Modifier.weight(1.3f), style = Ruvo.type.caption, color = c.inkSoft)
+                }
+            }
+        }
+        Spacer(Modifier.height(Space.lg))
         PrimaryButton("Got it", onDismiss, Modifier.fillMaxWidth())
+    }
+}
+
+/**
+ * Your week in three minutes: what you spent against last week, which categories moved, and a quick
+ * "was it worth it?" on the biggest purchases. Answers shape future Guide ideas; there is no wrong answer.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun WeeklyReviewSheet(onDismiss: () -> Unit, onOpenGuide: () -> Unit) {
+    val state by RuvoGraph.repository.state.collectAsStateWithLifecycle()
+    val c = Ruvo.colors
+    val scope = rememberCoroutineScope()
+    val view = LocalView.current
+    val week = remember(state.input.transactions, state.today) { com.ruvo.engine.Insights.week(state.input.transactions, state.today) }
+    RuvoSheet("Your week in 3 minutes", onDismiss, eyebrow = "Weekly review") {
+        RuvoCard(Modifier.fillMaxWidth(), brush = c.heroBrush, border = null) {
+            Eyebrow("Total spent this week", color = c.onHero.copy(alpha = 0.7f))
+            Amount(week.total, style = Ruvo.type.display, color = c.onHero)
+            val change = week.changePercent
+            Text(
+                when {
+                    change == null -> "Nothing to compare with last week yet."
+                    change > 0 -> "$change% more than last week"
+                    change < 0 -> "${-change}% less than last week"
+                    else -> "The same as last week"
+                },
+                style = Ruvo.type.body, color = c.onHero.copy(alpha = 0.85f),
+            )
+        }
+        if (week.categories.isEmpty()) {
+            Spacer(Modifier.height(Space.md))
+            Text("No spending recorded this week yet.", style = Ruvo.type.body, color = c.inkSoft)
+        }
+        val top = week.categories.maxOfOrNull { it.thisPeriod }?.coerceAtLeast(1) ?: 1
+        week.categories.take(5).forEach { cat ->
+            Spacer(Modifier.height(Space.sm))
+            Row(Modifier.fillMaxWidth()) {
+                Text(cat.category, Modifier.weight(1f), style = Ruvo.type.bodyStrong, color = c.ink)
+                val p = cat.changePercent
+                if (p != null) Text(if (p >= 0) "+$p%" else "$p%", style = Ruvo.type.label, color = if (p > 0) c.warning else c.futureInk)
+                Spacer(Modifier.padding(start = Space.sm))
+                Amount(cat.thisPeriod, style = Ruvo.type.label)
+            }
+            Spacer(Modifier.height(4.dp))
+            FillBar(cat.thisPeriod.toFloat() / top, c.fuel)
+        }
+        val big = state.input.transactions
+            .filter { it.countsAsSpending && java.time.temporal.ChronoUnit.DAYS.between(it.date, state.today) in 0..6 }
+            .sortedByDescending { it.yourShare }.take(3)
+        if (big.isNotEmpty()) {
+            Spacer(Modifier.height(Space.lg))
+            Eyebrow("Review a purchase")
+            Text("Was it worth it? Your answers shape future ideas. There's no wrong answer.", style = Ruvo.type.caption, color = c.inkSoft)
+            big.forEach { t ->
+                val verdict = state.settings.reviewOf(t.id)
+                RuvoCard(Modifier.fillMaxWidth().padding(top = Space.xs)) {
+                    Row {
+                        Text(t.merchant.ifBlank { t.category }, Modifier.weight(1f), style = Ruvo.type.bodyStrong, color = c.ink)
+                        Amount(t.yourShare)
+                    }
+                    Text("${t.category} · ${IndianFormat.date(t.date, state.today)}", style = Ruvo.type.caption, color = c.inkFaint)
+                    Spacer(Modifier.height(Space.xs))
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.xs), verticalArrangement = Arrangement.spacedBy(Space.xs)) {
+                        listOf("WORTH" to "Worth it", "NOT" to "Not worth it", "UNSURE" to "Unsure").forEach { (k, label) ->
+                            Chip(label, verdict == k, { scope.launch { RuvoGraph.repository.reviewPurchase(t.id, k); Haptics.tick(view) } })
+                        }
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(Space.lg))
+        PrimaryButton("Open Ruvo Guide", { onDismiss(); onOpenGuide() }, Modifier.fillMaxWidth())
     }
 }
 

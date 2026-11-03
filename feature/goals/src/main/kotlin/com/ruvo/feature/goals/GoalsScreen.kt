@@ -74,6 +74,9 @@ import com.ruvo.design.RuvoIcons
 import com.ruvo.design.RuvoSheet
 import com.ruvo.design.SectionTitle
 import com.ruvo.design.Space
+import com.ruvo.design.reveal
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.draw.clip
 import com.ruvo.design.parseRupees
 import com.ruvo.engine.Goal
 import com.ruvo.engine.IndianFormat
@@ -100,7 +103,7 @@ fun rememberTilt(): State<Float> {
                 // Low-pass filter so the liquid settles instead of jittering.
                 val raw = (-e.values[0] / SensorManager.GRAVITY_EARTH).coerceIn(-1f, 1f)
                 smoothed = smoothed * 0.85f + raw * 0.15f
-                // Ignore sensor noise (about 1°) so a phone at rest lets the liquid settle completely.
+                // Ignore sensor noise (about 1Ã‚Â°) so a phone at rest lets the liquid settle completely.
                 if (abs(smoothed - tilt.floatValue) > 0.02f) tilt.floatValue = smoothed
             }
             override fun onAccuracyChanged(s: Sensor?, a: Int) {}
@@ -111,16 +114,21 @@ fun rememberTilt(): State<Float> {
     return tilt
 }
 
+/**
+ * Goals: liquid jars that tilt with the phone, insights on when each lands, perks and the monthly review.
+ * [startNewGoal] opens the new-goal sheet straight away, e.g. from a Guide book's last page.
+ */
 @Composable
-fun GoalsScreen() {
+fun GoalsScreen(startNewGoal: Boolean = false, onNewGoalShown: () -> Unit = {}, onWeekly: () -> Unit = {}) {
     val state by RuvoGraph.repository.state.collectAsStateWithLifecycle()
     var openGoal by remember { mutableStateOf<String?>(null) }
     var newGoal by remember { mutableStateOf(false) }
+    androidx.compose.runtime.LaunchedEffect(startNewGoal) { if (startNewGoal) { newGoal = true; onNewGoalShown() } }
     var review by remember { mutableStateOf(false) }
     val tilt by rememberTilt()
     val c = Ruvo.colors
 
-    LazyColumn(Modifier.fillMaxSize().background(c.canvas), contentPadding = PaddingValues(bottom = Space.dockClearance)) {
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = Space.dockClearance)) {
         item {
             Column(Modifier.statusBarsPadding().padding(horizontal = Space.gutter, vertical = Space.md)) {
                 Eyebrow("Goals")
@@ -133,8 +141,8 @@ fun GoalsScreen() {
         }
         item {
             Column(Modifier.padding(horizontal = Space.gutter), verticalArrangement = Arrangement.spacedBy(Space.sm)) {
-                state.goals.chunked(2).forEach { pair ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
+                state.goals.chunked(2).forEachIndexed { row, pair ->
+                    Row(Modifier.reveal(row), horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
                         pair.forEach { g ->
                             GoalJarCard(g, state.goalShapes[g.id] ?: 0, tilt, state.today, Modifier.weight(1f)) { openGoal = g.id }
                         }
@@ -144,6 +152,7 @@ fun GoalsScreen() {
                 if (state.goals.size % 2 == 0) NewGoalCard(Modifier.fillMaxWidth()) { newGoal = true }
             }
         }
+        if (state.goals.isNotEmpty()) item { GoalInsights(state, Modifier.padding(horizontal = Space.gutter).padding(top = Space.md).reveal(3)) }
         item { SectionTitle("Perks", Modifier.padding(horizontal = Space.gutter)) }
         item {
             Text("Ways to save and earn. Sample offers with made-up brands; no ads, no tracking.", Modifier.padding(horizontal = Space.gutter), style = Ruvo.type.caption, color = c.inkFaint)
@@ -153,16 +162,58 @@ fun GoalsScreen() {
             }
         }
         item {
-            RuvoCard(Modifier.padding(horizontal = Space.gutter).padding(top = Space.xl), onClick = { review = true }, onClickLabel = "Open monthly review") {
-                Eyebrow("Monthly review")
-                Text("Your month on one screen", style = Ruvo.type.title, color = c.ink)
-                Text("What came in, what went out, what you protected.", style = Ruvo.type.caption, color = c.inkSoft)
+            RuvoCard(Modifier.padding(horizontal = Space.gutter).padding(top = Space.xl), brush = c.heroBrush, border = null, elevated = true, onClick = { review = true }, onClickLabel = "Open monthly review") {
+                Eyebrow("Monthly review", color = c.onHero.copy(alpha = 0.7f))
+                Text("Your month in 30 seconds", style = Ruvo.type.title, color = c.onHero)
+                Text("What came in, what went out, what you protected.", style = Ruvo.type.caption, color = c.onHero.copy(alpha = 0.7f))
             }
         }
     }
     openGoal?.let { id -> GoalSheet(id, state) { openGoal = null } }
     if (newGoal) NewGoalSheet { newGoal = false }
-    if (review) MonthlyReviewSheet(state) { review = false }
+    if (review) MonthlyReviewSheet(state, onDismiss = { review = false }, onWeekly = onWeekly)
+}
+
+/** Where a goal stands: on track if what is protected keeps pace with a straight line to the target date. */
+internal fun onTrack(g: Goal, today: LocalDate): Boolean? {
+    val end = g.targetDate ?: return null
+    if (g.isComplete) return true
+    val months = java.time.temporal.ChronoUnit.MONTHS.between(today.withDayOfMonth(1), end.withDayOfMonth(1)).coerceAtLeast(0)
+    val reachable = g.protectedAmount + g.monthlyContribution * months
+    return reachable >= g.target
+}
+
+/** Goal insights: when each goal lands at its current pace, and what would bring the date in reach. */
+@Composable
+private fun GoalInsights(state: AppState, modifier: Modifier) {
+    val c = Ruvo.colors
+    RuvoCard(modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(RuvoIcons.Spark, null, Modifier.size(18.dp), tint = c.futureInk)
+            Spacer(Modifier.width(Space.xs))
+            Eyebrow("Goal insights", color = c.futureInk)
+        }
+        state.goals.forEach { g ->
+            Spacer(Modifier.height(Space.sm))
+            val left = (g.target - g.protectedAmount).coerceAtLeast(0)
+            val line = when {
+                g.isComplete -> "Done. Every rupee is there."
+                g.monthlyContribution > 0 -> {
+                    val months = ((left + g.monthlyContribution - 1) / g.monthlyContribution).toInt()
+                    val lands = state.today.plusMonths(months.toLong())
+                    val ok = onTrack(g, state.today)
+                    val base = "At ${IndianFormat.rupees(g.monthlyContribution)} a month it lands around ${lands.month.name.lowercase().replaceFirstChar { it.uppercase() }} ${lands.year}."
+                    if (ok == false && g.targetDate != null) {
+                        val m = java.time.temporal.ChronoUnit.MONTHS.between(state.today.withDayOfMonth(1), g.targetDate!!.withDayOfMonth(1)).coerceAtLeast(1)
+                        "$base To make ${IndianFormat.date(g.targetDate!!)}, try about ${IndianFormat.rupees(left / m)} a month."
+                    } else base
+                }
+                else -> "No monthly amount yet. Even a small regular pour makes the date real."
+            }
+            Text(g.name, style = Ruvo.type.bodyStrong, color = c.ink)
+            Text(line, style = Ruvo.type.caption, color = c.inkSoft)
+        }
+    }
 }
 
 @Composable
@@ -173,9 +224,21 @@ private fun GoalJarCard(g: Goal, shape: Int, tilt: Float, today: LocalDate, modi
         Jar(g.progress.toFloat(), shape, tilt, accent, Modifier.fillMaxWidth().height(132.dp)
             .clearAndSetSemantics { contentDescription = "${g.name}, ${(g.progress * 100).toInt()} percent saved" })
         Spacer(Modifier.height(Space.sm))
-        Text(g.name, style = Ruvo.type.bodyStrong, color = c.ink, maxLines = 1)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(g.name, Modifier.weight(1f), style = Ruvo.type.bodyStrong, color = c.ink, maxLines = 1)
+            Text("${(g.progress * 100).toInt()}%", style = Ruvo.type.bodyStrong, color = c.futureInk)
+        }
         Text("${IndianFormat.rupees(g.protectedAmount)} of ${IndianFormat.compact(g.target)}", style = Ruvo.type.caption, color = c.inkSoft)
         g.targetDate?.let { Text("by ${IndianFormat.date(it, today)}", style = Ruvo.type.caption, color = c.inkFaint) }
+        val ok = onTrack(g, today)
+        if (ok != null) {
+            Spacer(Modifier.height(Space.xs))
+            com.ruvo.design.Tag(
+                if (g.isComplete) "Complete" else if (ok) "On track" else "Catching up",
+                color = (if (g.isComplete) c.sun else if (ok) c.future else c.fuel).copy(alpha = 0.22f),
+                content = if (ok) c.futureInk else c.fuelInk,
+            )
+        }
     }
 }
 
@@ -190,7 +253,7 @@ fun Jar(progress: Float, shape: Int, tilt: Float, accent: androidx.compose.ui.gr
     Canvas(modifier) {
         val outline = jarPath(shape)
         clipPath(outline) {
-            drawRect(c.hairline.copy(alpha = 0.35f))
+            drawRect(c.ink.copy(alpha = if (c.isDark) 0.08f else 0.05f))
             val top = size.height * (1f - level * 0.86f) - 2f
             val lean = slosh * size.width * 0.18f
             val p = Path().apply {
@@ -207,7 +270,7 @@ fun Jar(progress: Float, shape: Int, tilt: Float, accent: androidx.compose.ui.gr
             // A soft highlight down the glass.
             drawRect(androidx.compose.ui.graphics.Color.White.copy(alpha = 0.16f), topLeft = Offset(size.width * 0.18f, size.height * 0.2f), size = androidx.compose.ui.geometry.Size(size.width * 0.06f, size.height * 0.6f))
         }
-        drawPath(outline, c.ink.copy(alpha = 0.55f), style = Stroke(width = 1.6.dp.toPx()))
+        drawPath(outline, c.ink.copy(alpha = 0.4f), style = Stroke(width = 1.6.dp.toPx()))
     }
 }
 
@@ -242,8 +305,10 @@ private fun DrawScope.jarPath(shape: Int): Path {
 @Composable
 private fun NewGoalCard(modifier: Modifier, onClick: () -> Unit) {
     val c = Ruvo.colors
-    RuvoCard(modifier, color = c.canvas, onClick = onClick, onClickLabel = "Add a goal") {
-        Icon(RuvoIcons.Plus, null, Modifier.size(28.dp), tint = c.future)
+    RuvoCard(modifier, onClick = onClick, onClickLabel = "Add a goal") {
+        Box(Modifier.size(44.dp).clip(androidx.compose.foundation.shape.CircleShape).background(c.amberBrush), contentAlignment = Alignment.Center) {
+            Icon(RuvoIcons.Plus, null, Modifier.size(24.dp), tint = c.onAccent)
+        }
         Spacer(Modifier.height(Space.xs))
         Text("New goal", style = Ruvo.type.bodyStrong, color = c.ink)
         Text("A trip, a laptop, a cushion", style = Ruvo.type.caption, color = c.inkFaint)
@@ -254,11 +319,11 @@ private fun NewGoalCard(modifier: Modifier, onClick: () -> Unit) {
 private fun PerkCard(p: Perks.Perk, daily: Long) {
     val c = Ruvo.colors
     val days = Perks.daysSaved(p, daily)
-    RuvoCard(Modifier.width(220.dp), color = c.surface) {
+    RuvoCard(Modifier.width(220.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(RuvoIcons.Perk, null, Modifier.size(18.dp), tint = c.sun)
+            Icon(RuvoIcons.Perk, null, Modifier.size(18.dp), tint = c.fuelInk)
             Spacer(Modifier.width(Space.xxs))
-            Eyebrow("${p.kind} · sample")
+            Eyebrow("${p.kind} Ã‚Â· sample")
         }
         Spacer(Modifier.height(Space.xs))
         Text(p.brand, style = Ruvo.type.title, color = c.ink)
@@ -297,14 +362,14 @@ private fun GoalSheet(id: String, state: AppState, onDismiss: () -> Unit) {
                 listOf(100, 500, 1_000).forEach { v ->
                     val paise = v * 100L
                     val days = if (daily > 0) (paise / daily).toInt() else 0
-                    Chip("${IndianFormat.rupees(paise)} · ${days}d", false, {
+                    Chip("${IndianFormat.rupees(paise)} Ã‚Â· ${days}d", false, {
                         Haptics.confirm(view)
                         scope.launch { RuvoGraph.repository.pour(g.id, paise) }
                     }, accent = c.future)
                 }
             }
             Spacer(Modifier.height(Space.sm))
-            RuvoField(custom, { custom = it }, "Another amount", number = true, prefix = "₹ ")
+            RuvoField(custom, { custom = it }, "Another amount", number = true, prefix = "Ã¢â€šÂ¹ ")
             Spacer(Modifier.height(Space.sm))
             val amount = parseRupees(custom) ?: 0
             PrimaryButton(
@@ -321,9 +386,9 @@ private fun GoalSheet(id: String, state: AppState, onDismiss: () -> Unit) {
             val take = (parseRupees(custom) ?: 0).coerceAtMost(g.protectedAmount)
             Text("It is your money and your call. Moving it back to Fuel adds to your runway and moves the goal back.", style = Ruvo.type.body, color = c.ink)
             Spacer(Modifier.height(Space.sm))
-            RuvoField(custom, { custom = it }, "How much?", number = true, prefix = "₹ ")
+            RuvoField(custom, { custom = it }, "How much?", number = true, prefix = "Ã¢â€šÂ¹ ")
             if (take > 0 && daily > 0) {
-                Text("Runway +${IndianFormat.days((take / daily).toInt())} · ${g.name} back to ${IndianFormat.rupees(g.protectedAmount - take)}", Modifier.padding(top = Space.xs), style = Ruvo.type.caption, color = c.inkSoft)
+                Text("Runway +${IndianFormat.days((take / daily).toInt())} Ã‚Â· ${g.name} back to ${IndianFormat.rupees(g.protectedAmount - take)}", Modifier.padding(top = Space.xs), style = Ruvo.type.caption, color = c.inkSoft)
             }
             Spacer(Modifier.height(Space.md))
             Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
@@ -338,7 +403,7 @@ private fun GoalSheet(id: String, state: AppState, onDismiss: () -> Unit) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun NewGoalSheet(onDismiss: () -> Unit) {
+fun NewGoalSheet(onDismiss: () -> Unit) {
     var name by remember { mutableStateOf("") }
     var target by remember { mutableStateOf("") }
     var monthly by remember { mutableStateOf("") }
@@ -354,9 +419,9 @@ private fun NewGoalSheet(onDismiss: () -> Unit) {
         Spacer(Modifier.height(Space.sm))
         RuvoField(name, { name = it }, "Goal name")
         Spacer(Modifier.height(Space.sm))
-        RuvoField(target, { target = it }, "Target", number = true, prefix = "₹ ")
+        RuvoField(target, { target = it }, "Target", number = true, prefix = "Ã¢â€šÂ¹ ")
         Spacer(Modifier.height(Space.sm))
-        RuvoField(monthly, { monthly = it }, "Each month (optional)", number = true, prefix = "₹ ")
+        RuvoField(monthly, { monthly = it }, "Each month (optional)", number = true, prefix = "Ã¢â€šÂ¹ ")
         Spacer(Modifier.height(Space.md))
         Eyebrow("By when")
         Spacer(Modifier.height(Space.xs))
@@ -367,7 +432,7 @@ private fun NewGoalSheet(onDismiss: () -> Unit) {
         Eyebrow("Pick a jar")
         Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
             (0..2).forEach { s ->
-                RuvoCard(Modifier.weight(1f), color = if (shape == s) c.future.copy(alpha = 0.16f) else c.surface, onClick = { shape = s }, padding = PaddingValues(Space.sm)) {
+                RuvoCard(Modifier.weight(1f), color = if (shape == s) c.future.copy(alpha = 0.2f) else androidx.compose.ui.graphics.Color.Unspecified, onClick = { shape = s }, padding = PaddingValues(Space.sm)) {
                     Jar(0.5f, s, tilt, c.future, Modifier.fillMaxWidth().height(70.dp))
                 }
             }
@@ -383,25 +448,49 @@ private fun NewGoalSheet(onDismiss: () -> Unit) {
     }
 }
 
+/** Your month in 30 seconds: what came in, went out, was saved and is still free, then what to do next. */
 @Composable
-private fun MonthlyReviewSheet(state: AppState, onDismiss: () -> Unit) {
+fun MonthlyReviewSheet(state: AppState, onDismiss: () -> Unit, onWeekly: () -> Unit = {}) {
     val c = Ruvo.colors
     val month = state.today.withDayOfMonth(1)
     val tx = state.activity.map { it.txn }.filter { !it.date.isBefore(month) && it.status != com.ruvo.engine.TxnStatus.IGNORED }
     val came = tx.filter { it.direction == com.ruvo.engine.Direction.CREDIT && it.kind == com.ruvo.engine.TxnKind.INCOME }.sumOf { it.amount }
     val went = tx.filter { it.countsAsSpending }.sumOf { it.yourShare }
     val top = tx.filter { it.countsAsSpending }.groupBy { it.category }.mapValues { (_, l) -> l.sumOf { it.yourShare } }.maxByOrNull { it.value }
-    RuvoSheet("${month.month.name.lowercase().replaceFirstChar { it.uppercase() }} so far", onDismiss, eyebrow = "Monthly review") {
+    var giveJob by remember { mutableStateOf(false) }
+    RuvoSheet("Your month in 30 seconds", onDismiss, eyebrow = "${month.month.name.lowercase().replaceFirstChar { it.uppercase() }} so far") {
         Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
-            RuvoCard(Modifier.weight(1f)) { Eyebrow("Came in"); Amount(came, style = Ruvo.type.title, color = c.fuel) }
-            RuvoCard(Modifier.weight(1f)) { Eyebrow("Went out"); Amount(went, style = Ruvo.type.title) }
+            RuvoCard(Modifier.weight(1f).reveal(0)) { Eyebrow("Received"); Amount(came, style = Ruvo.type.title, color = c.futureInk) }
+            RuvoCard(Modifier.weight(1f).reveal(1), brush = c.heroBrush, border = null) { Eyebrow("Spent", color = c.onHero.copy(alpha = 0.7f)); Amount(went, style = Ruvo.type.title, color = c.onHero) }
         }
         Spacer(Modifier.height(Space.sm))
-        RuvoCard { Eyebrow("Protected for goals"); Amount(state.runway.futureProtected, style = Ruvo.type.title, color = c.future) }
-        Spacer(Modifier.height(Space.md))
-        top?.let { Text("Biggest category: ${it.key}, ${IndianFormat.rupees(it.value)}.", style = Ruvo.type.body, color = c.ink) }
-        Text("One thing to try next month: move a little to a goal the day money arrives.", style = Ruvo.type.body, color = c.inkSoft)
+        Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
+            RuvoCard(Modifier.weight(1f).reveal(2), brush = c.bucketBrush(com.ruvo.engine.Bucket.FUTURE), border = null) { Eyebrow("Saved", color = c.onAccent.copy(alpha = 0.7f)); Amount(state.runway.futureProtected, style = Ruvo.type.title, color = c.onAccent) }
+            RuvoCard(Modifier.weight(1f).reveal(3), brush = c.amberBrush, border = null) { Eyebrow("Still free", color = c.onAccent.copy(alpha = 0.7f)); Amount(state.runway.fuel.coerceAtLeast(0), style = Ruvo.type.title, color = c.onAccent) }
+        }
+        Spacer(Modifier.height(Space.lg))
+        Text("What can you do next?", style = Ruvo.type.title, color = c.ink)
+        val firstGoal = state.goals.firstOrNull { !it.isComplete }
+        Spacer(Modifier.height(Space.xs))
+        NextStep("Save better", if (firstGoal != null) "You could move a little earlier toward ${firstGoal.name}, the day money arrives." else "Give your next money a job with a small goal.", "Give it a job") { giveJob = true }
+        top?.let { NextStep("Spending pattern", "${it.key} was your biggest category, at ${IndianFormat.rupees(it.value)}.", "See what changed") { onDismiss(); onWeekly() } }
+        NextStep("Plan ahead", "Bills and fees are predictable. Give the next one a date and set money aside early.", "Got it", onDismiss)
+        if (giveJob) {
+            if (firstGoal != null) GoalSheet(firstGoal.id, state) { giveJob = false } else NewGoalSheet { giveJob = false }
+        }
         Spacer(Modifier.height(Space.lg))
         PrimaryButton("Close", onDismiss, Modifier.fillMaxWidth())
+    }
+}
+
+@Composable
+private fun NextStep(label: String, text: String, action: String, onClick: () -> Unit) {
+    val c = Ruvo.colors
+    RuvoCard(Modifier.fillMaxWidth().padding(bottom = Space.xs)) {
+        Eyebrow(label, color = c.fuelInk)
+        Spacer(Modifier.height(Space.xxs))
+        Text(text, style = Ruvo.type.body, color = c.ink)
+        Spacer(Modifier.height(Space.sm))
+        com.ruvo.design.Chip(action, true, onClick)
     }
 }

@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.ruvo.engine.Cadence
 import com.ruvo.engine.SpendBasis
@@ -41,7 +42,21 @@ data class UserSettings(
     val upiVpa: String = "",
     val sortDay: Int = 7,
     val sortHour: Int = 19,
-)
+    /** Guide books the user has finished. */
+    val readBooks: Set<String> = emptySet(),
+    /** Ideas saved from a book or an insight, as "bookId:page". */
+    val savedIdeas: Set<String> = emptySet(),
+    /** Weekly review answers, as "txnId:WORTH|NOT|UNSURE". */
+    val purchaseReviews: Set<String> = emptySet(),
+    /** Shows •••• instead of the balance on Money. */
+    val hideBalance: Boolean = false,
+    /** Calm, occasional notifications. Each can be switched off. */
+    val notifyCapture: Boolean = true,
+    val notifyWeekly: Boolean = true,
+    val notifyGoals: Boolean = true,
+) {
+    fun reviewOf(txnId: String): String? = purchaseReviews.firstOrNull { it.startsWith("$txnId:") }?.substringAfter(":")
+}
 
 class SettingsStore(private val context: Context) {
 
@@ -62,6 +77,13 @@ class SettingsStore(private val context: Context) {
         val demoSms = booleanPreferencesKey("demo_sms")
         val spoken = booleanPreferencesKey("spoken_replies")
         val vpa = stringPreferencesKey("upi_vpa")
+        val read = stringSetPreferencesKey("read_books")
+        val ideas = stringSetPreferencesKey("saved_ideas")
+        val reviews = stringSetPreferencesKey("purchase_reviews")
+        val hide = booleanPreferencesKey("hide_balance")
+        val nCapture = booleanPreferencesKey("notify_capture")
+        val nWeekly = booleanPreferencesKey("notify_weekly")
+        val nGoals = booleanPreferencesKey("notify_goals")
     }
 
     val settings: Flow<UserSettings> = context.store.data.map { readFrom(it) }
@@ -87,6 +109,13 @@ class SettingsStore(private val context: Context) {
             p[K.demoSms] = s.demoSms
             p[K.spoken] = s.spokenReplies
             p[K.vpa] = s.upiVpa
+            p[K.read] = s.readBooks
+            p[K.ideas] = s.savedIdeas
+            p[K.reviews] = s.purchaseReviews
+            p[K.hide] = s.hideBalance
+            p[K.nCapture] = s.notifyCapture
+            p[K.nWeekly] = s.notifyWeekly
+            p[K.nGoals] = s.notifyGoals
         }
     }
 
@@ -107,5 +136,12 @@ class SettingsStore(private val context: Context) {
         demoSms = p[K.demoSms] ?: true,
         spokenReplies = p[K.spoken] ?: false,
         upiVpa = p[K.vpa] ?: "",
+        readBooks = p[K.read] ?: emptySet(),
+        savedIdeas = p[K.ideas] ?: emptySet(),
+        purchaseReviews = p[K.reviews] ?: emptySet(),
+        hideBalance = p[K.hide] ?: false,
+        notifyCapture = p[K.nCapture] ?: true,
+        notifyWeekly = p[K.nWeekly] ?: true,
+        notifyGoals = p[K.nGoals] ?: true,
     )
 }

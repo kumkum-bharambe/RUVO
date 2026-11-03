@@ -14,7 +14,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -33,6 +37,15 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ruvo.data.AppState
 import com.ruvo.data.RuvoGraph
 import com.ruvo.design.Amount
+import com.ruvo.design.IconCircle
+import com.ruvo.design.LegendDot
+import com.ruvo.design.Pill
+import com.ruvo.design.PillBars
+import com.ruvo.design.RuvoIcons
+import com.ruvo.design.Segment
+import com.ruvo.design.SegmentedControl
+import com.ruvo.design.SplitBar
+import com.ruvo.design.reveal
 import com.ruvo.design.Chip
 import com.ruvo.design.Eyebrow
 import com.ruvo.design.FillBar
@@ -52,45 +65,63 @@ import com.ruvo.design.parseRupees
 import com.ruvo.engine.Bucket
 import com.ruvo.engine.Direction
 import com.ruvo.engine.IndianFormat
+import com.ruvo.engine.Insights
 import com.ruvo.engine.TxnStatus
 import kotlinx.coroutines.launch
 
-private enum class MoneyTab(val label: String) { ACTIVITY("Activity"), BUCKETS("Buckets"), OWED("Owed to you") }
+private enum class MoneyTab(val label: String) { OVERVIEW("Overview"), ACTIVITY("Activity"), HISTORY("History"), OWED("Owed") }
 
+private enum class Period(val label: String, val days: Long?) { WEEK("This week", 7), LAST_WEEK("Last week", 14), MONTH("This month", 31), ALL("All", null) }
+
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun MoneyScreen(openTxn: (String) -> Unit) {
+fun MoneyScreen(openTxn: (String) -> Unit, openAdd: () -> Unit = {}) {
     val state by RuvoGraph.repository.state.collectAsStateWithLifecycle()
-    var tab by rememberSaveable { mutableStateOf(MoneyTab.ACTIVITY) }
+    var tab by rememberSaveable { mutableStateOf(MoneyTab.OVERVIEW) }
+    var period by rememberSaveable { mutableStateOf(Period.WEEK) }
     var balanceSheet by remember { mutableStateOf(false) }
     val c = Ruvo.colors
 
-    LazyColumn(Modifier.fillMaxSize().background(c.canvas), contentPadding = PaddingValues(bottom = Space.dockClearance)) {
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = Space.dockClearance)) {
         item {
-            Column(Modifier.statusBarsPadding().padding(horizontal = Space.gutter, vertical = Space.md)) {
-                Eyebrow("Money")
-                Text("Where it is, where it went", Modifier.semantics { heading() }, style = Ruvo.type.headline, color = c.ink)
-            }
-        }
-        item {
-            RuvoCard(Modifier.padding(horizontal = Space.gutter), color = c.ink, border = null, onClick = { balanceSheet = true }, onClickLabel = "Update balance") {
-                Eyebrow("You have", color = c.canvas.copy(alpha = 0.7f))
-                Amount(state.runway.balance, style = Ruvo.type.display, color = c.canvas)
-                Spacer(Modifier.height(Space.xxs))
-                Text("Across accounts and cash · tap to update", style = Ruvo.type.caption, color = c.canvas.copy(alpha = 0.7f))
-            }
-        }
-        item {
-            Row(Modifier.fillMaxWidth().padding(horizontal = Space.gutter, vertical = Space.md), horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
-                MoneyTab.entries.forEach { t ->
-                    val label = if (t == MoneyTab.OWED && state.owedToYou > 0) "${t.label} · ${IndianFormat.compact(state.owedToYou)}" else t.label
-                    Chip(label, tab == t, { tab = t })
+            Row(Modifier.statusBarsPadding().padding(horizontal = Space.gutter, vertical = Space.md), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Eyebrow("Money")
+                    Text("Where it is, where it went", Modifier.semantics { heading() }, style = Ruvo.type.headline, color = c.ink)
                 }
+                IconCircle(RuvoIcons.Plus, "Add a spend", openAdd, tint = c.onAccent, background = c.fuel)
             }
+        }
+        item { BalanceCard(state, Modifier.padding(horizontal = Space.gutter).reveal(0)) { balanceSheet = true } }
+        item {
+            SegmentedControl(
+                MoneyTab.entries.map { if (it == MoneyTab.OWED && state.owedToYou > 0) "Owed · ${IndianFormat.compact(state.owedToYou)}" else it.label },
+                tab.ordinal, { tab = MoneyTab.entries[it] },
+                Modifier.padding(horizontal = Space.gutter, vertical = Space.md).reveal(1),
+            )
         }
         when (tab) {
+            MoneyTab.OVERVIEW -> {
+                item { WhereItWent(state, Modifier.reveal(2)) }
+                item { Buckets(state) }
+            }
             MoneyTab.ACTIVITY -> {
-                val groups = state.activity.groupBy { it.txn.date }.toSortedMap(compareByDescending { it })
-                if (groups.isEmpty()) item { Empty("Nothing yet. Pull the Orb down to add a spend, or turn on SMS tracking in Settings.") }
+                item {
+                    FlowRow(Modifier.padding(horizontal = Space.gutter), horizontalArrangement = Arrangement.spacedBy(Space.xs), verticalArrangement = Arrangement.spacedBy(Space.xs)) {
+                        Period.entries.forEach { p -> Chip(p.label, period == p, { period = p }) }
+                    }
+                }
+                val inPeriod = state.activity.filter { entry ->
+                    val ago = state.today.toEpochDay() - entry.txn.date.toEpochDay()
+                    when (period) {
+                        Period.WEEK -> ago in 0..6
+                        Period.LAST_WEEK -> ago in 7..13
+                        Period.MONTH -> entry.txn.date.month == state.today.month && entry.txn.date.year == state.today.year
+                        Period.ALL -> true
+                    }
+                }
+                val groups = inPeriod.groupBy { it.txn.date }.toSortedMap(compareByDescending { it })
+                if (groups.isEmpty()) item { Empty(if (state.activity.isEmpty()) "Nothing yet. Pull the Orb down to add a spend, or turn on SMS tracking in Settings." else "Nothing in ${period.label.lowercase()}.") }
                 groups.forEach { (date, items) ->
                     item(key = "d$date") {
                         val out = items.filter { it.txn.direction == Direction.DEBIT && it.txn.status != TxnStatus.IGNORED }.sumOf { it.txn.yourShare }
@@ -102,13 +133,130 @@ fun MoneyScreen(openTxn: (String) -> Unit) {
                     items.forEach { entry -> item(key = entry.txn.id) { TxnRow(entry, state, openTxn) } }
                 }
             }
-            MoneyTab.BUCKETS -> item { Buckets(state) }
+            MoneyTab.HISTORY -> item { History(state) }
             MoneyTab.OWED -> item { Owed(state) }
         }
     }
     if (balanceSheet) BalanceSheet(state) { balanceSheet = false }
 }
 
+/** The balance on navy, with how it splits into goals, planned and yours to spend. Can be hidden. */
+@Composable
+private fun BalanceCard(state: AppState, modifier: Modifier, onUpdate: () -> Unit) {
+    val c = Ruvo.colors
+    val r = state.runway
+    val scope = rememberCoroutineScope()
+    val hidden = state.settings.hideBalance
+    RuvoCard(modifier.fillMaxWidth(), brush = c.heroBrush, border = null, elevated = true, onClick = onUpdate, onClickLabel = "Update balance") {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Eyebrow("You have", color = c.onHero.copy(alpha = 0.7f))
+                if (hidden) Text("₹ ••••", style = Ruvo.type.display, color = c.onHero)
+                else Amount(r.balance, style = Ruvo.type.display, color = c.onHero)
+            }
+            IconCircle(
+                if (hidden) RuvoIcons.Lock else RuvoIcons.Check, if (hidden) "Show balance" else "Hide balance",
+                { scope.launch { RuvoGraph.repository.setHideBalance(!hidden) } },
+                tint = c.onHero, background = c.onHero.copy(alpha = 0.12f),
+            )
+        }
+        Spacer(Modifier.height(Space.sm))
+        val total = (r.fixedReserved + r.futureProtected + r.fuel.coerceAtLeast(0)).toFloat().coerceAtLeast(1f)
+        SplitBar(listOf(Segment(r.futureProtected / total, c.future), Segment(r.fixedReserved / total, c.fixed), Segment(r.fuel.coerceAtLeast(0) / total, c.fuel)))
+        Spacer(Modifier.height(Space.sm))
+        Row {
+            listOf(Triple(c.future, "In goals", r.futureProtected), Triple(c.fixed, "Planned", r.fixedReserved), Triple(c.fuel, "Yours to use", r.fuel.coerceAtLeast(0))).forEach { (col, label, v) ->
+                Column(Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        androidx.compose.foundation.layout.Box(Modifier.padding(end = 6.dp).size(8.dp).clip(CircleShape).background(col))
+                        Text(label, style = Ruvo.type.caption, color = c.onHero.copy(alpha = 0.7f), maxLines = 1)
+                    }
+                    if (hidden) Text("••••", style = Ruvo.type.bodyStrong, color = c.onHero) else Amount(v, style = Ruvo.type.bodyStrong, color = c.onHero)
+                }
+            }
+        }
+        Spacer(Modifier.height(Space.xs))
+        Text("Across accounts and cash · tap to update", style = Ruvo.type.caption, color = c.onHero.copy(alpha = 0.6f))
+    }
+}
+
+/** Spending by category over the last 30 days. */
+@Composable
+private fun WhereItWent(state: AppState, modifier: Modifier) {
+    val c = Ruvo.colors
+    val cats = remember(state.input.transactions, state.today) { Insights.byCategory(state.input.transactions, state.today, 30) }
+    if (cats.isEmpty()) return
+    val top = cats.first().second.toFloat().coerceAtLeast(1f)
+    val palette = listOf(c.fuel, c.future, c.fixed, c.warning, c.sun, c.inkFaint)
+    RuvoCard(Modifier.padding(horizontal = Space.gutter).fillMaxWidth().then(modifier)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Eyebrow("Where it went")
+                Amount(cats.sumOf { it.second }, style = Ruvo.type.title)
+            }
+            Text("last 30 days", style = Ruvo.type.caption, color = c.inkFaint)
+        }
+        cats.take(6).forEachIndexed { i, (cat, v) ->
+            Spacer(Modifier.height(Space.sm))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(cat, Modifier.width(104.dp), style = Ruvo.type.label, color = c.ink, maxLines = 1)
+                FillBar(v / top, palette[i % palette.size], Modifier.weight(1f))
+                Spacer(Modifier.width(Space.sm))
+                Amount(v, style = Ruvo.type.label)
+            }
+        }
+    }
+}
+
+/** Received and spent for the last three months, as paired pills, plus each month's numbers. */
+@Composable
+private fun History(state: AppState) {
+    val c = Ruvo.colors
+    val months = remember(state.input.transactions, state.today) { Insights.months(state.input.transactions, state.today, 3) }
+    Column(Modifier.padding(horizontal = Space.gutter)) {
+        RuvoCard(Modifier.fillMaxWidth().reveal(2)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Received and spent", Modifier.weight(1f), style = Ruvo.type.title, color = c.ink)
+                Text("Last 3 months", style = Ruvo.type.caption, color = c.inkFaint)
+            }
+            Spacer(Modifier.height(Space.md))
+            val max = months.maxOfOrNull { maxOf(it.received, it.spent) }?.toFloat()?.coerceAtLeast(1f) ?: 1f
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                months.forEach { m ->
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        PillBars(
+                            listOf(
+                                Pill("", m.received / max * 100f, spoken = "${m.month.month.name.lowercase()} received ${IndianFormat.spoken(m.received)}"),
+                                Pill("", m.spent / max * 100f, highlight = true, spoken = "spent ${IndianFormat.spoken(m.spent)}"),
+                            ),
+                            Modifier.width(64.dp), height = 120.dp, color = c.future, highlightColor = c.fuel,
+                        )
+                        Text(m.month.month.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.ENGLISH), style = Ruvo.type.label, color = c.inkSoft)
+                    }
+                }
+            }
+            Spacer(Modifier.height(Space.sm))
+            Row(horizontalArrangement = Arrangement.spacedBy(Space.md)) {
+                LegendDot(c.future, "Received")
+                LegendDot(c.fuel, "Spent")
+            }
+        }
+        months.reversed().forEachIndexed { i, m ->
+            RuvoCard(Modifier.fillMaxWidth().padding(top = Space.xs).reveal(3 + i)) {
+                Text(m.month.month.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.ENGLISH) + " " + m.month.year, style = Ruvo.type.bodyStrong, color = c.ink)
+                Spacer(Modifier.height(Space.xs))
+                Row {
+                    listOf("Received" to m.received, "Spent" to m.spent, "Left over" to m.leftOver).forEach { (k, v) ->
+                        Column(Modifier.weight(1f)) {
+                            Eyebrow(k)
+                            Amount(v, style = Ruvo.type.label, color = if (k == "Left over" && v < 0) c.warning else c.ink)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
 @Composable
 private fun Empty(text: String) {
     Text(text, Modifier.padding(Space.gutter), style = Ruvo.type.body, color = Ruvo.colors.inkSoft)
@@ -126,15 +274,15 @@ private fun TxnRow(entry: com.ruvo.data.ActivityItem, state: AppState, open: (St
         if (t.othersShare > 0) add("shared")
         if (t.status == TxnStatus.TO_SORT) add("to sort")
         if (ignored) add("ignored")
-    }.joinToString(" · ")
+    }.joinToString(" Â· ")
     ListRow(
         title = t.merchant, subtitle = tags, modifier = Modifier.padding(horizontal = Space.gutter),
-        leading = { MerchantTile(t.merchant, if (credit) c.fuel else c.bucket(t.bucket)) },
+        leading = { MerchantTile(t.merchant, if (credit) c.future else c.bucket(t.bucket)) },
         onClick = { open(t.id) },
     ) {
         Amount(
             if (credit) t.amount else -t.yourShare,
-            color = when { ignored -> c.inkFaint; credit -> c.fuel; else -> c.ink }, signed = credit,
+            color = when { ignored -> c.inkFaint; credit -> c.futureInk; else -> c.ink }, signed = credit,
         )
     }
 }
@@ -144,12 +292,12 @@ private fun Buckets(state: AppState) {
     val c = Ruvo.colors
     val r = state.runway
     val total = (r.fixedReserved + r.futureProtected + r.fuel.coerceAtLeast(0)).coerceAtLeast(1)
-    Column(Modifier.padding(horizontal = Space.gutter), verticalArrangement = Arrangement.spacedBy(Space.sm)) {
+    Column(Modifier.padding(horizontal = Space.gutter).padding(top = Space.sm), verticalArrangement = Arrangement.spacedBy(Space.sm)) {
         listOf(Bucket.FIXED to r.fixedReserved, Bucket.FUEL to r.fuel.coerceAtLeast(0), Bucket.FUTURE to r.futureProtected).forEach { (b, amount) ->
             RuvoCard {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Eyebrow(bucketName(b), color = c.bucket(b))
+                        Eyebrow(bucketName(b), color = c.bucketInk(b))
                         Text(bucketMeaning(b), style = Ruvo.type.caption, color = c.inkSoft)
                     }
                     Amount(amount, style = Ruvo.type.title)
@@ -192,7 +340,7 @@ private fun Owed(state: AppState) {
             Empty("Nobody owes you anything. Open a payment and tap Shared to split it.")
             return@Column
         }
-        RuvoCard(color = c.fuel.copy(alpha = if (c.isDark) 0.14f else 0.16f), border = null) {
+        RuvoCard(brush = c.bucketBrush(Bucket.FUTURE), border = null) {
             Eyebrow("Owed to you", color = c.ink)
             Amount(state.owedToYou, style = Ruvo.type.display)
             Text("Ruvo never moves money. Friends pay you with a UPI link.", style = Ruvo.type.caption, color = c.inkSoft)
@@ -200,7 +348,7 @@ private fun Owed(state: AppState) {
         SectionTitle("Waiting")
         state.owed.forEach { o ->
             ListRow(
-                title = o.person, subtitle = "${o.merchant} · ${IndianFormat.relativeDay(o.date, state.today)}",
+                title = o.person, subtitle = "${o.merchant} Â· ${IndianFormat.relativeDay(o.date, state.today)}",
                 leading = { MerchantTile(o.person, c.fixed) },
             ) { Amount(o.amount) }
             Row(Modifier.fillMaxWidth().padding(bottom = Space.sm), horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
@@ -226,7 +374,7 @@ private fun BalanceSheet(state: AppState, onDismiss: () -> Unit) {
     RuvoSheet("How much do you have right now?", onDismiss, eyebrow = "Update balance") {
         Text("Add up your bank balance and cash. Ruvo counts from here.", style = Ruvo.type.body, color = Ruvo.colors.inkSoft)
         Spacer(Modifier.height(Space.md))
-        RuvoField(text, { text = it }, "Total", number = true, prefix = "₹ ")
+        RuvoField(text, { text = it }, "Total", number = true, prefix = "â‚¹ ")
         Spacer(Modifier.height(Space.lg))
         PrimaryButton("Save", {
             parseRupees(text)?.let { v -> scope.launch { RuvoGraph.repository.setBalance(v) } }
@@ -250,7 +398,7 @@ fun TxnSheet(id: String, startWithSplit: Boolean, onDismiss: () -> Unit) {
     var people by remember(id) { mutableStateOf(item.shares.joinToString(", ") { it.person }) }
     val categories = listOf("Food", "Groceries", "Transport", "Shopping", "Entertainment", "Subscriptions", "Bills", "Education", "Health", "Other")
 
-    RuvoSheet(IndianFormat.rupees(t.amount), onDismiss, eyebrow = "${IndianFormat.relativeDay(t.date, state.today)} · ${if (t.direction == Direction.CREDIT) "money in" else "payment"}") {
+    RuvoSheet(IndianFormat.rupees(t.amount), onDismiss, eyebrow = "${IndianFormat.relativeDay(t.date, state.today)} Â· ${if (t.direction == Direction.CREDIT) "money in" else "payment"}") {
         RuvoField(name, { name = it }, "Name")
         Spacer(Modifier.height(Space.md))
         Eyebrow("Category")
@@ -269,7 +417,7 @@ fun TxnSheet(id: String, startWithSplit: Boolean, onDismiss: () -> Unit) {
             }
             Spacer(Modifier.height(Space.md))
             RuvoCard {
-                Text(if (t.othersShare > 0) "Shared · your part ${IndianFormat.rupees(t.yourShare)}" else "Shared with friends?", style = Ruvo.type.bodyStrong, color = c.ink)
+                Text(if (t.othersShare > 0) "Shared Â· your part ${IndianFormat.rupees(t.yourShare)}" else "Shared with friends?", style = Ruvo.type.bodyStrong, color = c.ink)
                 if (!splitOpen) {
                     Spacer(Modifier.height(Space.xs))
                     GhostButton(if (t.othersShare > 0) "Change split" else "Split it", { splitOpen = true }, Modifier.fillMaxWidth())

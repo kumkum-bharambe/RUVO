@@ -41,6 +41,7 @@ dependencies {
     implementation(project(":feature:today"))
     implementation(project(":feature:money"))
     implementation(project(":feature:goals"))
+    implementation(project(":feature:guide"))
     implementation(project(":feature:orb"))
     implementation(project(":feature:onboarding"))
     implementation(project(":widget"))

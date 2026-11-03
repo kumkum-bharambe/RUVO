@@ -204,6 +204,12 @@ fun GhostButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier
     PillButton(text, onClick, modifier, background = Color.Transparent, content = c.ink, border = c.ink.copy(alpha = 0.85f), icon = icon)
 }
 
+/** Outlined pill in any colour, e.g. white on the navy hero. */
+@Composable
+fun OutlineButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, color: Color = Ruvo.colors.onHero, icon: ImageVector? = null) {
+    PillButton(text, onClick, modifier, background = Color.Transparent, content = color, border = color.copy(alpha = 0.7f), icon = icon)
+}
+
 @Composable
 private fun PillButton(
     text: String,

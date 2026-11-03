@@ -14,6 +14,7 @@ import com.ruvo.engine.Commitment
 import com.ruvo.engine.Direction
 import com.ruvo.engine.Goal
 import com.ruvo.engine.IncomePlan
+import com.ruvo.engine.IndianFormat
 import com.ruvo.engine.Paise
 import com.ruvo.engine.RunwayEngine
 import com.ruvo.engine.RunwayInput
@@ -300,6 +301,55 @@ class RuvoRepository(
     suspend fun setDemoSms(on: Boolean) = settingsStore.update { it.copy(demoSms = on) }
     suspend fun setSpokenReplies(on: Boolean) = settingsStore.update { it.copy(spokenReplies = on) }
     suspend fun setUpiVpa(vpa: String) = settingsStore.update { it.copy(upiVpa = vpa.trim()) }
+    suspend fun setName(name: String) = settingsStore.update { it.copy(name = name.trim()) }
+    suspend fun setHideBalance(on: Boolean) = settingsStore.update { it.copy(hideBalance = on) }
+    suspend fun setNotifications(capture: Boolean? = null, weekly: Boolean? = null, goals: Boolean? = null) = settingsStore.update {
+        it.copy(notifyCapture = capture ?: it.notifyCapture, notifyWeekly = weekly ?: it.notifyWeekly, notifyGoals = goals ?: it.notifyGoals)
+    }
+
+    // --- Guide and reviews ---
+
+    suspend fun markBookRead(id: String) = settingsStore.update { it.copy(readBooks = it.readBooks + id) }
+
+    /** Saves or unsaves an idea from a book page. */
+    suspend fun toggleIdea(key: String) = settingsStore.update {
+        it.copy(savedIdeas = if (key in it.savedIdeas) it.savedIdeas - key else it.savedIdeas + key)
+    }
+
+    /** Weekly review: was this purchase worth it? WORTH, NOT or UNSURE. */
+    suspend fun reviewPurchase(txnId: String, verdict: String) = settingsStore.update { s ->
+        s.copy(purchaseReviews = s.purchaseReviews.filterNot { it.startsWith("$txnId:") }.toSet() + "$txnId:$verdict")
+    }
+
+    /** Settings → Clear all transactions. The balance stays what it is now. */
+    suspend fun clearTransactions() {
+        val balance = state.value.input.balance
+        dao.clearShares()
+        dao.clearTxns()
+        settingsStore.update { it.copy(anchorAmount = balance, anchorMillis = clock(), purchaseReviews = emptySet()) }
+    }
+
+    /** Settings → Export my data: a plain-text copy of transactions, goals and commitments, made on the phone. */
+    fun exportText(): String {
+        val s = state.value
+        return buildString {
+            appendLine("Ruvo export · ${IndianFormat.date(s.today)}")
+            appendLine("Balance: ${IndianFormat.rupees(s.input.balance)} · Runway: ${s.runway.runwayDays} days")
+            appendLine()
+            appendLine("Transactions")
+            s.activity.forEach { a ->
+                val t = a.txn
+                val sign = if (t.direction == Direction.CREDIT) "+" else "-"
+                appendLine("${IndianFormat.date(t.date)}\t${t.merchant.ifBlank { t.category }}\t${t.category}\t$sign${IndianFormat.rupees(t.amount)}")
+            }
+            appendLine()
+            appendLine("Goals")
+            s.goals.forEach { appendLine("${it.name}\t${IndianFormat.rupees(it.protectedAmount)} of ${IndianFormat.rupees(it.target)}") }
+            appendLine()
+            appendLine("Commitments")
+            s.commitments.forEach { appendLine("${it.name}\t${IndianFormat.rupees(it.amount)}") }
+        }
+    }
 
     /** "How much do you have right now?": resets the balance anchor to now. */
     suspend fun setBalance(amount: Paise) = settingsStore.update { it.copy(anchorAmount = amount, anchorMillis = clock()) }

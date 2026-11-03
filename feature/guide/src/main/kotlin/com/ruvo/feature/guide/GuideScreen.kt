@@ -1,0 +1,252 @@
+package com.ruvo.feature.guide
+
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.ruvo.data.RuvoGraph
+import com.ruvo.design.Eyebrow
+import com.ruvo.design.FillBar
+import com.ruvo.design.GhostButton
+import com.ruvo.design.PrimaryButton
+import com.ruvo.design.Radius
+import com.ruvo.design.Ruvo
+import com.ruvo.design.RuvoCard
+import com.ruvo.design.RuvoIcons
+import com.ruvo.design.SectionTitle
+import com.ruvo.design.Space
+import com.ruvo.design.Tag
+import com.ruvo.design.reveal
+import com.ruvo.engine.guide.Library
+import com.ruvo.engine.guide.Perks
+
+/** What the Guide tab can open. The app shell owns the overlays. */
+class GuideActions(
+    val openBook: (String) -> Unit,
+    val openBuy: () -> Unit,
+    val openChat: (String?) -> Unit,
+)
+
+@Composable
+fun GuideScreen(a: GuideActions) {
+    val state by RuvoGraph.repository.state.collectAsStateWithLifecycle()
+    val c = Ruvo.colors
+    val read = state.settings.readBooks
+    val total = Library.all.size
+    val done = Library.all.count { it.id in read }
+
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).statusBarsPadding().padding(top = Space.md, bottom = Space.dockClearance),
+    ) {
+        Column(Modifier.padding(horizontal = Space.gutter)) {
+            Eyebrow("Guide", Modifier.reveal(0))
+            Spacer(Modifier.height(Space.xs))
+
+            // Hero: what the Guide is, and how far you have read.
+            RuvoCard(Modifier.fillMaxWidth().reveal(1), brush = c.heroBrush, border = null, elevated = true, padding = PaddingValues(Space.xl)) {
+                Row(verticalAlignment = Alignment.Top) {
+                    Text(
+                        "Understand your money. One small idea at a time.",
+                        Modifier.weight(1f).semantics { heading() },
+                        style = Ruvo.type.headline, color = c.onHero,
+                    )
+                    Spacer(Modifier.width(Space.sm))
+                    SlowSpark()
+                }
+                Spacer(Modifier.height(Space.lg))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("$done of $total read", style = Ruvo.type.label, color = c.onHero.copy(alpha = 0.75f), modifier = Modifier.weight(1f))
+                    Text("No streaks, no pressure", style = Ruvo.type.caption, color = c.onHero.copy(alpha = 0.55f))
+                }
+                Spacer(Modifier.height(Space.xs))
+                FillBar(done / total.toFloat(), c.fuel)
+            }
+
+            // New this week: the first unread fresh book, highlighted with a slow glow.
+            val fresh = Library.shelf(Library.Shelf.NEW)
+            val next = fresh.firstOrNull { it.id !in read } ?: fresh.first()
+            Spacer(Modifier.height(Space.md))
+            NewThisWeek(next, next.id in read, Modifier.reveal(2)) { a.openBook(next.id) }
+        }
+
+        // Picked from what actually happened this month.
+        val forYou = Library.forYou(state.input, state.runway, read)
+        Shelf("Picked for you", "Lessons picked from what you actually did this month.", forYou, read, a.openBook, 3)
+
+        Library.Shelf.entries.forEachIndexed { i, shelf ->
+            Shelf(shelf.title, shelf.blurb, Library.shelf(shelf), read, a.openBook, 4 + i)
+        }
+
+        Column(Modifier.padding(horizontal = Space.gutter)) {
+            // Saved ideas, collected from book pages.
+            val ideas = state.settings.savedIdeas.mapNotNull { key ->
+                val book = Library.byId(key.substringBefore(":")) ?: return@mapNotNull null
+                val page = key.substringAfter(":").toIntOrNull()?.takeIf { it in 1..book.pages.size } ?: return@mapNotNull null
+                book to book.pages[page - 1]
+            }
+            if (ideas.isNotEmpty()) {
+                SectionTitle("Your saved ideas")
+                ideas.forEachIndexed { i, (book, page) ->
+                    RuvoCard(Modifier.fillMaxWidth().padding(bottom = Space.xs).reveal(i), onClick = { a.openBook(book.id) }, onClickLabel = "Open ${book.title}") {
+                        Eyebrow("${book.title} · ${page.first}", color = c.fuelInk)
+                        Spacer(Modifier.height(Space.xxs))
+                        Text(page.second, style = Ruvo.type.body, color = c.ink, maxLines = 3, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                    }
+                }
+            }
+
+            Marketplace(state.runway.dailySpend)
+
+            Spacer(Modifier.height(Space.lg))
+            PrimaryButton("Before you buy", a.openBuy, Modifier.fillMaxWidth(), icon = RuvoIcons.Cart)
+            Spacer(Modifier.height(Space.sm))
+            GhostButton("Ask Ruvo a question", { a.openChat(null) }, Modifier.fillMaxWidth(), icon = RuvoIcons.Message)
+        }
+    }
+}
+
+/** The Guide's spark, turning very slowly. */
+@Composable
+private fun SlowSpark() {
+    val c = Ruvo.colors
+    val reduced = Ruvo.reducedMotion
+    val t = rememberInfiniteTransition(label = "spark")
+    val r by t.animateFloat(0f, 360f, infiniteRepeatable(tween(24_000, easing = LinearEasing), RepeatMode.Restart), label = "r")
+    Box(Modifier.size(56.dp).clip(CircleShape).background(c.fuel.copy(alpha = 0.18f)), contentAlignment = Alignment.Center) {
+        Icon(RuvoIcons.Spark, null, Modifier.size(30.dp).graphicsLayer { rotationZ = if (reduced) 0f else r }, tint = c.fuel)
+    }
+}
+
+@Composable
+private fun NewThisWeek(book: Library.Book, read: Boolean, modifier: Modifier, onOpen: () -> Unit) {
+    val c = Ruvo.colors
+    val reduced = Ruvo.reducedMotion
+    val t = rememberInfiniteTransition(label = "glow")
+    val breathe by t.animateFloat(10f, 26f, infiniteRepeatable(tween(2_600), RepeatMode.Reverse), label = "b")
+    val shape = RoundedCornerShape(Radius.card)
+    Box(
+        modifier.fillMaxWidth()
+            .shadow(if (reduced) 16.dp else breathe.dp, shape, ambientColor = c.fuelDeep, spotColor = c.fuelDeep),
+    ) {
+        RuvoCard(Modifier.fillMaxWidth(), brush = c.amberBrush, border = null, onClick = onOpen, onClickLabel = "Read ${book.title}", padding = PaddingValues(Space.md)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                BookCover(book, read, width = 64.dp, showLabel = false, modifier = Modifier.graphicsLayer { rotationZ = -5f })
+                Spacer(Modifier.width(Space.md))
+                Column(Modifier.weight(1f)) {
+                    Tag("New this week", color = c.ink, content = if (c.isDark) c.canvas else c.surface)
+                    Spacer(Modifier.height(Space.xs))
+                    Text(book.title, style = Ruvo.type.title, color = c.onAccent)
+                    Text("${book.minutes} min read · tap to open", style = Ruvo.type.caption, color = c.onAccent.copy(alpha = 0.7f))
+                }
+                Icon(RuvoIcons.Forward, null, Modifier.size(22.dp), tint = c.onAccent)
+            }
+        }
+    }
+}
+
+@Composable
+private fun Shelf(title: String, blurb: String, books: List<Library.Book>, read: Set<String>, open: (String) -> Unit, index: Int) {
+    if (books.isEmpty()) return
+    val c = Ruvo.colors
+    Column(Modifier.reveal(index)) {
+        Column(Modifier.padding(horizontal = Space.gutter)) {
+            SectionTitle(title)
+            Text(blurb, style = Ruvo.type.caption, color = c.inkSoft)
+        }
+        Spacer(Modifier.height(Space.sm))
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = Space.gutter, vertical = Space.sm),
+            horizontalArrangement = Arrangement.spacedBy(Space.md),
+        ) {
+            itemsIndexed(books, key = { _, b -> b.id }) { _, b ->
+                BookCover(b, b.id in read, onClick = { open(b.id) })
+            }
+        }
+    }
+}
+
+/** Marketplace: sample offers from made-up brands, each showing its saving in days. Not advice; no ads. */
+@Composable
+private fun Marketplace(dailySpend: Long) {
+    val c = Ruvo.colors
+    SectionTitle("Ruvo marketplace")
+    Text("Student savings and opportunities.", style = Ruvo.type.headline, color = c.ink)
+    Spacer(Modifier.height(Space.sm))
+    Box(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(Radius.inner)).drawBehind {
+            drawRoundRect(
+                c.inkFaint, style = Stroke(width = 1.5.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 8f))),
+                cornerRadius = CornerRadius(Radius.inner.toPx()),
+            )
+        }.padding(Space.md),
+    ) {
+        Text("Sample offers with made-up brands. They are not Ruvo advice: check the terms before you decide. No ads, no tracking.", style = Ruvo.type.caption, color = c.inkSoft)
+    }
+    Perks.all.groupBy { it.kind }.forEach { (kind, perks) ->
+        Spacer(Modifier.height(Space.md))
+        Eyebrow(kind, color = c.inkSoft)
+        Spacer(Modifier.height(Space.xs))
+        perks.forEachIndexed { i, p ->
+            val days = Perks.daysSaved(p, dailySpend)
+            RuvoCard(Modifier.fillMaxWidth().padding(bottom = Space.xs).reveal(i)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        Modifier.size(44.dp).clip(RoundedCornerShape(14.dp)).background(c.fuel.copy(alpha = 0.2f)).border(1.dp, c.glassEdge, RoundedCornerShape(14.dp)),
+                        contentAlignment = Alignment.Center,
+                    ) { Icon(RuvoIcons.Perk, null, Modifier.size(22.dp), tint = c.fuelInk) }
+                    Spacer(Modifier.width(Space.sm))
+                    Column(Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(p.brand, style = Ruvo.type.bodyStrong, color = c.ink)
+                            Spacer(Modifier.width(Space.xs))
+                            Tag("Sample")
+                        }
+                        Text(p.offer, style = Ruvo.type.caption, color = c.inkSoft)
+                        if (days > 0) Text("Saves you about ${com.ruvo.engine.IndianFormat.days(days)} a month", style = Ruvo.type.label, color = c.futureInk)
+                        else if (p.kind == "Earn") Text("Adds days instead of saving them", style = Ruvo.type.label, color = c.futureInk)
+                    }
+                }
+            }
+        }
+    }
+}
