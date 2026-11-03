@@ -27,6 +27,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
@@ -57,6 +61,11 @@ fun RuvoSheet(
         val scroll = rememberScrollState()
         Column(
             Modifier.fillMaxWidth()
+                // A low warm glow in the corner, echoing the canvas behind the sheet.
+                .drawBehind {
+                    drawRect(Brush.radialGradient(listOf(c.glowWarm, Color.Transparent), Offset(size.width, 0f), size.width * 0.9f))
+                    drawRect(Brush.radialGradient(listOf(c.glowCool.copy(alpha = c.glowCool.alpha * 0.6f), Color.Transparent), Offset(0f, size.height), size.width))
+                }
                 .let { if (scrollable) it.verticalScroll(scroll) else it }
                 .padding(horizontal = Space.gutter)
                 .navigationBarsPadding()
@@ -98,7 +107,7 @@ fun RuvoField(
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = c.ink, unfocusedBorderColor = c.hairline, focusedLabelColor = c.ink,
             unfocusedLabelColor = c.inkSoft, cursorColor = c.ink, focusedTextColor = c.ink, unfocusedTextColor = c.ink,
-            focusedContainerColor = c.surface, unfocusedContainerColor = c.surface,
+            focusedContainerColor = c.surface.copy(alpha = if (c.isDark) 0.6f else 0.9f), unfocusedContainerColor = c.glass,
         ),
         modifier = modifier.fillMaxWidth(),
     )

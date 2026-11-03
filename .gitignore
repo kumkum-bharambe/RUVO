@@ -1,4 +1,4 @@
-*.iml
+﻿*.iml
 .gradle/
 /local.properties
 /.idea/
@@ -15,4 +15,4 @@ secrets.properties
 ruvo-sync.zip
 
 # Anek Latin is downloaded at build time by core/design (fetchFonts)
-/core/design/src/main/res/font/anek_latin.ttf
+/core/design/src/main/res/font/*.ttf

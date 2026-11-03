@@ -32,6 +32,7 @@ fun RuvoTheme(choice: ThemeChoice = ThemeChoice.SYSTEM, content: @Composable () 
     val reduced = remember(context) {
         Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
     }
+    val type = remember(context) { ruvoType(context) }
     val material = if (dark) {
         darkColorScheme(
             primary = colors.fuel, onPrimary = colors.onAccent, secondary = colors.fixed, tertiary = colors.future,
@@ -41,7 +42,7 @@ fun RuvoTheme(choice: ThemeChoice = ThemeChoice.SYSTEM, content: @Composable () 
         )
     } else {
         lightColorScheme(
-            primary = colors.ink, onPrimary = colors.canvas, secondary = colors.fixed, tertiary = colors.future,
+            primary = colors.ink, onPrimary = colors.surface, secondary = colors.fixed, tertiary = colors.future,
             background = colors.canvas, onBackground = colors.ink, surface = colors.surface, onSurface = colors.ink,
             surfaceVariant = colors.raised, onSurfaceVariant = colors.inkSoft, outline = colors.hairline, error = colors.warning,
             surfaceContainerLow = colors.surface, surfaceContainer = colors.surface, surfaceContainerHigh = colors.raised,
@@ -49,7 +50,7 @@ fun RuvoTheme(choice: ThemeChoice = ThemeChoice.SYSTEM, content: @Composable () 
     }
     CompositionLocalProvider(
         LocalRuvoColors provides colors,
-        LocalRuvoType provides DefaultType,
+        LocalRuvoType provides type,
         LocalReducedMotion provides reduced,
     ) {
         MaterialTheme(colorScheme = material, content = content)

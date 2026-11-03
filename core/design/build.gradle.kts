@@ -31,25 +31,32 @@ dependencies {
     implementation(libs.androidx.core.ktx)
 }
 
-// The brand typeface, Anek Latin (SIL Open Font License), is downloaded once on the build machine
-// instead of being committed. It includes the ₹ sign and has width and weight axes.
-val anekFont = layout.projectDirectory.file("src/main/res/font/anek_latin.ttf").asFile
+// The brand typefaces (SIL Open Font License) are downloaded once on the build machine instead of being
+// committed. Outfit is the brand face; Anek Latin supplies the ₹ sign, which Outfit lacks.
+val brandFonts = mapOf(
+    "outfit.ttf" to ("Outfit" to "https://github.com/google/fonts/raw/main/ofl/outfit/Outfit%5Bwght%5D.ttf"),
+    "anek_latin.ttf" to ("Anek Latin" to "https://github.com/google/fonts/raw/main/ofl/aneklatin/AnekLatin%5Bwdth,wght%5D.ttf"),
+)
+val fontDir = layout.projectDirectory.dir("src/main/res/font").asFile
 val fetchFonts by tasks.registering {
-    description = "Downloads the Anek Latin variable font into res/font if it is missing."
-    outputs.file(anekFont)
-    onlyIf { !anekFont.exists() }
+    description = "Downloads the Outfit and Anek Latin variable fonts into res/font if they are missing."
+    outputs.files(brandFonts.keys.map { fontDir.resolve(it) })
+    onlyIf { brandFonts.keys.any { !fontDir.resolve(it).exists() } }
     doLast {
-        anekFont.parentFile.mkdirs()
-        val url = "https://github.com/google/fonts/raw/main/ofl/aneklatin/AnekLatin%5Bwdth,wght%5D.ttf"
-        try {
-            URI(url).toURL().openStream().use { input -> anekFont.outputStream().use { input.copyTo(it) } }
-        } catch (e: Exception) {
-            anekFont.delete()
-            throw GradleException(
-                "Could not download Anek Latin ($url). Download the variable TTF from " +
-                    "https://fonts.google.com/specimen/Anek+Latin and save it as $anekFont",
-                e,
-            )
+        fontDir.mkdirs()
+        brandFonts.forEach { (file, info) ->
+            val (name, url) = info
+            val target = fontDir.resolve(file)
+            if (target.exists()) return@forEach
+            try {
+                URI(url).toURL().openStream().use { input -> target.outputStream().use { input.copyTo(it) } }
+            } catch (e: Exception) {
+                target.delete()
+                throw GradleException(
+                    "Could not download $name ($url). Download the variable TTF from Google Fonts and save it as $target",
+                    e,
+                )
+            }
         }
     }
 }
