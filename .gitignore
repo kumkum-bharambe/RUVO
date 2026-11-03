@@ -13,3 +13,6 @@ secrets.properties
 # Screenshots and recordings from test runs
 /artifacts/
 ruvo-sync.zip
+
+# Anek Latin is downloaded at build time by core/design (fetchFonts)
+/core/design/src/main/res/font/anek_latin.ttf
