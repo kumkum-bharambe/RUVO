@@ -136,7 +136,8 @@ fun RunwayHero(r: RunwayResult, onWhy: () -> Unit, modifier: Modifier = Modifier
             Spacer(Modifier.height(Space.xxs))
             Text("${IndianFormat.rupees(r.fuel.coerceAtLeast(0))} of Fuel at about ${IndianFormat.rupees(r.dailySpend)} a day", style = Ruvo.type.caption, color = c.inkSoft)
             Spacer(Modifier.height(Space.md))
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.xs), verticalArrangement = Arrangement.spacedBy(Space.xs)) {
                 Row(
                     Modifier.clip(RoundedCornerShape(Radius.chip)).background(c.ink).padding(horizontal = Space.md, vertical = 9.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -144,7 +145,6 @@ fun RunwayHero(r: RunwayResult, onWhy: () -> Unit, modifier: Modifier = Modifier
                     Text("Why ${if (r.unlimited) "no end" else IndianFormat.days(r.runwayDays)}?", style = Ruvo.type.label, color = if (c.isDark) c.canvas else c.surface, maxLines = 1)
                     Icon(RuvoIcons.Forward, null, Modifier.padding(start = 2.dp).size(14.dp), tint = if (c.isDark) c.canvas else c.surface)
                 }
-                Spacer(Modifier.width(Space.xs))
                 Row(
                     Modifier.clip(RoundedCornerShape(Radius.chip)).background(c.ink.copy(alpha = 0.07f)).padding(horizontal = Space.sm, vertical = 9.dp),
                     verticalAlignment = Alignment.CenterVertically,

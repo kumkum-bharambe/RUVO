@@ -48,6 +48,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
@@ -581,7 +582,7 @@ fun PillBars(
             }
             val press by animateFloatAsState(if (chosen) 1f else 0.97f, Motion.snappy(), label = "pill$i")
             var col = Modifier.weight(1f).semantics(mergeDescendants = true) { contentDescription = pill.spoken.ifEmpty { "${pill.label}: ${pill.value.toInt()}" } }
-            if (onSelect != null) col = col.clip(RoundedCornerShape(Radius.inner)).clickable(role = Role.Tab, onClickLabel = "Show ${pill.spoken}") { onSelect(i) }
+            if (onSelect != null) col = col.clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, role = Role.Tab, onClickLabel = "Show ${pill.spoken}") { onSelect(i) }
             Column(col, horizontalAlignment = Alignment.CenterHorizontally) {
                 Box(Modifier.fillMaxWidth().height(height), contentAlignment = Alignment.BottomCenter) {
                     Box(Modifier.fillMaxSize().clip(RoundedCornerShape(Radius.chip)).background(c.ink.copy(alpha = if (c.isDark) 0.08f else 0.05f)))
@@ -591,10 +592,12 @@ fun PillBars(
                             .clip(RoundedCornerShape(Radius.chip)).background(fill),
                     )
                     if (chosen && tooltip != null) {
+                        // The amount floats above the chosen pill and may be wider than it.
                         Text(
                             tooltip(i),
-                            Modifier.align(Alignment.TopCenter).clip(RoundedCornerShape(Radius.chip)).background(c.ink).padding(horizontal = 6.dp, vertical = 3.dp),
-                            style = Ruvo.type.caption, color = if (c.isDark) c.canvas else c.surface, maxLines = 1,
+                            Modifier.align(Alignment.TopCenter).wrapContentWidth(unbounded = true)
+                                .clip(RoundedCornerShape(Radius.chip)).background(c.ink).padding(horizontal = 8.dp, vertical = 4.dp),
+                            style = Ruvo.type.label, color = if (c.isDark) c.canvas else c.surface, maxLines = 1, softWrap = false,
                         )
                     }
                 }
