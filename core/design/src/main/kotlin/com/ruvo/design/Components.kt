@@ -8,6 +8,10 @@ import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.animation.core.withInfiniteAnimationFrameNanos
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.infiniteRepeatable
@@ -153,7 +157,7 @@ fun RuvoCard(
     border: Color? = Color.Unspecified,
     onClickLabel: String? = null,
     onClick: (() -> Unit)? = null,
-    padding: PaddingValues = PaddingValues(Space.lg),
+    padding: PaddingValues = PaddingValues(Space.md),
     brush: Brush? = null,
     elevated: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
@@ -182,7 +186,9 @@ fun RuvoCard(
 
 @Composable
 fun Eyebrow(text: String, modifier: Modifier = Modifier, color: Color = Ruvo.colors.inkSoft) {
-    Text(text.uppercase(), modifier, style = Ruvo.type.eyebrow, color = color, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
+    // Sentence case: "Daily spending", not "DAILY SPENDING".
+    val calm = text.lowercase().replaceFirstChar { it.uppercase() }.replace("ruvo", "Ruvo").replace(" upi", " UPI")
+    Text(calm, modifier, style = Ruvo.type.eyebrow, color = color, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
 }
 
 @Composable
@@ -403,12 +409,27 @@ fun Amount(paise: Paise, modifier: Modifier = Modifier, style: TextStyle = Ruvo.
 data class StatusItem(val label: String, val dot: Color, val onClick: () -> Unit)
 
 /**
- * Black status chips: each has a pulsing coloured dot, bobs gently out of step with its neighbours and catches a
- * slow shimmer. Tapping one opens what it describes.
+ * Status chips that glide past like a ticker, about 28 dp a second, looping forever. Each has a pulsing coloured
+ * dot and catches a slow shimmer. Dragging pauses the glide; tapping a chip opens what it describes. With reduced
+ * motion the row stands still and scrolls by hand.
  */
 @Composable
 fun StatusChips(items: List<StatusItem>, modifier: Modifier = Modifier) {
     val reduced = Ruvo.reducedMotion
+    if (items.isEmpty()) return
+    // A very long list that repeats the chips, started in the middle so it can glide on without running out.
+    val loopCount = if (reduced) items.size else Int.MAX_VALUE
+    val list = rememberLazyListState(initialFirstVisibleItemIndex = if (reduced) 0 else (Int.MAX_VALUE / 2).let { it - it % items.size })
+    val speed = with(LocalDensity.current) { 28.dp.toPx() }
+    LaunchedEffect(reduced, items.size) {
+        if (reduced) return@LaunchedEffect
+        var last = 0L
+        while (true) {
+            val now = withInfiniteAnimationFrameNanos { it }
+            if (last != 0L && !list.isScrollInProgress) list.dispatchRawDelta(speed * ((now - last) / 1_000_000_000f).coerceAtMost(0.05f))
+            last = now
+        }
+    }
     // White chips on Daybreak, black chips on Night swim (Ruvo 7).
     val dark = Ruvo.colors.isDark
     val fill = if (dark) Color(0xFF0B0B0D) else Color.White
@@ -419,18 +440,24 @@ fun StatusChips(items: List<StatusItem>, modifier: Modifier = Modifier) {
     val t by loop.animateFloat(0f, 1f, infiniteRepeatable(tween(2800, easing = LinearEasing)), label = "t")
     val sweep by loop.animateFloat(-0.6f, 1.6f, infiniteRepeatable(tween(4200, easing = LinearEasing)), label = "sweep")
     LazyRow(
-        modifier, horizontalArrangement = Arrangement.spacedBy(Space.xs),
-        contentPadding = PaddingValues(horizontal = Space.gutter, vertical = 8.dp),
+        modifier.fillMaxWidth().drawWithContent {
+            // Chips fade in and out at the screen edges instead of being cut off.
+            drawContent()
+            val fade = 28.dp.toPx()
+            drawRect(Brush.horizontalGradient(listOf(Color.Black, Color.Transparent), endX = fade), blendMode = BlendMode.DstOut)
+            drawRect(Brush.horizontalGradient(listOf(Color.Transparent, Color.Black), startX = size.width - fade), blendMode = BlendMode.DstOut)
+        }.graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen },
+        state = list, horizontalArrangement = Arrangement.spacedBy(Space.xs),
+        contentPadding = PaddingValues(horizontal = if (reduced) Space.gutter else 0.dp, vertical = 8.dp),
     ) {
-        items(items.size) { i ->
+        items(loopCount) { n ->
+            val i = n % items.size
             val item = items[i]
-            val phase = (t + i * 0.2f) % 1f
-            val bob = if (reduced) 0f else sin(phase * 2f * PI.toFloat()) * 3f
             val pulse = if (reduced) 0f else (t * 1.55f + i * 0.2f) % 1f
             val shape = RoundedCornerShape(Radius.chip)
             Row(
-                Modifier.graphicsLayer { translationY = bob * density }
-                    .shadow(8.dp, shape, ambientColor = Color.Black.copy(alpha = if (dark) 1f else 0.4f), spotColor = Color.Black.copy(alpha = if (dark) 1f else 0.4f))
+                Modifier
+                    .shadow(6.dp, shape, ambientColor = Color.Black.copy(alpha = if (dark) 1f else 0.3f), spotColor = Color.Black.copy(alpha = if (dark) 1f else 0.3f))
                     .clip(shape).background(fill).border(1.dp, edge, shape)
                     .clickable(role = Role.Button, onClickLabel = "Open ${item.label}", onClick = item.onClick)
                     .drawWithContent {
@@ -440,14 +467,14 @@ fun StatusChips(items: List<StatusItem>, modifier: Modifier = Modifier) {
                             drawRect(Brush.horizontalGradient(listOf(Color.Transparent, shine, Color.Transparent), startX = x, endX = x + size.width * 0.4f))
                         }
                     }
-                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Box(Modifier.size(18.dp), contentAlignment = Alignment.Center) {
-                    Box(Modifier.size(9.dp + 9.dp * pulse).clip(CircleShape).background(item.dot.copy(alpha = (1f - pulse) * 0.55f)))
-                    Box(Modifier.size(9.dp).clip(CircleShape).background(item.dot))
+                Box(Modifier.size(16.dp), contentAlignment = Alignment.Center) {
+                    Box(Modifier.size(8.dp + 8.dp * pulse).clip(CircleShape).background(item.dot.copy(alpha = (1f - pulse) * 0.55f)))
+                    Box(Modifier.size(8.dp).clip(CircleShape).background(item.dot))
                 }
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(6.dp))
                 Text(item.label, style = Ruvo.type.label, color = text, maxLines = 1)
             }
         }
@@ -456,22 +483,19 @@ fun StatusChips(items: List<StatusItem>, modifier: Modifier = Modifier) {
 
 /**
  * The three bucket cards share one layout and one height. Each is filled with its bucket's colour and still
- * carries its name and icon, so colour is never the only cue.
+ * carries its name, so colour is never the only cue.
  */
 @Composable
 fun BucketCard(bucket: Bucket, amount: Paise, caption: String, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
     val c = Ruvo.colors
     RuvoCard(
-        modifier.height(156.dp), brush = c.bucketBrush(bucket), border = null, elevated = !c.isDark,
+        modifier.height(124.dp), brush = c.bucketBrush(bucket), border = null, elevated = !c.isDark,
         onClick = onClick, onClickLabel = "Open ${bucketName(bucket)}", padding = PaddingValues(14.dp),
     ) {
-        Box(Modifier.size(34.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.55f)), contentAlignment = Alignment.Center) {
-            Icon(RuvoIcons.forBucket(bucket), null, Modifier.size(19.dp), tint = c.onAccent)
-        }
+        // Name first, then the number: the word carries the meaning, so no icon is needed.
+        Text(bucketName(bucket), style = Ruvo.type.bodyStrong, color = c.onAccent, maxLines = 1)
         Spacer(Modifier.weight(1f))
-        Eyebrow(bucketName(bucket), color = c.onAccent.copy(alpha = 0.75f))
-        Spacer(Modifier.height(2.dp))
-        Amount(amount, style = Ruvo.type.amount, color = c.onAccent)
+        Amount(amount, style = Ruvo.type.title, color = c.onAccent)
         Text(caption, style = Ruvo.type.caption, color = c.onAccent.copy(alpha = 0.72f), maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
@@ -509,15 +533,6 @@ fun ListRow(
         }
         Spacer(Modifier.width(Space.xs))
         trailing()
-    }
-}
-
-/** Letter tile for merchants: first letter on a soft accent square. */
-@Composable
-fun MerchantTile(name: String, accent: Color, size: Dp = 44.dp) {
-    val c = Ruvo.colors
-    Box(Modifier.size(size).clip(RoundedCornerShape(14.dp)).background(accent.copy(alpha = if (c.isDark) 0.22f else 0.2f)), contentAlignment = Alignment.Center) {
-        Text(name.firstOrNull { it.isLetterOrDigit() }?.uppercase() ?: "·", style = Ruvo.type.bodyStrong, color = if (c.isDark) accent else c.ink)
     }
 }
 
@@ -626,5 +641,31 @@ fun LegendDot(color: Color, label: String, modifier: Modifier = Modifier) {
         Box(Modifier.size(9.dp).clip(CircleShape).background(color))
         Spacer(Modifier.width(6.dp))
         Text(label, style = Ruvo.type.caption, color = Ruvo.colors.inkSoft)
+    }
+}
+
+/**
+ * A big tile that opens a place: amber for the Marketplace, ink for Settings. The same tile is used in Profile
+ * and in the Guide, so the Marketplace looks and opens the same from both.
+ */
+@Composable
+fun BigTile(title: String, line: String, icon: ImageVector, modifier: Modifier = Modifier, amber: Boolean = true, onClick: () -> Unit) {
+    val c = Ruvo.colors
+    val fg = if (amber) c.onAccent else c.canvas
+    RuvoCard(
+        modifier.fillMaxWidth(), brush = if (amber) c.amberBrush else null, color = if (amber) Color.Unspecified else c.ink,
+        border = null, elevated = true, onClick = onClick, onClickLabel = "Open $title", padding = PaddingValues(Space.md),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(44.dp).clip(RoundedCornerShape(14.dp)).background(fg.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
+                Icon(icon, null, Modifier.size(22.dp), tint = fg)
+            }
+            Spacer(Modifier.width(Space.sm))
+            Column(Modifier.weight(1f)) {
+                Text(title, style = Ruvo.type.title, color = fg)
+                Text(line, style = Ruvo.type.caption, color = fg.copy(alpha = 0.75f))
+            }
+            Icon(RuvoIcons.Forward, null, Modifier.size(20.dp), tint = fg)
+        }
     }
 }

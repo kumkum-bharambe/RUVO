@@ -136,15 +136,16 @@ val Daybreak = RuvoColors(
 
 val NightSwim = RuvoColors(
     isDark = true,
-    canvas = Color(0xFF0A1029),
-    surface = Color(0xFF141C45),
-    raised = Color(0xFF1B2556),
-    glass = Color(0x1FFFFFFF),
-    glassEdge = Color(0x33FFFFFF),
-    ink = Color(0xFFF5F7FF),
-    inkSoft = Color(0xFFAAB1CE),
-    inkFaint = Color(0xFF7780A6),
-    hairline = Color(0xFF27325E),
+    // True black: the canvas is #000, cards are barely lifted greys, and nothing glows behind them.
+    canvas = Color(0xFF000000),
+    surface = Color(0xFF111114),
+    raised = Color(0xFF1A1A1F),
+    glass = Color(0xFF111114),
+    glassEdge = Color(0x1FFFFFFF),
+    ink = Color(0xFFF5F5F7),
+    inkSoft = Color(0xFFA9A9B2),
+    inkFaint = Color(0xFF6E6E78),
+    hairline = Color(0xFF232328),
     fixed = Color(0xFFC3AAF7),
     fixedDeep = Color(0xFF9C7DEB),
     fuel = Amber,
@@ -157,15 +158,15 @@ val NightSwim = RuvoColors(
     warning = Color(0xFFFF8F57),
     sun = Butter,
     onAccent = Navy,
-    heroTop = Color(0xFF26368A),
-    heroBottom = Color(0xFF131E52),
+    heroTop = Color(0xFF1C2A66),
+    heroBottom = Color(0xFF0F1838),
     onHero = Color(0xFFFFFFFF),
-    glowWarm = Color(0x40F59E2B),
-    glowCool = Color(0x596E5ADC),
+    glowWarm = Color(0x00000000),
+    glowCool = Color(0x00000000),
     orbCore = Color(0xFFFFF1B8),
     orbGlow = Amber,
     orbDeep = Color(0xFFB86E06),
-    scrim = Color(0xA6050818),
+    scrim = Color(0xCC000000),
     shadow = Color(0x80000000),
 )
 
@@ -185,10 +186,10 @@ object Space {
 }
 
 object Radius {
-    val card = 26.dp
-    val inner = 18.dp
+    val card = 22.dp
+    val inner = 16.dp
     val chip = 999.dp
-    val sheet = 34.dp
+    val sheet = 30.dp
 }
 
 /**

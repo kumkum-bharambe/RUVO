@@ -47,7 +47,7 @@ import com.ruvo.design.StatusItem
 import com.ruvo.design.reveal
 import com.ruvo.design.Eyebrow
 import com.ruvo.design.IconCircle
-import com.ruvo.design.MerchantTile
+import com.ruvo.design.MerchantLogo
 import com.ruvo.design.Radius
 import com.ruvo.design.Ruvo
 import com.ruvo.design.RuvoCard
@@ -133,8 +133,6 @@ fun TodayContent(state: AppState, a: TodayActions) {
         }
         item {
             RunwayHero(r, a.openWhy, Modifier.padding(horizontal = Space.gutter).reveal(0))
-            Spacer(Modifier.height(Space.md))
-            DayStripRow(r, Modifier.reveal(1))
         }
         item {
             Row(Modifier.padding(horizontal = Space.gutter).padding(top = Space.sm).reveal(2), horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
@@ -174,7 +172,7 @@ fun TodayContent(state: AppState, a: TodayActions) {
         item {
             Row(Modifier.padding(horizontal = Space.gutter).padding(top = Space.md).reveal(8), horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
                 ReviewTile("Your week", "in 3 minutes", RuvoIcons.Calendar, Modifier.weight(1f), a.openWeekly)
-                ReviewTile("Your month", "in 30 seconds", RuvoIcons.Spark, Modifier.weight(1f), a.openMonthly)
+                ReviewTile("Your month", "in 30 seconds", RuvoIcons.Chart, Modifier.weight(1f), a.openMonthly)
             }
         }
         item { BuyCard(a.openBuy, Modifier.reveal(9)) }
@@ -236,7 +234,7 @@ private fun InsightCard(change: Insights.CategoryChange, onWhy: () -> Unit, onHi
     RuvoCard(Modifier.padding(horizontal = Space.gutter).padding(top = Space.sm).then(modifier)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(32.dp).clip(CircleShape).background(c.fuel.copy(alpha = 0.22f)), contentAlignment = Alignment.Center) {
-                Icon(RuvoIcons.Spark, null, Modifier.size(18.dp), tint = c.fuelInk)
+                Icon(RuvoIcons.Bulb, null, Modifier.size(18.dp), tint = c.fuelInk)
             }
             Spacer(Modifier.width(Space.xs))
             Eyebrow("Ruvo noticed", color = c.fuelInk)
@@ -301,6 +299,8 @@ private fun DailySpendingCard(state: AppState, modifier: Modifier) {
         } else {
             payments.forEach { p ->
                 Row(Modifier.fillMaxWidth().padding(top = Space.xs), verticalAlignment = Alignment.CenterVertically) {
+                    MerchantLogo(p.merchant, p.category, size = 30.dp)
+                    Spacer(Modifier.width(Space.sm))
                     Column(Modifier.weight(1f)) {
                         Text(p.merchant.ifBlank { p.category }, style = Ruvo.type.label, color = c.ink, maxLines = 1)
                         Text(p.category, style = Ruvo.type.caption, color = c.inkFaint)
@@ -451,7 +451,7 @@ fun ActivityLine(item: ActivityItem, state: AppState, open: (String) -> Unit) {
         title = t.merchant,
         subtitle = "${IndianFormat.relativeDay(t.date, state.today)} · ${t.category}$shared · $tag",
         modifier = Modifier.padding(horizontal = Space.gutter),
-        leading = { MerchantTile(t.merchant, if (credit) c.future else c.bucket(t.bucket)) },
+        leading = { MerchantLogo(t.merchant, t.category) },
         onClick = { open(t.id) },
     ) {
         Amount(if (credit) t.amount else -t.yourShare, color = if (credit) c.futureInk else c.ink, signed = credit)

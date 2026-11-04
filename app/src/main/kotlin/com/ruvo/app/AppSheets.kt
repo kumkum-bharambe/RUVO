@@ -152,7 +152,7 @@ fun SettingsSheet(state: AppState, onDismiss: () -> Unit, onPersonas: () -> Unit
             MoodCard("Daybreak", "Soft light, amber dawn glow", Daybreak, s.theme == ThemeChoice.DAYBREAK.name, Modifier.weight(1f)) {
                 scope.launch { repo.setTheme(ThemeChoice.DAYBREAK.name) }
             }
-            MoodCard("Night swim", "Deep navy, glowing liquid", NightSwim, s.theme == ThemeChoice.NIGHT_SWIM.name, Modifier.weight(1f)) {
+            MoodCard("Night swim", "True black, quiet glow", NightSwim, s.theme == ThemeChoice.NIGHT_SWIM.name, Modifier.weight(1f)) {
                 scope.launch { repo.setTheme(ThemeChoice.NIGHT_SWIM.name) }
             }
         }

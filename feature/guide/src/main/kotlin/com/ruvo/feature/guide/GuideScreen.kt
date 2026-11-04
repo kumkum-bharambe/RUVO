@@ -65,10 +65,11 @@ class GuideActions(
     val openBook: (String) -> Unit,
     val openBuy: () -> Unit,
     val openChat: (String?) -> Unit,
+    val openMarketplace: () -> Unit = {},
 )
 
 @Composable
-fun GuideScreen(a: GuideActions, showMarketplace: Boolean = false, onMarketplaceShown: () -> Unit = {}) {
+fun GuideScreen(a: GuideActions) {
     val state by RuvoGraph.repository.state.collectAsStateWithLifecycle()
     val c = Ruvo.colors
     val read = state.settings.readBooks
@@ -76,10 +77,6 @@ fun GuideScreen(a: GuideActions, showMarketplace: Boolean = false, onMarketplace
     val done = Library.all.count { it.id in read }
 
     val scroll = rememberScrollState()
-    // Opened from the profile's Marketplace tile: glide down to the marketplace.
-    androidx.compose.runtime.LaunchedEffect(showMarketplace, scroll.maxValue) {
-        if (showMarketplace && scroll.maxValue > 0) { scroll.animateScrollTo(scroll.maxValue); onMarketplaceShown() }
-    }
     Column(
         Modifier.fillMaxSize().verticalScroll(scroll).statusBarsPadding().padding(top = Space.md, bottom = Space.dockClearance),
     ) {
@@ -96,7 +93,7 @@ fun GuideScreen(a: GuideActions, showMarketplace: Boolean = false, onMarketplace
                         style = Ruvo.type.headline, color = c.onHero,
                     )
                     Spacer(Modifier.width(Space.sm))
-                    SlowSpark()
+                    GuideMark()
                 }
                 Spacer(Modifier.height(Space.lg))
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -140,7 +137,9 @@ fun GuideScreen(a: GuideActions, showMarketplace: Boolean = false, onMarketplace
                 }
             }
 
-            Marketplace(state.runway.dailySpend)
+            // The same tile as in Profile, opening the same Marketplace.
+            Spacer(Modifier.height(Space.lg))
+            com.ruvo.design.BigTile("Marketplace", MARKETPLACE_LINE, RuvoIcons.Store, onClick = a.openMarketplace)
 
             Spacer(Modifier.height(Space.lg))
             PrimaryButton("Before you buy", a.openBuy, Modifier.fillMaxWidth(), icon = RuvoIcons.Cart)
@@ -150,15 +149,16 @@ fun GuideScreen(a: GuideActions, showMarketplace: Boolean = false, onMarketplace
     }
 }
 
-/** The Guide's spark, turning very slowly. */
+/** The Guide's mark: an open book with a soft halo that breathes very slowly. */
 @Composable
-private fun SlowSpark() {
+private fun GuideMark() {
     val c = Ruvo.colors
     val reduced = Ruvo.reducedMotion
-    val t = rememberInfiniteTransition(label = "spark")
-    val r by t.animateFloat(0f, 360f, infiniteRepeatable(tween(24_000, easing = LinearEasing), RepeatMode.Restart), label = "r")
-    Box(Modifier.size(56.dp).clip(CircleShape).background(c.fuel.copy(alpha = 0.18f)), contentAlignment = Alignment.Center) {
-        Icon(RuvoIcons.Spark, null, Modifier.size(30.dp).graphicsLayer { rotationZ = if (reduced) 0f else r }, tint = c.fuel)
+    val t = rememberInfiniteTransition(label = "halo")
+    val b by t.animateFloat(0f, 1f, infiniteRepeatable(tween(3_600, easing = LinearEasing), RepeatMode.Reverse), label = "b")
+    Box(Modifier.size(52.dp), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(52.dp).graphicsLayer { val s = if (reduced) 1f else 0.9f + 0.1f * b; scaleX = s; scaleY = s }.clip(CircleShape).background(c.fuel.copy(alpha = 0.18f)))
+        Icon(RuvoIcons.Book, null, Modifier.size(26.dp), tint = c.fuelInk)
     }
 }
 
@@ -198,52 +198,6 @@ private fun Shelf(title: String, blurb: String, books: List<Library.Book>, read:
         ) {
             itemsIndexed(books, key = { _, b -> b.id }) { _, b ->
                 BookCover(b, b.id in read, onClick = { open(b.id) })
-            }
-        }
-    }
-}
-
-/** Marketplace: sample offers from made-up brands, each showing its saving in days. Not advice; no ads. */
-@Composable
-private fun Marketplace(dailySpend: Long) {
-    val c = Ruvo.colors
-    SectionTitle("Ruvo marketplace")
-    Text("Student savings and opportunities.", style = Ruvo.type.headline, color = c.ink)
-    Spacer(Modifier.height(Space.sm))
-    Box(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(Radius.inner)).drawBehind {
-            drawRoundRect(
-                c.inkFaint, style = Stroke(width = 1.5.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 8f))),
-                cornerRadius = CornerRadius(Radius.inner.toPx()),
-            )
-        }.padding(Space.md),
-    ) {
-        Text("Sample offers with made-up brands. They are not Ruvo advice: check the terms before you decide. No ads, no tracking.", style = Ruvo.type.caption, color = c.inkSoft)
-    }
-    Perks.all.groupBy { it.kind }.forEach { (kind, perks) ->
-        Spacer(Modifier.height(Space.md))
-        Eyebrow(kind, color = c.inkSoft)
-        Spacer(Modifier.height(Space.xs))
-        perks.forEachIndexed { i, p ->
-            val days = Perks.daysSaved(p, dailySpend)
-            RuvoCard(Modifier.fillMaxWidth().padding(bottom = Space.xs).reveal(i)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        Modifier.size(44.dp).clip(RoundedCornerShape(14.dp)).background(c.fuel.copy(alpha = 0.2f)).border(1.dp, c.glassEdge, RoundedCornerShape(14.dp)),
-                        contentAlignment = Alignment.Center,
-                    ) { Icon(RuvoIcons.Perk, null, Modifier.size(22.dp), tint = c.fuelInk) }
-                    Spacer(Modifier.width(Space.sm))
-                    Column(Modifier.weight(1f)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(p.brand, style = Ruvo.type.bodyStrong, color = c.ink)
-                            Spacer(Modifier.width(Space.xs))
-                            Tag("Sample")
-                        }
-                        Text(p.offer, style = Ruvo.type.caption, color = c.inkSoft)
-                        if (days > 0) Text("Saves you about ${com.ruvo.engine.IndianFormat.days(days)} a month", style = Ruvo.type.label, color = c.futureInk)
-                        else if (p.kind == "Earn") Text("Adds days instead of saving them", style = Ruvo.type.label, color = c.futureInk)
-                    }
-                }
             }
         }
     }

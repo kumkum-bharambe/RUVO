@@ -60,7 +60,8 @@ import com.ruvo.design.Eyebrow
 import com.ruvo.design.FillBar
 import com.ruvo.design.GhostButton
 import com.ruvo.design.ListRow
-import com.ruvo.design.MerchantTile
+import com.ruvo.design.MerchantLogo
+import com.ruvo.design.PersonAvatar
 import com.ruvo.design.PrimaryButton
 import com.ruvo.design.Ruvo
 import com.ruvo.design.RuvoCard
@@ -271,7 +272,7 @@ private fun MonthEditSheet(state: AppState, month: java.time.YearMonth, onDismis
     }
 }
 
-/** The balance on navy, with how it splits into goals, planned and yours to spend. Can be hidden. */
+/** The balance on navy, with how it splits into goals, planned and yours to spend. Hidden when Settings says so. */
 @Composable
 private fun BalanceCard(state: AppState, modifier: Modifier, onUpdate: () -> Unit) {
     val c = Ruvo.colors
@@ -285,11 +286,6 @@ private fun BalanceCard(state: AppState, modifier: Modifier, onUpdate: () -> Uni
                 if (hidden) Text("₹ ••••", style = Ruvo.type.display, color = c.onHero)
                 else Amount(r.balance, style = Ruvo.type.display, color = c.onHero, countUp = true)
             }
-            IconCircle(
-                if (hidden) RuvoIcons.Eye else RuvoIcons.EyeOff, if (hidden) "Show balance" else "Hide balance",
-                { scope.launch { RuvoGraph.repository.setHideBalance(!hidden) } },
-                tint = c.onHero, background = c.onHero.copy(alpha = 0.12f),
-            )
         }
         Spacer(Modifier.height(Space.sm))
         val total = (r.fixedReserved + r.futureProtected + r.fuel.coerceAtLeast(0)).toFloat().coerceAtLeast(1f)
@@ -464,7 +460,7 @@ private fun TxnRow(entry: com.ruvo.data.ActivityItem, state: AppState, open: (St
     }.joinToString(" · ")
     ListRow(
         title = t.merchant, subtitle = tags, modifier = Modifier.padding(horizontal = Space.gutter),
-        leading = { MerchantTile(t.merchant, if (credit) c.future else c.bucket(t.bucket)) },
+        leading = { MerchantLogo(t.merchant, t.category) },
         onClick = { open(t.id) },
     ) {
         Amount(
@@ -536,7 +532,7 @@ private fun Owed(state: AppState) {
         state.owed.forEach { o ->
             ListRow(
                 title = o.person, subtitle = "${o.merchant} · ${IndianFormat.relativeDay(o.date, state.today)}",
-                leading = { MerchantTile(o.person, c.fixed) },
+                leading = { PersonAvatar(o.person, c.fixed) },
             ) { Amount(o.amount) }
             Row(Modifier.fillMaxWidth().padding(bottom = Space.sm), horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
                 GhostButton("Send UPI link", {
@@ -586,7 +582,11 @@ fun TxnSheet(id: String, startWithSplit: Boolean, onDismiss: () -> Unit) {
     val categories = listOf("Food", "Groceries", "Transport", "Shopping", "Entertainment", "Subscriptions", "Bills", "Education", "Health", "Other")
 
     RuvoSheet(IndianFormat.rupees(t.amount), onDismiss, eyebrow = "${IndianFormat.relativeDay(t.date, state.today)} · ${if (t.direction == Direction.CREDIT) "money in" else "payment"}") {
-        RuvoField(name, { name = it }, "Name")
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            MerchantLogo(name.ifBlank { t.merchant }, t.category, size = 52.dp)
+            Spacer(Modifier.width(Space.sm))
+            RuvoField(name, { name = it }, "Name", Modifier.weight(1f))
+        }
         Spacer(Modifier.height(Space.md))
         Eyebrow("Category")
         Spacer(Modifier.height(Space.xs))

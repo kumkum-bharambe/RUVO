@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.Alignment
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -166,7 +168,9 @@ fun WeeklyReviewSheet(onDismiss: () -> Unit, onOpenGuide: () -> Unit) {
             big.forEach { t ->
                 val verdict = state.settings.reviewOf(t.id)
                 RuvoCard(Modifier.fillMaxWidth().padding(top = Space.xs)) {
-                    Row {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        com.ruvo.design.MerchantLogo(t.merchant, t.category, size = 32.dp)
+                        Spacer(Modifier.width(Space.sm))
                         Text(t.merchant.ifBlank { t.category }, Modifier.weight(1f), style = Ruvo.type.bodyStrong, color = c.ink)
                         Amount(t.yourShare)
                     }

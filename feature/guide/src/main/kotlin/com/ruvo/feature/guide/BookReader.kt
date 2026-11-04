@@ -111,11 +111,10 @@ fun BookReader(bookId: String, onClose: () -> Unit, onApply: (Library.Apply) -> 
                 val saved = ideaKey in state.settings.savedIdeas
                 val canSave = pager.currentPage in 1..5
                 IconCircle(
-                    if (saved) RuvoIcons.Check else RuvoIcons.Spark,
+                    if (saved) RuvoIcons.BookmarkFilled else RuvoIcons.Bookmark,
                     if (saved) "Saved. Tap to remove" else "Save this idea",
                     { if (canSave) scope.launch { RuvoGraph.repository.toggleIdea(ideaKey); Haptics.tick(view) } },
-                    tint = if (saved) c.onAccent else if (canSave) c.ink else c.inkFaint,
-                    background = if (saved) c.fuel else c.glass,
+                    tint = if (saved) c.fuelInk else if (canSave) c.ink else c.inkFaint,
                 )
             }
 
@@ -146,7 +145,12 @@ fun BookReader(bookId: String, onClose: () -> Unit, onApply: (Library.Apply) -> 
                         when (page) {
                             6 -> CheckPage(label, book.check, answer) { answer = it; Haptics.tick(view) }
                             7 -> ApplyPage(label, text, onApply = { finish(book.apply) }, onAsk = { onClose(); onAsk("Explain \"${book.title}\" in simple words") })
-                            else -> TextPage(page, label, text)
+                            else -> {
+                                val key = "${book.id}:$page"
+                                TextPage(page, label, text, saved = key in state.settings.savedIdeas) {
+                                    scope.launch { RuvoGraph.repository.toggleIdea(key); Haptics.tick(view) }
+                                }
+                            }
                         }
                     }
                 }
@@ -198,10 +202,10 @@ private fun CoverPage(book: Library.Book, read: Boolean) {
 }
 
 @Composable
-private fun TextPage(page: Int, label: String, text: String) {
+private fun TextPage(page: Int, label: String, text: String, saved: Boolean, onSave: () -> Unit) {
     val c = Ruvo.colors
     RuvoCard(Modifier.fillMaxSize(), padding = androidx.compose.foundation.layout.PaddingValues(Space.xl)) {
-        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+        Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
             Text("$page", style = Ruvo.type.display, color = c.fuel)
             Spacer(Modifier.height(Space.xs))
             Eyebrow(label, color = c.inkSoft)
@@ -212,6 +216,29 @@ private fun TextPage(page: Int, label: String, text: String) {
                 Text("Take a moment. There's no right answer here.", style = Ruvo.type.caption, color = c.inkFaint)
             }
         }
+        Spacer(Modifier.height(Space.md))
+        SaveIdeaButton(saved, onSave)
+    }
+}
+
+/** Keeps the idea on this page in Profile > Saved ideas. The ribbon fills and the pill turns amber when saved. */
+@Composable
+private fun SaveIdeaButton(saved: Boolean, onSave: () -> Unit) {
+    val c = Ruvo.colors
+    val fill by animateColorAsState(if (saved) c.fuel else c.ink.copy(alpha = 0.06f), label = "saveFill")
+    val pop = remember { Animatable(1f) }
+    androidx.compose.runtime.LaunchedEffect(saved) { if (saved) { pop.snapTo(0.92f); pop.animateTo(1f, Motion.bouncy()) } }
+    Row(
+        Modifier.graphicsLayer { scaleX = pop.value; scaleY = pop.value }
+            .heightIn(min = 48.dp).clip(RoundedCornerShape(Radius.chip)).background(fill)
+            .border(1.dp, if (saved) c.fuel else c.hairline, RoundedCornerShape(Radius.chip))
+            .clickable(role = Role.Button, onClickLabel = if (saved) "Remove from saved ideas" else "Save this idea", onClick = onSave)
+            .padding(horizontal = Space.md, vertical = Space.sm),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(if (saved) RuvoIcons.BookmarkFilled else RuvoIcons.Bookmark, null, Modifier.size(18.dp), tint = if (saved) c.onAccent else c.ink)
+        Spacer(Modifier.width(Space.xs))
+        Text(if (saved) "Saved to your ideas" else "Save this idea", style = Ruvo.type.label, color = if (saved) c.onAccent else c.ink)
     }
 }
 
@@ -273,7 +300,7 @@ private fun ApplyPage(label: String, text: String, onApply: () -> Unit, onAsk: (
     val c = Ruvo.colors
     RuvoCard(Modifier.fillMaxSize(), brush = c.heroBrush, border = null, padding = androidx.compose.foundation.layout.PaddingValues(Space.xl)) {
         Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center) {
-            Icon(RuvoIcons.Spark, null, Modifier.size(40.dp), tint = c.fuel)
+            Icon(RuvoIcons.Bulb, null, Modifier.size(40.dp), tint = c.fuel)
             Spacer(Modifier.height(Space.md))
             Eyebrow(label, color = c.onHero.copy(alpha = 0.7f))
             Spacer(Modifier.height(Space.xs))

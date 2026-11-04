@@ -99,6 +99,7 @@ sealed interface Overlay {
     data object Weekly : Overlay
     data object Profile : Overlay
     data object Monthly : Overlay
+    data object Marketplace : Overlay
 }
 
 @Composable
@@ -128,7 +129,6 @@ private fun MainShell(state: AppState, request: LaunchRequest?, consumed: () -> 
     val reduced = Ruvo.reducedMotion
     var lastBook by remember { mutableStateOf<String?>(null) }
     var newGoal by remember { mutableStateOf(false) }
-    var toMarket by remember { mutableStateOf(false) }
 
     LaunchedEffect(request) {
         when (request) {
@@ -155,7 +155,7 @@ private fun MainShell(state: AppState, request: LaunchRequest?, consumed: () -> 
         openWeekly = { overlay = Overlay.Weekly },
         openMonthly = { overlay = Overlay.Monthly },
         openChat = { overlay = Overlay.Chat(it) },
-        openGuide = { tab = Tab.GUIDE },
+        openGuide = { overlay = Overlay.Marketplace },
         openAdd = { overlay = Overlay.QuickAdd },
         openProfile = { overlay = Overlay.Profile },
     )
@@ -164,6 +164,7 @@ private fun MainShell(state: AppState, request: LaunchRequest?, consumed: () -> 
         openBook = { overlay = Overlay.Book(it) },
         openBuy = { overlay = Overlay.Buy },
         openChat = { overlay = Overlay.Chat(it) },
+        openMarketplace = { overlay = Overlay.Marketplace },
     )
 
     AmbientBackdrop {
@@ -182,7 +183,7 @@ private fun MainShell(state: AppState, request: LaunchRequest?, consumed: () -> 
                 Tab.TODAY -> TodayScreen(actions)
                 Tab.MONEY -> MoneyScreen(openTxn = { overlay = Overlay.Txn(it) }, openAdd = { overlay = Overlay.QuickAdd })
                 Tab.GOALS -> GoalsScreen(startNewGoal = newGoal, onNewGoalShown = { newGoal = false }, onWeekly = { overlay = Overlay.Weekly })
-                Tab.GUIDE -> GuideScreen(guide, showMarketplace = toMarket, onMarketplaceShown = { toMarket = false })
+                Tab.GUIDE -> GuideScreen(guide)
             }
         }
 
@@ -259,12 +260,14 @@ private fun MainShell(state: AppState, request: LaunchRequest?, consumed: () -> 
         Overlay.Profile -> ProfileSheet(
             state, onDismiss = { overlay = Overlay.None },
             onSettings = { overlay = Overlay.Settings },
-            onMarketplace = { tab = Tab.GUIDE; toMarket = true },
+            onMarketplace = { overlay = Overlay.Marketplace },
+            onGuide = { tab = Tab.GUIDE },
             onPersonas = { overlay = Overlay.Personas },
             onWeekly = { overlay = Overlay.Weekly },
         )
         Overlay.Weekly -> WeeklyReviewSheet(onDismiss = { overlay = Overlay.None }, onOpenGuide = { tab = Tab.GUIDE })
         Overlay.Monthly -> MonthlyReviewSheet(state, onDismiss = { overlay = Overlay.None }, onWeekly = { overlay = Overlay.Weekly })
+        Overlay.Marketplace -> com.ruvo.feature.guide.MarketplaceSheet { overlay = Overlay.None }
     }
 }
 

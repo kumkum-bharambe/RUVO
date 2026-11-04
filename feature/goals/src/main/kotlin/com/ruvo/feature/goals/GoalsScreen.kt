@@ -14,6 +14,11 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import com.ruvo.design.FillBar
+import com.ruvo.design.Radius
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -145,7 +150,7 @@ fun GoalsScreen(startNewGoal: Boolean = false, onNewGoalShown: () -> Unit = {}, 
                 state.goals.chunked(2).forEachIndexed { row, pair ->
                     Row(Modifier.reveal(row), horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
                         pair.forEach { g ->
-                            GoalJarCard(g, state.goalShapes[g.id] ?: 0, tilt, state.today, Modifier.weight(1f)) { openGoal = g.id }
+                            GoalCard(g, state.goalShapes[g.id] ?: 0, tilt, state.today, Modifier.weight(1f)) { openGoal = g.id }
                         }
                         if (pair.size == 1) NewGoalCard(Modifier.weight(1f)) { newGoal = true }
                     }
@@ -190,7 +195,7 @@ private fun GoalInsights(state: AppState, modifier: Modifier) {
     val c = Ruvo.colors
     RuvoCard(modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(RuvoIcons.Spark, null, Modifier.size(18.dp), tint = c.futureInk)
+            Icon(RuvoIcons.Target, null, Modifier.size(18.dp), tint = c.futureInk)
             Spacer(Modifier.width(Space.xs))
             Eyebrow("Goal insights", color = c.futureInk)
         }
@@ -218,13 +223,17 @@ private fun GoalInsights(state: AppState, modifier: Modifier) {
 }
 
 @Composable
-private fun GoalJarCard(g: Goal, shape: Int, tilt: Float, today: LocalDate, modifier: Modifier, onClick: () -> Unit) {
+private fun GoalCard(g: Goal, shape: Int, tilt: Float, today: LocalDate, modifier: Modifier, onClick: () -> Unit) {
     val c = Ruvo.colors
-    val accent = if (g.isComplete) c.sun else c.future
-    RuvoCard(modifier, onClick = onClick, onClickLabel = "Open ${g.name}", padding = PaddingValues(Space.md)) {
-        Jar(g.progress.toFloat(), shape, tilt, accent, Modifier.fillMaxWidth().height(132.dp)
-            .clearAndSetSemantics { contentDescription = "${g.name}, ${(g.progress * 100).toInt()} percent saved" })
+    RuvoCard(modifier, onClick = onClick, onClickLabel = "Open ${g.name}", padding = PaddingValues(Space.sm)) {
+        GoalIllustration(
+            sceneFor(g.name, shape), tilt,
+            Modifier.fillMaxWidth().height(112.dp).clearAndSetSemantics { contentDescription = "${g.name}, ${(g.progress * 100).toInt()} percent saved" },
+            complete = g.isComplete,
+        )
         Spacer(Modifier.height(Space.sm))
+        FillBar(g.progress.toFloat(), if (g.isComplete) c.sun else c.future, height = 6.dp)
+        Spacer(Modifier.height(Space.xs))
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(g.name, Modifier.weight(1f), style = Ruvo.type.bodyStrong, color = c.ink, maxLines = 1)
             Text("${(g.progress * 100).toInt()}%", style = Ruvo.type.bodyStrong, color = c.futureInk)
@@ -239,66 +248,6 @@ private fun GoalJarCard(g: Goal, shape: Int, tilt: Float, today: LocalDate, modi
                 color = (if (g.isComplete) c.sun else if (ok) c.future else c.fuel).copy(alpha = 0.22f),
                 content = if (ok) c.futureInk else c.fuelInk,
             )
-        }
-    }
-}
-
-/** A jar drawn on canvas: glass outline, liquid at the goal's level, its surface tilting with the phone. */
-@Composable
-fun Jar(progress: Float, shape: Int, tilt: Float, accent: androidx.compose.ui.graphics.Color, modifier: Modifier) {
-    val c = Ruvo.colors
-    val level by animateFloatAsState(progress.coerceIn(0f, 1f), Motion.bouncy(), label = "jar")
-    val slosh by animateFloatAsState(tilt, Motion.bouncy(), label = "slosh")
-    val wave = rememberInfiniteTransition(label = "jarwave")
-    val phase by wave.animateFloat(0f, (2 * PI).toFloat(), infiniteRepeatable(tween(4200, easing = LinearEasing), RepeatMode.Restart), label = "p")
-    Canvas(modifier) {
-        val outline = jarPath(shape)
-        clipPath(outline) {
-            drawRect(c.ink.copy(alpha = if (c.isDark) 0.08f else 0.05f))
-            val top = size.height * (1f - level * 0.86f) - 2f
-            val lean = slosh * size.width * 0.18f
-            val p = Path().apply {
-                moveTo(0f, size.height)
-                var x = 0f
-                while (x <= size.width) {
-                    val t = x / size.width
-                    val y = top + (t - 0.5f) * lean * 2f + sin(t * 2f * PI.toFloat() + phase) * 3.dp.toPx()
-                    lineTo(x, y); x += 4f
-                }
-                lineTo(size.width, size.height); close()
-            }
-            if (level > 0f) drawPath(p, Brush.verticalGradient(listOf(accent.copy(alpha = 0.85f), accent), startY = top, endY = size.height))
-            // A soft highlight down the glass.
-            drawRect(androidx.compose.ui.graphics.Color.White.copy(alpha = 0.16f), topLeft = Offset(size.width * 0.18f, size.height * 0.2f), size = androidx.compose.ui.geometry.Size(size.width * 0.06f, size.height * 0.6f))
-        }
-        drawPath(outline, c.ink.copy(alpha = 0.4f), style = Stroke(width = 1.6.dp.toPx()))
-    }
-}
-
-private fun DrawScope.jarPath(shape: Int): Path {
-    val w = size.width
-    val h = size.height
-    return Path().apply {
-        when (shape % 3) {
-            1 -> { // tall bottle
-                moveTo(w * 0.40f, 0f); lineTo(w * 0.60f, 0f); lineTo(w * 0.60f, h * 0.16f)
-                cubicTo(w * 0.80f, h * 0.24f, w * 0.80f, h * 0.30f, w * 0.80f, h * 0.40f)
-                lineTo(w * 0.80f, h * 0.9f); quadraticTo(w * 0.80f, h, w * 0.68f, h); lineTo(w * 0.32f, h)
-                quadraticTo(w * 0.20f, h, w * 0.20f, h * 0.9f); lineTo(w * 0.20f, h * 0.40f)
-                cubicTo(w * 0.20f, h * 0.30f, w * 0.20f, h * 0.24f, w * 0.40f, h * 0.16f); close()
-            }
-            2 -> { // wide bowl
-                moveTo(w * 0.08f, h * 0.30f); lineTo(w * 0.92f, h * 0.30f)
-                cubicTo(w * 0.92f, h * 0.80f, w * 0.78f, h, w * 0.5f, h)
-                cubicTo(w * 0.22f, h, w * 0.08f, h * 0.80f, w * 0.08f, h * 0.30f); close()
-            }
-            else -> { // round jar
-                moveTo(w * 0.32f, 0f); lineTo(w * 0.68f, 0f); lineTo(w * 0.68f, h * 0.12f)
-                cubicTo(w * 0.92f, h * 0.18f, w * 0.92f, h * 0.30f, w * 0.92f, h * 0.45f)
-                lineTo(w * 0.92f, h * 0.86f); quadraticTo(w * 0.92f, h, w * 0.78f, h); lineTo(w * 0.22f, h)
-                quadraticTo(w * 0.08f, h, w * 0.08f, h * 0.86f); lineTo(w * 0.08f, h * 0.45f)
-                cubicTo(w * 0.08f, h * 0.30f, w * 0.08f, h * 0.18f, w * 0.32f, h * 0.12f); close()
-            }
         }
     }
 }
@@ -349,7 +298,9 @@ private fun GoalSheet(id: String, state: AppState, onDismiss: () -> Unit) {
     val daily = state.runway.dailySpend
 
     RuvoSheet(g.name, onDismiss, eyebrow = if (g.isComplete) "Goal complete" else "Goal") {
-        Jar(g.progress.toFloat(), state.goalShapes[g.id] ?: 0, tilt, if (g.isComplete) c.sun else c.future, Modifier.fillMaxWidth().height(200.dp))
+        GoalIllustration(sceneFor(g.name, state.goalShapes[g.id] ?: 0), tilt, Modifier.fillMaxWidth().height(180.dp), complete = g.isComplete)
+        Spacer(Modifier.height(Space.sm))
+        FillBar(g.progress.toFloat(), if (g.isComplete) c.sun else c.future, height = 8.dp)
         Spacer(Modifier.height(Space.md))
         Row(verticalAlignment = Alignment.Bottom) {
             Amount(g.protectedAmount, style = Ruvo.type.display)
@@ -429,7 +380,7 @@ fun NewGoalSheet(onDismiss: () -> Unit) {
     var target by remember { mutableStateOf("") }
     var monthly by remember { mutableStateOf("") }
     var months by remember { mutableStateOf(6) }
-    var shape by remember { mutableStateOf(0) }
+    var picked by remember { mutableStateOf<GoalScene?>(null) }
     val scope = rememberCoroutineScope()
     val tilt by rememberTilt()
     val c = Ruvo.colors
@@ -450,11 +401,22 @@ fun NewGoalSheet(onDismiss: () -> Unit) {
             listOf(3, 6, 12).forEach { m -> Chip("$m months", months == m, { months = m }) }
         }
         Spacer(Modifier.height(Space.md))
-        Eyebrow("Pick a jar")
-        Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
-            (0..2).forEach { s ->
-                RuvoCard(Modifier.weight(1f), color = if (shape == s) c.future.copy(alpha = 0.2f) else androidx.compose.ui.graphics.Color.Unspecified, onClick = { shape = s }, padding = PaddingValues(Space.sm)) {
-                    Jar(0.5f, s, tilt, c.future, Modifier.fillMaxWidth().height(70.dp))
+        Eyebrow("Pick a picture")
+        Text("Ruvo picks one from the name. Tap another if you like.", style = Ruvo.type.caption, color = c.inkFaint)
+        Spacer(Modifier.height(Space.xs))
+        val shown = picked ?: sceneFor(name, 0)
+        androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
+            items(GoalScene.entries.size) { i ->
+                val scene = GoalScene.entries[i]
+                val on = scene == shown
+                Column(
+                    Modifier.width(96.dp).clip(RoundedCornerShape(Radius.inner))
+                        .border(2.dp, if (on) c.fuel else androidx.compose.ui.graphics.Color.Transparent, RoundedCornerShape(Radius.inner))
+                        .clickable(role = androidx.compose.ui.semantics.Role.RadioButton, onClickLabel = scene.label) { picked = scene }
+                        .padding(4.dp),
+                ) {
+                    GoalIllustration(scene, tilt, Modifier.fillMaxWidth().height(64.dp))
+                    Text(scene.label, Modifier.padding(top = 4.dp, start = 4.dp), style = Ruvo.type.caption, color = if (on) c.ink else c.inkSoft)
                 }
             }
         }
@@ -462,7 +424,7 @@ fun NewGoalSheet(onDismiss: () -> Unit) {
         val t = parseRupees(target) ?: 0
         PrimaryButton("Create goal", {
             scope.launch {
-                RuvoGraph.repository.addGoal(name.ifBlank { "My goal" }, t, LocalDate.now().plusMonths(months.toLong()), parseRupees(monthly) ?: (t / months), shape)
+                RuvoGraph.repository.addGoal(name.ifBlank { "My goal" }, t, LocalDate.now().plusMonths(months.toLong()), parseRupees(monthly) ?: (t / months), picked?.let { PICKED_SCENE + it.ordinal } ?: 0)
             }
             onDismiss()
         }, Modifier.fillMaxWidth(), enabled = t > 0)
