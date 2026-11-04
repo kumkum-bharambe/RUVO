@@ -210,7 +210,7 @@ private fun FlowCard(
         }
         Spacer(Modifier.height(Space.md))
         Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
-            GhostButton("Update balance", onUpdateBalance, Modifier.weight(1f))
+            GhostButton("Balance", onUpdateBalance, Modifier.weight(1f))
             PrimaryButton("Add", onAdd, Modifier.weight(1f), icon = RuvoIcons.Plus)
         }
     }

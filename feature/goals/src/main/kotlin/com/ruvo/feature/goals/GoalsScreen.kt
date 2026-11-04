@@ -364,7 +364,7 @@ private fun GoalSheet(id: String, state: AppState, onDismiss: () -> Unit) {
                 listOf(100, 500, 1_000).forEach { v ->
                     val paise = v * 100L
                     val days = if (daily > 0) (paise / daily).toInt() else 0
-                    Chip("${IndianFormat.rupees(paise)} · ${days}d", false, {
+                    Chip(if (days > 0) "${IndianFormat.rupees(paise)} · ${days}d" else IndianFormat.rupees(paise), false, {
                         Haptics.confirm(view)
                         scope.launch { RuvoGraph.repository.pour(g.id, paise) }
                     }, accent = c.future)

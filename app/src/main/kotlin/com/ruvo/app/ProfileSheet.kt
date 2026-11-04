@@ -95,7 +95,7 @@ fun ProfileSheet(
         Row(Modifier.reveal(1), horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
             Stat("Runway", if (state.runway.unlimited) "No end" else IndianFormat.days(state.runway.runwayDays), Modifier.weight(1f))
             Stat("Goals", state.goals.size.toString(), Modifier.weight(1f))
-            Stat("Books read", "${Library.all.count { it.id in state.settings.readBooks }} of ${Library.all.size}", Modifier.weight(1f))
+            Stat("Read", "${Library.all.count { it.id in state.settings.readBooks }} of ${Library.all.size}", Modifier.weight(1f))
         }
 
         Spacer(Modifier.height(Space.lg))
@@ -114,7 +114,7 @@ fun ProfileSheet(
         Spacer(Modifier.height(Space.xs))
         Row(horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
             GhostButton("Your week", { onDismiss(); onWeekly() }, Modifier.weight(1f), icon = RuvoIcons.Calendar)
-            GhostButton(if (state.isDemo) "Switch student" else "Try a sample", { onDismiss(); onPersonas() }, Modifier.weight(1f))
+            GhostButton(if (state.isDemo) "Switch" else "Try a sample", { onDismiss(); onPersonas() }, Modifier.weight(1f))
         }
         Spacer(Modifier.height(Space.lg))
         Row(verticalAlignment = Alignment.CenterVertically) {
