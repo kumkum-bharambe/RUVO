@@ -109,6 +109,7 @@ fun RuvoOrb(
     val pullThreshold = with(density) { 64.dp.toPx() }
     val drag = remember { Animatable(Offset.Zero, Offset.VectorConverter) }
     val poke = remember { Animatable(0f) }
+    val hop = remember { Animatable(0f) }
     var pokeAt by remember { mutableStateOf(Offset.Zero) }
     var armed by remember { mutableStateOf(false) }
 
@@ -139,7 +140,11 @@ fun RuvoOrb(
                         pokeAt = at
                         scope.launch { poke.snapTo(1f); poke.animateTo(0f, tween(1100)) }
                     },
-                    onTap = { Haptics.tick(view); onTalk() },
+                    onTap = {
+                        Haptics.tick(view)
+                        if (!reduced) scope.launch { hop.snapTo(0f); hop.animateTo(1f, tween(520)); hop.snapTo(0f) }
+                        onTalk()
+                    },
                 )
             }
             .pointerInput(Unit) {
@@ -162,11 +167,23 @@ fun RuvoOrb(
                 }
             },
     ) {
-        if (Build.VERSION.SDK_INT >= 33 && !reduced) {
-            ShaderOrb(mood, tilt, poke.value, pokeAt, halo)
-        } else {
-            CanvasOrb(mood, if (reduced) 0f else tilt, poke.value, halo)
+        // Ruvo 7's fox is the companion now. A tap makes it hop before the chat opens; a goal reached makes it glow.
+        val hopY = with(density) { -22.dp.toPx() }
+        if (mood.glow) {
+            Canvas(Modifier.fillMaxSize().graphicsLayer { scaleX = 1.5f; scaleY = 1.5f }) {
+                drawCircle(Brush.radialGradient(listOf(Color(0xFFFFD54F).copy(alpha = 0.55f * halo), Color.Transparent)))
+            }
         }
+        FoxPet(
+            mood.fox(),
+            Modifier.fillMaxSize().graphicsLayer {
+                val p = hop.value
+                translationY = hopY * sin(PI.toFloat() * p)
+                val squash = if (p < 0.15f || p > 0.85f) 1f - 0.08f * sin(PI.toFloat() * (if (p < 0.15f) p / 0.15f else (1f - p) / 0.15f)) else 1f
+                scaleX = 2f - squash; scaleY = squash
+                transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 1f)
+            },
+        )
     }
 }
 

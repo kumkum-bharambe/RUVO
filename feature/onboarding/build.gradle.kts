@@ -19,6 +19,7 @@ android {
 dependencies {
     implementation(project(":core:design"))
     implementation(project(":core:data"))
+    implementation(project(":feature:orb"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)

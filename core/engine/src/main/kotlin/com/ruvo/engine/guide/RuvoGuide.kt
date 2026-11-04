@@ -175,7 +175,7 @@ object RuvoGuide {
     private fun moneyIn(c: Context): Reply {
         val s = MoneyArrives.suggest(c.input.income.expectedAmount, c.input.commitments, c.input.goals)
         val text = if (s.received <= 0) {
-            "Lovely. Add it from the Orb so your runway updates, and Ruvo will suggest how to set it up."
+            "Lovely. Add it with the + button so your runway updates, and Ruvo will suggest how to set it up."
         } else {
             "Nice. A calm way to set it up: put ${IndianFormat.rupees(s.setAsideFixed)} aside for Fixed first, move " +
                 "${IndianFormat.rupees(s.suggestFuture)} to your goals, and the remaining ${IndianFormat.rupees(s.leavesFuel)} is Fuel."

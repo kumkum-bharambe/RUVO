@@ -89,6 +89,7 @@ fun ChatSheet(onDismiss: () -> Unit, firstQuestion: String? = null) {
         if (!heard.isNullOrBlank()) input = heard
     }
     val canDictate = remember { SpeechRecognizer.isRecognitionAvailable(context) }
+    val foxMood = OrbMood.from(state.runway, false).fox()
 
     fun ask(q: String) {
         if (q.isBlank()) return
@@ -171,10 +172,7 @@ fun ChatSheet(onDismiss: () -> Unit, firstQuestion: String? = null) {
                 } else {
                     // Ruvo's answer: glass bubble beside a small amber orb.
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-                        Box(
-                            Modifier.size(32.dp).clip(androidx.compose.foundation.shape.CircleShape)
-                                .background(androidx.compose.ui.graphics.Brush.radialGradient(listOf(c.orbCore, c.orbGlow, c.orbDeep))),
-                        )
+                        FoxPet(foxMood, Modifier.size(38.dp))
                         Spacer(Modifier.size(10.dp))
                         Column(
                             Modifier.weight(1f).clip(RoundedCornerShape(topStart = 6.dp, topEnd = 22.dp, bottomStart = 22.dp, bottomEnd = 22.dp))
@@ -204,7 +202,13 @@ fun ChatSheet(onDismiss: () -> Unit, firstQuestion: String? = null) {
                     }
                 }
             }
-            if (thinking) Text("Ruvo is thinking", style = Ruvo.type.caption, color = c.inkFaint)
+            if (thinking) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    FoxPet(FoxMood.THINKING, Modifier.size(38.dp))
+                    Spacer(Modifier.size(10.dp))
+                    Text("Ruvo is thinking", style = Ruvo.type.caption, color = c.inkFaint)
+                }
+            }
         }
         Spacer(Modifier.height(Space.md))
         // The pill input: the mic turns into Send as soon as there is text.

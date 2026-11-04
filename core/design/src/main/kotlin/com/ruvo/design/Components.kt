@@ -65,6 +65,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
@@ -284,6 +285,7 @@ fun Chip(text: String, selected: Boolean, onClick: () -> Unit, modifier: Modifie
     val text_ = when {
         !selected -> c.ink
         accent == c.ink && !c.isDark -> c.surface
+        accent.luminance() < 0.35f -> Color.White
         else -> c.onAccent
     }
     Box(
@@ -407,6 +409,12 @@ data class StatusItem(val label: String, val dot: Color, val onClick: () -> Unit
 @Composable
 fun StatusChips(items: List<StatusItem>, modifier: Modifier = Modifier) {
     val reduced = Ruvo.reducedMotion
+    // White chips on Daybreak, black chips on Night swim (Ruvo 7).
+    val dark = Ruvo.colors.isDark
+    val fill = if (dark) Color(0xFF0B0B0D) else Color.White
+    val text = if (dark) Color.White else Color(0xFF111113)
+    val edge = if (dark) Color.White.copy(alpha = 0.16f) else Color(0xFF111113).copy(alpha = 0.14f)
+    val shine = if (dark) Color.White.copy(alpha = 0.18f) else Color(0xFF111113).copy(alpha = 0.1f)
     val loop = rememberInfiniteTransition(label = "chips")
     val t by loop.animateFloat(0f, 1f, infiniteRepeatable(tween(2800, easing = LinearEasing)), label = "t")
     val sweep by loop.animateFloat(-0.6f, 1.6f, infiniteRepeatable(tween(4200, easing = LinearEasing)), label = "sweep")
@@ -422,14 +430,14 @@ fun StatusChips(items: List<StatusItem>, modifier: Modifier = Modifier) {
             val shape = RoundedCornerShape(Radius.chip)
             Row(
                 Modifier.graphicsLayer { translationY = bob * density }
-                    .shadow(8.dp, shape, ambientColor = Color.Black, spotColor = Color.Black)
-                    .clip(shape).background(Color(0xFF0B0B0D)).border(1.dp, Color.White.copy(alpha = 0.16f), shape)
+                    .shadow(8.dp, shape, ambientColor = Color.Black.copy(alpha = if (dark) 1f else 0.4f), spotColor = Color.Black.copy(alpha = if (dark) 1f else 0.4f))
+                    .clip(shape).background(fill).border(1.dp, edge, shape)
                     .clickable(role = Role.Button, onClickLabel = "Open ${item.label}", onClick = item.onClick)
                     .drawWithContent {
                         drawContent()
                         if (!reduced) {
                             val x = size.width * (((sweep + i * 0.35f) % 2.2f) - 0.6f)
-                            drawRect(Brush.horizontalGradient(listOf(Color.Transparent, Color.White.copy(alpha = 0.18f), Color.Transparent), startX = x, endX = x + size.width * 0.4f))
+                            drawRect(Brush.horizontalGradient(listOf(Color.Transparent, shine, Color.Transparent), startX = x, endX = x + size.width * 0.4f))
                         }
                     }
                     .padding(horizontal = 14.dp, vertical = 10.dp),
@@ -440,7 +448,7 @@ fun StatusChips(items: List<StatusItem>, modifier: Modifier = Modifier) {
                     Box(Modifier.size(9.dp).clip(CircleShape).background(item.dot))
                 }
                 Spacer(Modifier.width(8.dp))
-                Text(item.label, style = Ruvo.type.label, color = Color.White, maxLines = 1)
+                Text(item.label, style = Ruvo.type.label, color = text, maxLines = 1)
             }
         }
     }

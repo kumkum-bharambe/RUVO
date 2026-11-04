@@ -481,7 +481,10 @@ fun MonthlyReviewSheet(state: AppState, onDismiss: () -> Unit, onWeekly: () -> U
     var giveJob by remember { mutableStateOf(false) }
     RuvoSheet("Your month in 30 seconds", onDismiss, eyebrow = "${month.month.name.lowercase().replaceFirstChar { it.uppercase() }} so far") {
         Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
-            RuvoCard(Modifier.weight(1f).reveal(0)) { Eyebrow("Received"); Amount(came, style = Ruvo.type.title, color = c.futureInk) }
+            RuvoCard(Modifier.weight(1f).reveal(0), brush = c.bucketBrush(com.ruvo.engine.Bucket.FUTURE), border = null) {
+                Eyebrow("Received", color = androidx.compose.ui.graphics.Color(0xFF0B1A33).copy(alpha = 0.75f))
+                Amount(came, style = Ruvo.type.title, color = androidx.compose.ui.graphics.Color(0xFF0B1A33), countUp = true)
+            }
             RuvoCard(Modifier.weight(1f).reveal(1), brush = c.heroBrush, border = null) { Eyebrow("Spent", color = c.onHero.copy(alpha = 0.7f)); Amount(went, style = Ruvo.type.title, color = c.onHero) }
         }
         Spacer(Modifier.height(Space.sm))

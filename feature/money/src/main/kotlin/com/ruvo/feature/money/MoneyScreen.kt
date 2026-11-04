@@ -2,6 +2,10 @@ package com.ruvo.feature.money
 
 import android.content.Intent
 import androidx.compose.foundation.background
+import com.ruvo.design.Motion
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Box
 import com.ruvo.design.Radius
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -141,7 +145,8 @@ fun MoneyScreen(openTxn: (String) -> Unit, openAdd: () -> Unit = {}) {
                 item {
                     Column(Modifier.padding(horizontal = Space.gutter)) {
                         Row(horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
-                            Span.entries.forEach { s -> Chip(s.label, span == s, { span = s; back = 0 }) }
+                            // Ruvo 7's black period menu.
+                            Span.entries.forEach { s -> Chip(s.label, span == s, { span = s; back = 0 }, accent = androidx.compose.ui.graphics.Color(0xFF0B0B0D)) }
                         }
                         category?.let { cat ->
                             Spacer(Modifier.height(Space.xs))
@@ -168,7 +173,15 @@ fun MoneyScreen(openTxn: (String) -> Unit, openAdd: () -> Unit = {}) {
                     items.forEach { entry -> item(key = entry.txn.id) { TxnRow(entry, state, openTxn) } }
                 }
             }
-            MoneyTab.HISTORY -> item { History(state) { editMonth = it } }
+            MoneyTab.HISTORY -> item {
+                History(state, onEdit = { editMonth = it }, onView = { ym ->
+                    // Jump to Activity, monthly, stepped back to that month.
+                    span = Span.MONTH
+                    back = java.time.temporal.ChronoUnit.MONTHS.between(ym, java.time.YearMonth.from(state.today)).toInt().coerceAtLeast(0)
+                    category = null
+                    tab = MoneyTab.ACTIVITY
+                })
+            }
             MoneyTab.OWED -> item { Owed(state) }
         }
     }
@@ -197,24 +210,26 @@ private fun FlowCard(
             if (range != null) IconCircle(RuvoIcons.Forward, "Later", onForward, tint = if (back > 0) c.ink else c.inkFaint.copy(alpha = 0.4f))
         }
         Spacer(Modifier.height(Space.md))
-        Row {
-            Column(Modifier.weight(1f)) {
-                Eyebrow("Money in", color = c.futureInk)
-                Amount(f.moneyIn, style = Ruvo.type.title, color = c.futureInk, signed = f.moneyIn > 0)
-                Text("credited", style = Ruvo.type.caption, color = c.inkFaint)
+        // Ruvo 7: Credited in blue, Debited beside it, and what is left underneath.
+        val blueInk = androidx.compose.ui.graphics.Color(0xFF0B1A33)
+        Row(horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
+            RuvoCard(Modifier.weight(1f), brush = c.bucketBrush(com.ruvo.engine.Bucket.FUTURE), border = null, elevated = !c.isDark, padding = PaddingValues(Space.md)) {
+                Eyebrow("Credited", color = blueInk.copy(alpha = 0.75f))
+                Amount(f.moneyIn, style = Ruvo.type.title, color = blueInk, signed = f.moneyIn > 0, countUp = true)
+                Text("money in", style = Ruvo.type.caption, color = blueInk.copy(alpha = 0.7f))
             }
-            Box(Modifier.width(1.dp).height(56.dp).background(c.glassEdge))
-            Column(Modifier.weight(1f).padding(start = Space.md)) {
-                Eyebrow("Money out")
-                Amount(-f.moneyOut, style = Ruvo.type.title)
-                Text("debited", style = Ruvo.type.caption, color = c.inkFaint)
+            RuvoCard(Modifier.weight(1f), padding = PaddingValues(Space.md)) {
+                Eyebrow("Debited")
+                Amount(-f.moneyOut, style = Ruvo.type.title, countUp = true)
+                Text("money out", style = Ruvo.type.caption, color = c.inkFaint)
             }
-            Box(Modifier.width(1.dp).height(56.dp).background(c.glassEdge))
-            Column(Modifier.weight(1f).padding(start = Space.md)) {
-                Eyebrow("Net")
-                Amount(f.net, style = Ruvo.type.title, color = if (f.net < 0) c.warning else c.ink, signed = f.net > 0)
-                Text("${f.count} entries", style = Ruvo.type.caption, color = c.inkFaint)
-            }
+        }
+        Spacer(Modifier.height(Space.sm))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(if (f.net >= 0) "Left" else "Over by", Modifier.weight(1f), style = Ruvo.type.bodyStrong, color = c.ink)
+            Amount(kotlin.math.abs(f.net), style = Ruvo.type.title, color = if (f.net < 0) c.warning else c.ink)
+            Spacer(Modifier.width(Space.xs))
+            Text("· ${f.count} entries", style = Ruvo.type.caption, color = c.inkFaint)
         }
         Spacer(Modifier.height(Space.md))
         Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
@@ -331,29 +346,43 @@ private fun WhereItWent(state: AppState, modifier: Modifier, onCategory: (String
 
 /** Received and spent for the last three months, as paired pills, plus each month's numbers. */
 @Composable
-private fun History(state: AppState, onEdit: (java.time.YearMonth) -> Unit) {
+private fun History(state: AppState, onEdit: (java.time.YearMonth) -> Unit, onView: (java.time.YearMonth) -> Unit = {}) {
     val c = Ruvo.colors
     val edits = state.settings.monthEditMap()
     val months = remember(state.input.transactions, state.today, edits) { Insights.months(state.input.transactions, state.today, 6, edits) }
     Column(Modifier.padding(horizontal = Space.gutter)) {
+        // Ruvo 7: tap a month; the others fade, and its numbers appear below.
+        var picked by rememberSaveable { mutableStateOf<String?>(null) }
+        val sel = months.firstOrNull { it.month.toString() == picked } ?: months.last()
         RuvoCard(Modifier.fillMaxWidth().reveal(2)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Received and spent", Modifier.weight(1f), style = Ruvo.type.title, color = c.ink)
-                Text("Last 3 months", style = Ruvo.type.caption, color = c.inkFaint)
+                Text("Tap a month", style = Ruvo.type.caption, color = c.inkFaint)
             }
             Spacer(Modifier.height(Space.md))
             val max = months.maxOfOrNull { maxOf(it.received, it.spent) }?.toFloat()?.coerceAtLeast(1f) ?: 1f
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.Bottom) {
                 months.forEach { m ->
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        PillBars(
-                            listOf(
-                                Pill("", m.received / max * 100f, spoken = "${m.month.month.name.lowercase()} received ${IndianFormat.spoken(m.received)}"),
-                                Pill("", m.spent / max * 100f, highlight = true, spoken = "spent ${IndianFormat.spoken(m.spent)}"),
-                            ),
-                            Modifier.width(64.dp), height = 120.dp, color = c.future, highlightColor = c.fuel,
+                    val on = m.month == sel.month
+                    val fade by androidx.compose.animation.core.animateFloatAsState(if (on) 1f else 0.42f, label = "fade${m.month}")
+                    Column(
+                        Modifier.weight(1f).clip(RoundedCornerShape(Radius.inner))
+                            .clickable(role = androidx.compose.ui.semantics.Role.Tab, onClickLabel = "Show ${m.month.month.name.lowercase()}") { picked = m.month.toString() }
+                            .semantics(mergeDescendants = true) { contentDescription = "${m.month.month.name.lowercase()}, received ${IndianFormat.spoken(m.received)}, spent ${IndianFormat.spoken(m.spent)}" }
+                            .graphicsLayer { alpha = fade },
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Row(Modifier.height(120.dp), horizontalArrangement = Arrangement.spacedBy(3.dp), verticalAlignment = Alignment.Bottom) {
+                            listOf(m.received to c.future, m.spent to c.fuel).forEach { (v, col) ->
+                                val h by androidx.compose.animation.core.animateFloatAsState((v / max).coerceIn(0.04f, 1f), Motion.gentle(), label = "h")
+                                Box(Modifier.width(14.dp).fillMaxHeight(h).clip(RoundedCornerShape(Radius.chip)).background(col))
+                            }
+                        }
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            m.month.month.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.ENGLISH),
+                            style = if (on) Ruvo.type.bodyStrong else Ruvo.type.label, color = if (on) c.ink else c.inkSoft,
                         )
-                        Text(m.month.month.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.ENGLISH), style = Ruvo.type.label, color = c.inkSoft)
                     }
                 }
             }
@@ -361,6 +390,33 @@ private fun History(state: AppState, onEdit: (java.time.YearMonth) -> Unit) {
             Row(horizontalArrangement = Arrangement.spacedBy(Space.md)) {
                 LegendDot(c.future, "Received")
                 LegendDot(c.fuel, "Spent")
+            }
+            Spacer(Modifier.height(Space.md))
+            Box(Modifier.fillMaxWidth().height(1.dp).background(c.hairline))
+            Spacer(Modifier.height(Space.sm))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    sel.month.month.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.ENGLISH) + " " + sel.month.year,
+                    Modifier.weight(1f), style = Ruvo.type.title, color = c.ink,
+                )
+                Text(
+                    (if (sel.leftOver >= 0) "Left " else "Over by ") + IndianFormat.rupees(kotlin.math.abs(sel.leftOver)),
+                    style = Ruvo.type.caption, color = if (sel.leftOver < 0) c.warning else c.inkSoft,
+                )
+            }
+            Spacer(Modifier.height(Space.xs))
+            Row {
+                listOf("Received" to sel.received, "Spent" to sel.spent, "Left" to sel.leftOver).forEach { (k, v) ->
+                    Column(Modifier.weight(1f)) {
+                        Eyebrow(k)
+                        Amount(v, style = Ruvo.type.bodyStrong, color = if (k == "Left" && v < 0) c.warning else c.ink)
+                    }
+                }
+            }
+            Spacer(Modifier.height(Space.sm))
+            Row(horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
+                PrimaryButton("View transactions", { onView(sel.month) }, Modifier.weight(1f))
+                GhostButton("Edit", { onEdit(sel.month) }, Modifier.weight(0.6f))
             }
         }
         months.reversed().forEachIndexed { i, m ->

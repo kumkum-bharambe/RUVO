@@ -313,7 +313,7 @@ private fun Welcome(adult: Boolean, setAdult: (Boolean) -> Unit) {
     }
 }
 
-/** Slide 1: a glowing amber sphere, the Orb before you meet it. */
+/** Slide 1: Ruvo's fox, happy to meet you, on amber. */
 @Composable
 private fun SlideOrb() {
     val c = Ruvo.colors
@@ -321,10 +321,7 @@ private fun SlideOrb() {
     val bob by t.animateFloat(-6f, 6f, infiniteRepeatable(tween(2800), RepeatMode.Reverse), label = "bob")
     val reduced = Ruvo.reducedMotion
     Box(Modifier.fillMaxSize().clip(RoundedCornerShape(Radius.card)).background(c.amberBrush), contentAlignment = Alignment.Center) {
-        Box(
-            Modifier.size(150.dp).graphicsLayer { translationY = if (reduced) 0f else bob * density }
-                .clip(CircleShape).background(androidx.compose.ui.graphics.Brush.radialGradient(listOf(c.orbCore, c.fuel, c.orbDeep))),
-        )
+        com.ruvo.feature.orb.FoxPet(com.ruvo.feature.orb.FoxMood.HAPPY, Modifier.size(190.dp).graphicsLayer { translationY = if (reduced) 0f else bob * density * 0.5f })
     }
 }
 
@@ -441,7 +438,7 @@ private fun Tracking(onFinish: (withSms: Boolean) -> Unit) {
     }, Modifier.fillMaxWidth())
     Spacer(Modifier.height(Space.sm))
     GhostButton("Not now", { onFinish(false) }, Modifier.fillMaxWidth())
-    Text("You can add spends by pulling the Orb down, any time.", Modifier.padding(top = Space.sm), style = Ruvo.type.caption, color = c.inkFaint)
+    Text("Add spends any time with the + button, or by pulling the fox down.", Modifier.padding(top = Space.sm), style = Ruvo.type.caption, color = c.inkFaint)
 }
 
 /** Choose one of the five sample students. Replaces whatever is on the phone with sample data. */
