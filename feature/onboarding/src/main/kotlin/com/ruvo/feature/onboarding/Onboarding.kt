@@ -254,10 +254,10 @@ private fun OptionCard(title: String, subtitle: String, selected: Boolean, onCli
     val c = Ruvo.colors
     RuvoCard(
         Modifier.fillMaxWidth().padding(bottom = Space.sm),
-        brush = if (selected) (if (c.isDark) c.amberBrush else c.heroBrush) else null,
+        brush = if (selected) c.brandBrush else null,
         border = if (selected) null else androidx.compose.ui.graphics.Color.Unspecified, elevated = selected, onClick = onClick,
     ) {
-        val on = if (c.isDark) c.onAccent else c.onHero
+        val on = c.onBrand
         Text(title, style = Ruvo.type.title, color = if (selected) on else c.ink)
         Text(subtitle, style = Ruvo.type.caption, color = if (selected) on.copy(alpha = 0.75f) else c.inkSoft)
     }
@@ -309,7 +309,7 @@ private fun SlideOrb() {
     val t = rememberInfiniteTransition(label = "orbSlide")
     val bob by t.animateFloat(-6f, 6f, infiniteRepeatable(tween(2800), RepeatMode.Reverse), label = "bob")
     val reduced = Ruvo.reducedMotion
-    Box(Modifier.fillMaxSize().clip(RoundedCornerShape(Radius.card)).background(c.amberBrush), contentAlignment = Alignment.Center) {
+    Box(Modifier.fillMaxSize().clip(RoundedCornerShape(Radius.card)).background(c.heroBrush), contentAlignment = Alignment.Center) {
         com.ruvo.feature.orb.RuvoPet(com.ruvo.feature.orb.PetMood.HAPPY, Modifier.size(190.dp).graphicsLayer { translationY = if (reduced) 0f else bob * density * 0.5f })
     }
 }
@@ -319,7 +319,7 @@ private fun SlideOrb() {
 private fun SlideJobs(active: Boolean) {
     val c = Ruvo.colors
     Column(Modifier.fillMaxSize().clip(RoundedCornerShape(Radius.card)).background(c.glass).padding(Space.md), verticalArrangement = Arrangement.Center) {
-        listOf(Triple("Fixed", c.bucketBrush(com.ruvo.engine.Bucket.FIXED), -2f), Triple("Fuel", c.amberBrush, 2f), Triple("Future", c.bucketBrush(com.ruvo.engine.Bucket.FUTURE), -2f))
+        listOf(Triple("Fixed", c.bucketBrush(com.ruvo.engine.Bucket.FIXED), -2f), Triple("Fuel", c.bucketBrush(com.ruvo.engine.Bucket.FUEL), 2f), Triple("Future", c.bucketBrush(com.ruvo.engine.Bucket.FUTURE), -2f))
             .forEachIndexed { i, (label, brush, rot) ->
                 val pop = remember { Animatable(0f) }
                 LaunchedEffect(active) { if (active) { pop.snapTo(0f); kotlinx.coroutines.delay(i * 120L); pop.animateTo(1f, Motion.bouncy()) } }

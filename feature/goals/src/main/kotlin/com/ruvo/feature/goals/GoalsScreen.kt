@@ -300,8 +300,8 @@ private fun MilestoneBar(progress: Float, accent: androidx.compose.ui.graphics.C
 private fun NewGoalCard(modifier: Modifier, onClick: () -> Unit) {
     val c = Ruvo.colors
     RuvoCard(modifier, onClick = onClick, onClickLabel = "Add a goal") {
-        Box(Modifier.size(44.dp).clip(androidx.compose.foundation.shape.CircleShape).background(c.amberBrush), contentAlignment = Alignment.Center) {
-            Icon(RuvoIcons.Plus, null, Modifier.size(24.dp), tint = c.onAccent)
+        Box(Modifier.size(44.dp).clip(androidx.compose.foundation.shape.CircleShape).background(c.brandBrush), contentAlignment = Alignment.Center) {
+            Icon(RuvoIcons.Plus, null, Modifier.size(24.dp), tint = c.onBrand)
         }
         Spacer(Modifier.height(Space.xs))
         Text("New goal", style = Ruvo.type.bodyStrong, color = c.ink)
@@ -546,8 +546,8 @@ private fun MonthReview(state: AppState, onDismiss: () -> Unit, onSeeWeek: () ->
     Column {
         Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
             RuvoCard(Modifier.weight(1f).reveal(0), brush = c.bucketBrush(com.ruvo.engine.Bucket.FUTURE), border = null) {
-                Eyebrow("Received", color = androidx.compose.ui.graphics.Color(0xFF0B1A33).copy(alpha = 0.75f))
-                Amount(came, style = Ruvo.type.title, color = androidx.compose.ui.graphics.Color(0xFF0B1A33), countUp = true)
+                Eyebrow("Received", color = c.onAccent.copy(alpha = 0.75f))
+                Amount(came, style = Ruvo.type.title, color = c.onAccent, countUp = true)
             }
             RuvoCard(Modifier.weight(1f).reveal(1), brush = c.heroBrush, border = null) { Eyebrow("Spent", color = c.onHero.copy(alpha = 0.7f)); Amount(went, style = Ruvo.type.title, color = c.onHero) }
         }
@@ -573,7 +573,7 @@ private fun MonthReview(state: AppState, onDismiss: () -> Unit, onSeeWeek: () ->
 private fun NextStep(label: String, text: String, action: String, onClick: () -> Unit) {
     val c = Ruvo.colors
     RuvoCard(Modifier.fillMaxWidth().padding(bottom = Space.xs)) {
-        Eyebrow(label, color = c.fuelInk)
+        Eyebrow(label, color = c.brandInk)
         Spacer(Modifier.height(Space.xxs))
         Text(text, style = Ruvo.type.body, color = c.ink)
         Spacer(Modifier.height(Space.sm))

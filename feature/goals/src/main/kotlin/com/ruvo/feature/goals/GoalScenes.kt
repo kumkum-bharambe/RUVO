@@ -187,7 +187,7 @@ private fun DrawScope.laptop(sky: Sky, s: Float, t: Float) {
         Brush.linearGradient(listOf(Color(0xFF1B2A6B), Color(0xFF4A9BEA)), Offset(left, top), Offset(left + sw, top + sh)),
         Offset(left + inset, top + inset), Size(sw - inset * 2, sh - inset * 2), CornerRadius(s * 0.015f),
     )
-    // Ruvo's own mark on the screen: the R with a rupee inside it, in white and lavender.
+    // Ruvo's own mark on the screen: the R with a rupee inside it, in white and sky blue.
     val m = sh * 0.6f
     val ox = cx - m * 0.51f
     val oy = top + (sh - m) / 2f
@@ -203,7 +203,7 @@ private fun DrawScope.laptop(sky: Sky, s: Float, t: Float) {
         lineTo(q(16f, 26f).x, q(16f, 26f).y); close()
         moveTo(q(46f, 54f).x, q(46f, 54f).y); lineTo(q(60f, 54f).x, q(60f, 54f).y); lineTo(q(86f, 88f).x, q(86f, 88f).y); lineTo(q(72f, 88f).x, q(72f, 88f).y); close()
     }, Color.White)
-    val lav = Color(0xFFC9B8FF)
+    val lav = Color(0xFF9DB4FF)
     drawRect(lav, q(16f, 31f), Size(20 * k, 7 * k))
     drawRect(lav, q(16f, 43f), Size(20 * k, 7 * k))
     drawPath(Path().apply {

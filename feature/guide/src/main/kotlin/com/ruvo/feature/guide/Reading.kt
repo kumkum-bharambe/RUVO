@@ -115,7 +115,7 @@ private fun BookLine(book: Library.Book, read: Boolean, onClick: () -> Unit) {
                 Icon(RuvoIcons.Check, "Read", Modifier.size(16.dp), tint = c.futureInk)
             }
         } else {
-            Text("Read", Modifier.graphicsLayer { alpha = 0.9f }, style = Ruvo.type.label, color = c.fuelInk)
+            Text("Read", Modifier.graphicsLayer { alpha = 0.9f }, style = Ruvo.type.label, color = c.brandInk)
         }
     }
 }

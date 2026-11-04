@@ -300,7 +300,7 @@ private fun Toggle(title: String, subtitle: String, on: Boolean, onChange: (Bool
         }
         Switch(
             on, onChange,
-            colors = SwitchDefaults.colors(checkedThumbColor = c.onAccent, checkedTrackColor = c.fuel, checkedBorderColor = c.fuel, uncheckedThumbColor = c.inkSoft, uncheckedTrackColor = c.hairline, uncheckedBorderColor = c.hairline),
+            colors = SwitchDefaults.colors(checkedThumbColor = c.onBrand, checkedTrackColor = c.brand, checkedBorderColor = c.brand, uncheckedThumbColor = c.inkSoft, uncheckedTrackColor = c.hairline, uncheckedBorderColor = c.hairline),
         )
     }
 }

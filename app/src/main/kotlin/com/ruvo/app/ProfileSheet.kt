@@ -86,14 +86,14 @@ fun ProfileSheet(
         // Who you are, on navy, with the three numbers that sum it up.
         RuvoCard(Modifier.fillMaxWidth().reveal(0), brush = c.heroBrush, border = null, elevated = true) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(60.dp).clip(CircleShape).background(c.amberBrush), contentAlignment = Alignment.Center) {
-                    Text(state.displayName.firstOrNull { it.isLetter() }?.uppercase() ?: "R", style = Ruvo.type.headline, color = c.onAccent)
+                Box(Modifier.size(60.dp).clip(CircleShape).background(androidx.compose.ui.graphics.Color.White), contentAlignment = Alignment.Center) {
+                    Text(state.displayName.firstOrNull { it.isLetter() }?.uppercase() ?: "R", style = Ruvo.type.headline, color = c.brand)
                 }
                 Spacer(Modifier.width(Space.sm))
                 Column(Modifier.weight(1f)) {
                     Text(if (state.displayName == "there") "You" else state.displayName, style = Ruvo.type.headline, color = c.onHero)
                     Text(who, style = Ruvo.type.caption, color = c.onHero.copy(alpha = 0.72f))
-                    if (state.isDemo) Text("Sample student, none of this is real", style = Ruvo.type.caption, color = if (c.isDark) c.fuel else c.fixedInk)
+                    if (state.isDemo) Text("Sample student, none of this is real", style = Ruvo.type.caption, color = c.onHero.copy(alpha = 0.75f))
                 }
                 if (!state.isDemo) {
                     androidx.compose.material3.TextButton({ editing = !editing }) {

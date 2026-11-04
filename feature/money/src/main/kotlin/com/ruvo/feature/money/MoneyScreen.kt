@@ -128,7 +128,7 @@ fun MoneyScreen(openTxn: (String) -> Unit, openAdd: () -> Unit = {}) {
                     Eyebrow("Money")
                     Text("Where it is, where it went", Modifier.semantics { heading() }, style = Ruvo.type.headline, color = c.ink)
                 }
-                IconCircle(RuvoIcons.Plus, "Add a spend", openAdd, tint = c.onAccent, background = c.fuel)
+                IconCircle(RuvoIcons.Plus, "Add a spend", openAdd, tint = c.onBrand, background = c.brand)
             }
         }
         item { BalanceCard(state, Modifier.padding(horizontal = Space.gutter).reveal(0)) { balanceSheet = true } }
@@ -215,7 +215,7 @@ private fun FlowCard(
         }
         Spacer(Modifier.height(Space.md))
         // Ruvo 7: Credited in blue, Debited beside it, and what is left underneath.
-        val blueInk = androidx.compose.ui.graphics.Color(0xFF0B1A33)
+        val blueInk = c.onAccent
         Row(horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
             RuvoCard(Modifier.weight(1f), brush = c.bucketBrush(com.ruvo.engine.Bucket.FUTURE), border = null, elevated = !c.isDark, padding = PaddingValues(Space.md)) {
                 Eyebrow("Credited", color = blueInk.copy(alpha = 0.75f))
@@ -317,7 +317,8 @@ private fun WhereItWent(state: AppState, modifier: Modifier, onCategory: (String
     val cats = remember(state.input.transactions, state.today) { Insights.byCategory(state.input.transactions, state.today, 30) }
     if (cats.isEmpty()) return
     val top = cats.first().second.toFloat().coerceAtLeast(1f)
-    val palette = listOf(c.fuel, c.future, c.fixed, c.ink.copy(alpha = 0.55f), c.sun, c.inkFaint)
+    // One calm ramp of brand blue, biggest first: the names say which is which, so the bars need no rainbow.
+    val palette = listOf(1f, 0.78f, 0.6f, 0.46f, 0.36f, 0.28f).map { c.brand.copy(alpha = it) }
     RuvoCard(Modifier.padding(horizontal = Space.gutter).fillMaxWidth().then(modifier)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {

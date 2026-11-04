@@ -177,7 +177,7 @@ fun ChatSheet(onDismiss: () -> Unit, firstQuestion: String? = null) {
                         if (last >= 0 && !speech.speak(bubbles[last].text, bubbles[last].language, "b$last")) speechTrouble = true
                     } else speech.stop()
                 },
-                tint = if (state.settings.spokenReplies) c.onAccent else c.inkFaint, background = if (state.settings.spokenReplies) c.fuel else c.glass,
+                tint = if (state.settings.spokenReplies) c.onBrand else c.inkFaint, background = if (state.settings.spokenReplies) c.brand else c.glass,
             )
         }
         androidx.compose.animation.AnimatedVisibility(speechTrouble || speech.status == RuvoSpeech.Status.UNAVAILABLE) {
@@ -208,7 +208,7 @@ fun ChatSheet(onDismiss: () -> Unit, firstQuestion: String? = null) {
                             Text(names.first, style = Ruvo.type.bodyStrong, color = c.ink)
                             Text(names.second, style = Ruvo.type.caption, color = c.inkFaint)
                         }
-                        if (on) androidx.compose.material3.Icon(RuvoIcons.Check, null, Modifier.size(18.dp), tint = c.fuelInk)
+                        if (on) androidx.compose.material3.Icon(RuvoIcons.Check, null, Modifier.size(18.dp), tint = c.brandInk)
                     }
                 }
             }
@@ -225,8 +225,8 @@ fun ChatSheet(onDismiss: () -> Unit, firstQuestion: String? = null) {
                         Text(
                             b.text,
                             Modifier.widthIn(max = 290.dp).clip(RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp, bottomStart = 22.dp, bottomEnd = 6.dp))
-                                .background(if (c.isDark) c.fuel else c.ink).padding(horizontal = 16.dp, vertical = 12.dp),
-                            style = Ruvo.type.bodyStrong, color = if (c.isDark) c.onAccent else c.surface,
+                                .background(c.brandBrush).padding(horizontal = 16.dp, vertical = 12.dp),
+                            style = Ruvo.type.bodyStrong, color = c.onBrand,
                         )
                     }
                 } else {
@@ -291,7 +291,7 @@ fun ChatSheet(onDismiss: () -> Unit, firstQuestion: String? = null) {
             }
             val typing = input.isNotBlank()
             Box(
-                Modifier.size(46.dp).clip(androidx.compose.foundation.shape.CircleShape).background(c.fuel)
+                Modifier.size(46.dp).clip(androidx.compose.foundation.shape.CircleShape).background(c.brandBrush)
                     .clickable(role = Role.Button, onClickLabel = if (typing) "Send" else "Speak your question") {
                         if (typing) ask(input)
                         else if (canDictate) runCatching {
@@ -306,7 +306,7 @@ fun ChatSheet(onDismiss: () -> Unit, firstQuestion: String? = null) {
                     .semantics { contentDescription = if (typing) "Send" else if (canDictate) "Speak your question" else "Speech input is not available on this phone" },
                 contentAlignment = Alignment.Center,
             ) {
-                androidx.compose.material3.Icon(if (typing) RuvoIcons.Send else RuvoIcons.Mic, null, Modifier.size(22.dp), tint = c.onAccent)
+                androidx.compose.material3.Icon(if (typing) RuvoIcons.Send else RuvoIcons.Mic, null, Modifier.size(22.dp), tint = c.onBrand)
             }
         }
         Spacer(Modifier.height(Space.xs))

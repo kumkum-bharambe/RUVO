@@ -40,7 +40,7 @@ fun RuvoTheme(choice: ThemeChoice = ThemeChoice.SYSTEM, content: @Composable () 
     val type = remember(context) { ruvoType(context) }
     val material = if (dark) {
         darkColorScheme(
-            primary = colors.fuel, onPrimary = colors.onAccent, secondary = colors.fixed, tertiary = colors.future,
+            primary = colors.brand, onPrimary = colors.onBrand, secondary = colors.fixed, tertiary = colors.future,
             background = colors.canvas, onBackground = colors.ink, surface = colors.surface, onSurface = colors.ink,
             surfaceVariant = colors.raised, onSurfaceVariant = colors.inkSoft, outline = colors.hairline, error = colors.warning,
             surfaceContainerLow = colors.surface, surfaceContainer = colors.surface, surfaceContainerHigh = colors.raised,

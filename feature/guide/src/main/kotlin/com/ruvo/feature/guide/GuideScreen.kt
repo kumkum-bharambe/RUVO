@@ -145,7 +145,7 @@ fun GuideScreen(a: GuideActions) {
                 SectionTitle("Your saved ideas")
                 ideas.forEachIndexed { i, (book, page) ->
                     RuvoCard(Modifier.fillMaxWidth().padding(bottom = Space.xs).reveal(i), onClick = { a.openBook(book.id) }, onClickLabel = "Open ${book.title}") {
-                        Eyebrow("${book.title} · ${page.first}", color = c.fuelInk)
+                        Eyebrow("${book.title} · ${page.first}", color = c.brandInk)
                         Spacer(Modifier.height(Space.xxs))
                         Text(page.second, style = Ruvo.type.body, color = c.ink, maxLines = 3, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                     }

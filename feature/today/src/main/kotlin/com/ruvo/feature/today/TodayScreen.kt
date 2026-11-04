@@ -180,9 +180,9 @@ fun TodayContent(state: AppState, a: TodayActions) {
             val lesson = Lessons.forNow(state.input, r)
             RuvoCard(Modifier.padding(horizontal = Space.gutter).padding(top = Space.sm).reveal(10), onClick = { a.openLesson(lesson.id) }, onClickLabel = "Read ${lesson.title}") {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(RuvoIcons.Book, null, Modifier.size(20.dp), tint = c.fixedInk)
+                    Icon(RuvoIcons.Book, null, Modifier.size(20.dp), tint = c.brandInk)
                     Spacer(Modifier.width(Space.xs))
-                    Eyebrow("A small idea", color = c.fixedInk)
+                    Eyebrow("A small idea", color = c.brandInk)
                     Spacer(Modifier.weight(1f))
                     Text("5 min read", style = Ruvo.type.caption, color = c.inkFaint)
                 }
@@ -190,7 +190,7 @@ fun TodayContent(state: AppState, a: TodayActions) {
                 Text(lesson.title, style = Ruvo.type.title, color = c.ink)
                 Text(lesson.body, style = Ruvo.type.body, color = c.inkSoft, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Spacer(Modifier.height(Space.xs))
-                Text("Open the book ›", style = Ruvo.type.label, color = c.fuelInk)
+                Text("Open the book ›", style = Ruvo.type.label, color = c.brandInk)
             }
         }
         // An occasional perk card: one a day, rotating, with its saving in days.
@@ -235,11 +235,11 @@ private fun InsightCard(change: Insights.CategoryChange, onWhy: () -> Unit, onHi
     val c = Ruvo.colors
     RuvoCard(Modifier.padding(horizontal = Space.gutter).padding(top = Space.sm).then(modifier)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(32.dp).clip(CircleShape).background(c.fuel.copy(alpha = 0.22f)), contentAlignment = Alignment.Center) {
-                Icon(RuvoIcons.Bulb, null, Modifier.size(18.dp), tint = c.fuelInk)
+            Box(Modifier.size(32.dp).clip(CircleShape).background(c.brand.copy(alpha = if (c.isDark) 0.22f else 0.12f)), contentAlignment = Alignment.Center) {
+                Icon(RuvoIcons.Bulb, null, Modifier.size(18.dp), tint = c.brandInk)
             }
             Spacer(Modifier.width(Space.xs))
-            Eyebrow("Ruvo noticed", color = c.fuelInk)
+            Eyebrow("Ruvo noticed", color = c.brandInk)
         }
         Spacer(Modifier.height(Space.xs))
         Text(
@@ -358,15 +358,15 @@ private fun Header(state: AppState, a: TodayActions) {
                 Text(
                     "Sample student · switch",
                     Modifier.padding(top = 4.dp).clip(RoundedCornerShape(Radius.chip))
-                        .background(c.fixed.copy(alpha = 0.14f))
+                        .background(c.brand.copy(alpha = if (c.isDark) 0.22f else 0.1f))
                         .clickable(role = Role.Button, onClick = a.openPersonas)
                         .padding(horizontal = Space.sm, vertical = 6.dp),
-                    style = Ruvo.type.caption, color = c.fixedInk,
+                    style = Ruvo.type.caption, color = c.brandInk,
                 )
             }
         }
         // Adding by hand is always one tap away, not hidden behind the Orb gesture.
-        IconCircle(RuvoIcons.Plus, "Add a payment", a.openAdd, tint = c.onAccent, background = c.fuel)
+        IconCircle(RuvoIcons.Plus, "Add a payment", a.openAdd, tint = c.onBrand, background = c.brand)
         Spacer(Modifier.width(Space.xs))
         Avatar(state.displayName, a.openProfile)
     }

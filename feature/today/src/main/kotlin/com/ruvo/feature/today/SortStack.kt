@@ -211,9 +211,9 @@ private fun SwipeCard(
                 Text(
                     hint,
                     Modifier.clip(RoundedCornerShape(Radius.chip)).background(
-                        when (hint) { "Confirm" -> c.fuel; "Ignore" -> c.inkFaint; else -> c.fixed },
+                        when (hint) { "Confirm" -> c.brand; "Ignore" -> c.inkFaint; else -> c.fixedDeep },
                     ).padding(horizontal = Space.sm, vertical = 4.dp),
-                    style = Ruvo.type.label, color = c.onAccent,
+                    style = Ruvo.type.label, color = c.onBrand,
                 )
             }
         }

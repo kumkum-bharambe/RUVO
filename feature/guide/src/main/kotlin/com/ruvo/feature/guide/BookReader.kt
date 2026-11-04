@@ -102,7 +102,7 @@ fun BookReader(bookId: String, onClose: () -> Unit, onApply: (Library.Apply) -> 
                 // Progress: one segment per page, filling as you read.
                 Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     repeat(pageCount) { i ->
-                        val on by animateColorAsState(if (i <= pager.currentPage) c.fuel else c.ink.copy(alpha = 0.12f), label = "seg$i")
+                        val on by animateColorAsState(if (i <= pager.currentPage) c.brand else c.ink.copy(alpha = 0.12f), label = "seg$i")
                         Box(Modifier.weight(1f).height(5.dp).clip(RoundedCornerShape(Radius.chip)).background(on))
                     }
                 }
@@ -114,7 +114,7 @@ fun BookReader(bookId: String, onClose: () -> Unit, onApply: (Library.Apply) -> 
                     if (saved) RuvoIcons.BookmarkFilled else RuvoIcons.Bookmark,
                     if (saved) "Saved. Tap to remove" else "Save this idea",
                     { if (canSave) scope.launch { RuvoGraph.repository.toggleIdea(ideaKey); Haptics.tick(view) } },
-                    tint = if (saved) c.fuelInk else if (canSave) c.ink else c.inkFaint,
+                    tint = if (saved) c.brandInk else if (canSave) c.ink else c.inkFaint,
                 )
             }
 
@@ -189,7 +189,7 @@ private fun CoverPage(book: Library.Book, read: Boolean) {
             },
         )
         Spacer(Modifier.height(Space.xl))
-        Eyebrow(book.shelf.title, color = c.fuelInk)
+        Eyebrow(book.shelf.title, color = c.brandInk)
         Spacer(Modifier.height(Space.xs))
         Text(book.title, Modifier.semantics { heading() }, style = Ruvo.type.headline, color = c.ink, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
         Spacer(Modifier.height(Space.xs))
@@ -225,20 +225,20 @@ private fun TextPage(page: Int, label: String, text: String, saved: Boolean, onS
 @Composable
 private fun SaveIdeaButton(saved: Boolean, onSave: () -> Unit) {
     val c = Ruvo.colors
-    val fill by animateColorAsState(if (saved) c.fuel else c.ink.copy(alpha = 0.06f), label = "saveFill")
+    val fill by animateColorAsState(if (saved) c.brand else c.ink.copy(alpha = 0.06f), label = "saveFill")
     val pop = remember { Animatable(1f) }
     androidx.compose.runtime.LaunchedEffect(saved) { if (saved) { pop.snapTo(0.92f); pop.animateTo(1f, Motion.bouncy()) } }
     Row(
         Modifier.graphicsLayer { scaleX = pop.value; scaleY = pop.value }
             .heightIn(min = 48.dp).clip(RoundedCornerShape(Radius.chip)).background(fill)
-            .border(1.dp, if (saved) c.fuel else c.hairline, RoundedCornerShape(Radius.chip))
+            .border(1.dp, if (saved) c.brand else c.hairline, RoundedCornerShape(Radius.chip))
             .clickable(role = Role.Button, onClickLabel = if (saved) "Remove from saved ideas" else "Save this idea", onClick = onSave)
             .padding(horizontal = Space.md, vertical = Space.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(if (saved) RuvoIcons.BookmarkFilled else RuvoIcons.Bookmark, null, Modifier.size(18.dp), tint = if (saved) c.onAccent else c.ink)
+        Icon(if (saved) RuvoIcons.BookmarkFilled else RuvoIcons.Bookmark, null, Modifier.size(18.dp), tint = if (saved) c.onBrand else c.ink)
         Spacer(Modifier.width(Space.xs))
-        Text(if (saved) "Saved to your ideas" else "Save this idea", style = Ruvo.type.label, color = if (saved) c.onAccent else c.ink)
+        Text(if (saved) "Saved to your ideas" else "Save this idea", style = Ruvo.type.label, color = if (saved) c.onBrand else c.ink)
     }
 }
 

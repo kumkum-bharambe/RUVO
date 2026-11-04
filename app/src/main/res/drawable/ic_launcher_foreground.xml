@@ -1,12 +1,12 @@
-<!-- The Ruvo mark: a bold deep purple R whose left side is a lavender rupee sign. -->
+<!-- The Ruvo mark: a bold deep royal blue R whose left side is a sky-blue rupee sign. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
     <!-- Top bar and bowl. -->
-    <path android:fillColor="#2E1A87" android:pathData="M33.6,32.4L58.8,32.4C67.2,32.4 73.2,38.4 73.2,45.6C73.2,52.8 67.2,58.8 58.8,58.8L48,58.8L48,51.6L58.8,51.6C62.4,51.6 65.4,49.2 65.4,45.6C65.4,42 62.4,39.6 58.8,39.6L33.6,39.6Z"/>
+    <path android:fillColor="#16216E" android:pathData="M33.6,32.4L58.8,32.4C67.2,32.4 73.2,38.4 73.2,45.6C73.2,52.8 67.2,58.8 58.8,58.8L48,58.8L48,51.6L58.8,51.6C62.4,51.6 65.4,49.2 65.4,45.6C65.4,42 62.4,39.6 58.8,39.6L33.6,39.6Z"/>
     <!-- Leg. -->
-    <path android:fillColor="#2E1A87" android:pathData="M51.6,56.4L60,56.4L75.6,76.8L67.2,76.8Z"/>
+    <path android:fillColor="#16216E" android:pathData="M51.6,56.4L60,56.4L75.6,76.8L67.2,76.8Z"/>
     <!-- Rupee bars. -->
-    <path android:fillColor="#9D7BFF" android:pathData="M33.6,42.6L45.6,42.6L45.6,46.8L33.6,46.8Z"/>
-    <path android:fillColor="#9D7BFF" android:pathData="M33.6,49.8L45.6,49.8L45.6,54L33.6,54Z"/>
+    <path android:fillColor="#4F7BFF" android:pathData="M33.6,42.6L45.6,42.6L45.6,46.8L33.6,46.8Z"/>
+    <path android:fillColor="#4F7BFF" android:pathData="M33.6,49.8L45.6,49.8L45.6,54L33.6,54Z"/>
     <!-- Rupee tail, parallel to the leg. -->
-    <path android:fillColor="#9D7BFF" android:pathData="M36,56.4L43.8,56.4L58.2,76.8L50.4,76.8Z"/>
+    <path android:fillColor="#4F7BFF" android:pathData="M36,56.4L43.8,56.4L58.2,76.8L50.4,76.8Z"/>
 </vector>

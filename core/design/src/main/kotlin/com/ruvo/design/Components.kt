@@ -179,20 +179,22 @@ fun RuvoCard(
             val loop = rememberInfiniteTransition(label = "cardGlow")
             val t by loop.animateFloat(0f, 1f, infiniteRepeatable(tween(11_000, easing = LinearEasing)), label = "drift")
             val sweep by loop.animateFloat(-0.6f, 2.4f, infiniteRepeatable(tween(8_000, easing = LinearEasing)), label = "sweep")
+            // Deep cards (night, or the blue brand cards by day) get gentle lights; pale cards get brighter ones.
+            val deep = c.isDark || brush == c.heroBrush || brush == c.brandBrush
             m.background(brush).drawWithContent {
                 val a = (if (reduced) 0.2f else t) * 2f * PI.toFloat()
                 val r = size.maxDimension * 0.5f
                 val one = Offset(size.width * (0.85f + 0.08f * cos(a)), size.height * (0.15f + 0.12f * sin(a)))
                 val two = Offset(size.width * (0.12f + 0.08f * sin(a)), size.height * (0.9f + 0.08f * cos(a)))
-                drawCircle(Brush.radialGradient(listOf(Color.White.copy(alpha = if (c.isDark) 0.12f else 0.5f), Color.Transparent), one, r), r, one)
-                drawCircle(Brush.radialGradient(listOf(c.fixed.copy(alpha = 0.22f), Color.Transparent), two, r), r, two)
-                drawRect(Brush.verticalGradient(listOf(Color.White.copy(alpha = if (c.isDark) 0.08f else 0.3f), Color.Transparent), endY = size.height * 0.4f))
+                drawCircle(Brush.radialGradient(listOf(Color.White.copy(alpha = if (deep) 0.1f else 0.5f), Color.Transparent), one, r), r, one)
+                drawCircle(Brush.radialGradient(listOf((if (deep) c.brand else c.fixed).copy(alpha = if (deep) 0.28f else 0.22f), Color.Transparent), two, r), r, two)
+                drawRect(Brush.verticalGradient(listOf(Color.White.copy(alpha = if (deep) 0.06f else 0.3f), Color.Transparent), endY = size.height * 0.4f))
                 if (!reduced) {
                     val x = size.width * sweep
-                    drawRect(Brush.linearGradient(listOf(Color.Transparent, Color.White.copy(alpha = if (c.isDark) 0.06f else 0.22f), Color.Transparent), Offset(x - size.width * 0.3f, 0f), Offset(x + size.width * 0.3f, size.height)))
+                    drawRect(Brush.linearGradient(listOf(Color.Transparent, Color.White.copy(alpha = if (deep) 0.07f else 0.22f), Color.Transparent), Offset(x - size.width * 0.3f, 0f), Offset(x + size.width * 0.3f, size.height)))
                 }
                 drawContent()
-            }.border(1.dp, Brush.verticalGradient(listOf(Color.White.copy(alpha = if (c.isDark) 0.25f else 0.9f), Color.White.copy(alpha = 0.05f))), shape)
+            }.border(1.dp, Brush.verticalGradient(listOf(Color.White.copy(alpha = if (deep) 0.2f else 0.9f), Color.White.copy(alpha = 0.04f))), shape)
         }
         color != Color.Unspecified -> m.background(color)
         // Frosted glass: brighter at the top where light falls, with a thin highlight along the top edge.
@@ -237,12 +239,12 @@ fun SectionTitle(text: String, modifier: Modifier = Modifier, action: String? = 
     }
 }
 
-/** The main call to action: an amber pill that glows a little, with navy text. */
+/** The main call to action: a brand-blue pill that glows a little, with white text. */
 @Composable
 fun PrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, icon: ImageVector? = null, enabled: Boolean = true) {
     val c = Ruvo.colors
     if (enabled) {
-        PillButton(text, onClick, modifier, background = Color.Transparent, brush = c.amberBrush, content = c.onAccent, icon = icon, glow = c.fuelDeep)
+        PillButton(text, onClick, modifier, background = Color.Transparent, brush = c.brandBrush, content = c.onBrand, icon = icon, glow = c.brand)
     } else {
         PillButton(text, onClick, modifier, background = c.hairline, content = c.inkFaint, icon = icon, enabled = false)
     }
@@ -251,7 +253,7 @@ fun PrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifi
 /** A filled pill in a specific accent, for bucket-specific actions. */
 @Composable
 fun AccentButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, accent: Color = Ruvo.colors.fuel, icon: ImageVector? = null) {
-    PillButton(text, onClick, modifier, background = accent, content = Ruvo.colors.onAccent, icon = icon)
+    PillButton(text, onClick, modifier, background = accent, content = if (accent.luminance() < 0.45f) Color.White else Color(0xFF141B4D), icon = icon)
 }
 
 /** Navy pill (white in Night swim): a strong secondary action. */
@@ -309,21 +311,21 @@ private fun PillButton(
     }
 }
 
-/** Selectable chip used for categories, cadence, amounts. Selected is navy in Daybreak, amber in Night swim. */
+/** Selectable chip used for categories, cadence, amounts. Selected is brand blue in both moods. */
 @Composable
 fun Chip(text: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier, accent: Color = Ruvo.colors.ink) {
     val c = Ruvo.colors
     val shape = RoundedCornerShape(Radius.chip)
     val fill = when {
         !selected -> c.glass
-        accent == c.ink -> if (c.isDark) c.fuel else c.ink
+        accent == c.ink -> c.brand
         else -> accent
     }
     val text_ = when {
         !selected -> c.ink
-        accent == c.ink && !c.isDark -> c.surface
-        accent.luminance() < 0.35f -> Color.White
-        else -> c.onAccent
+        accent == c.ink -> c.onBrand
+        accent.luminance() < 0.45f -> Color.White
+        else -> Color(0xFF141B4D)
     }
     Box(
         modifier.heightIn(min = 48.dp).clip(shape)
@@ -372,8 +374,8 @@ fun SegmentedControl(options: List<String>, selected: Int, onSelect: (Int) -> Un
         val x by animateDpAsState(w * selected, Motion.snappy(), label = "seg")
         Box(
             Modifier.offset(x = x).width(w).height(48.dp)
-                .shadow(8.dp, shape, ambientColor = c.fuelDeep, spotColor = c.fuelDeep)
-                .clip(shape).background(c.amberBrush),
+                .shadow(8.dp, shape, ambientColor = c.brand, spotColor = c.brand)
+                .clip(shape).background(c.brandBrush),
         )
         Row(Modifier.fillMaxWidth()) {
             options.forEachIndexed { i, label ->
@@ -384,7 +386,7 @@ fun SegmentedControl(options: List<String>, selected: Int, onSelect: (Int) -> Un
                         .clickable(role = Role.Tab, onClickLabel = "Show $label") { onSelect(i) },
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(label, style = Ruvo.type.label.copy(fontWeight = androidx.compose.ui.text.font.FontWeight(600)), color = if (on) c.onAccent else c.inkSoft, maxLines = 1, softWrap = false)
+                    Text(label, style = Ruvo.type.label.copy(fontWeight = androidx.compose.ui.text.font.FontWeight(600)), color = if (on) c.onBrand else c.inkSoft, maxLines = 1, softWrap = false)
                 }
             }
         }
@@ -529,26 +531,28 @@ fun BucketCard(bucket: Bucket, amount: Paise, caption: String, modifier: Modifie
         modifier.height(118.dp)
             .shadow(if (c.isDark) 0.dp else 10.dp, shape, ambientColor = c.bucket(bucket), spotColor = c.bucket(bucket))
             .clip(shape).background(c.bucketBrush(bucket))
-            .border(1.dp, Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.9f), Color.White.copy(alpha = 0.15f))), shape)
+            .border(1.dp, Brush.verticalGradient(listOf(Color.White.copy(alpha = if (c.isDark) 0.14f else 0.9f), Color.White.copy(alpha = if (c.isDark) 0.03f else 0.15f))), shape)
             .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClickLabel = "Open ${bucketName(bucket)}", onClick = onClick) else Modifier),
     ) {
-        // A soft blob of the bucket's own colour drifting in the corner, like liquid behind glass.
+        // A soft blob of the bucket's own colour drifting in the corner, like liquid behind glass. At night it is
+        // only a faint ember, so three boxes side by side never glare.
         Canvas(Modifier.matchParentSize()) {
             val t = if (reduced) 0.3f else drift
             val a = t * 2f * PI.toFloat()
             val centre = Offset(size.width * (0.82f + 0.08f * cos(a)), size.height * (0.18f + 0.1f * sin(a)))
-            drawCircle(Brush.radialGradient(listOf(c.bucket(bucket).copy(alpha = 0.55f), Color.Transparent), centre, size.width * 0.55f), size.width * 0.55f, centre)
-            drawRect(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.35f), Color.Transparent), endY = size.height * 0.45f))
+            drawCircle(Brush.radialGradient(listOf(c.bucket(bucket).copy(alpha = if (c.isDark) 0.16f else 0.55f), Color.Transparent), centre, size.width * 0.55f), size.width * 0.55f, centre)
+            drawRect(Brush.verticalGradient(listOf(Color.White.copy(alpha = if (c.isDark) 0.04f else 0.35f), Color.Transparent), endY = size.height * 0.45f))
         }
         Column(Modifier.matchParentSize().padding(12.dp)) {
-            // Name first, then the number: the word carries the meaning, so no icon is needed.
-            Text(bucketName(bucket), style = Ruvo.type.bodyStrong, color = ink, maxLines = 1)
-            Text(caption, style = Ruvo.type.caption, color = ink.copy(alpha = 0.68f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            // Name first, then the number: the word carries the meaning, so no icon is needed. At night the name
+            // carries the bucket's colour and the number stays plain white.
+            Text(bucketName(bucket), style = Ruvo.type.bodyStrong, color = if (c.isDark) c.bucketInk(bucket) else ink, maxLines = 1)
+            Text(caption, style = Ruvo.type.caption, color = ink.copy(alpha = if (c.isDark) 0.55f else 0.68f), maxLines = 1, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.weight(1f))
             Amount(amount, style = Ruvo.type.title, color = ink, countUp = true)
             Spacer(Modifier.height(6.dp))
             // Its share of everything you have, so the three boxes compare at a glance.
-            FillBar(share, c.bucket(bucket).copy(alpha = 1f), height = 5.dp, track = Color.White.copy(alpha = 0.55f))
+            FillBar(share, c.bucket(bucket).copy(alpha = 1f), height = 5.dp, track = Color.White.copy(alpha = if (c.isDark) 0.08f else 0.55f))
         }
     }
 }
@@ -636,7 +640,7 @@ fun PillBars(
     pills: List<Pill>,
     modifier: Modifier = Modifier,
     height: Dp = 120.dp,
-    color: Color = Ruvo.colors.fuel,
+    color: Color = Ruvo.colors.brand,
     highlightColor: Color = Ruvo.colors.ink,
     /** When set, pills are tappable: the chosen one is solid with its [tooltip] above, the rest are faded. */
     selected: Int? = null,

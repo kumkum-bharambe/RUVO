@@ -46,8 +46,13 @@ data class RuvoColors(
     val warning: Color,
     /** Highlights, perks and the goal-complete glow. */
     val sun: Color,
-    /** Text and icons placed on an accent fill. */
+    /** Text and icons on a bucket or soft-amber card: dark ink on the pastels of Daybreak, light in Night swim. */
     val onAccent: Color,
+    /** Ruvo's brand: a dark royal blue. Buttons, the chosen tab, chips, the logo and the main cards. */
+    val brand: Color,
+    val brandDeep: Color,
+    /** Text and icons on a brand fill. Always light. */
+    val onBrand: Color,
     /** The navy hero card. */
     val heroTop: Color,
     val heroBottom: Color,
@@ -74,18 +79,31 @@ data class RuvoColors(
         Bucket.FUTURE -> futureInk
     }
 
-    /** Top-left to bottom-right fill for a filled bucket card. */
-    fun bucketBrush(b: Bucket): Brush = when (b) {
-        // Soft, light fills: the colour says which bucket, the ink stays easy to read.
+    /**
+     * Top-left to bottom-right fill for a filled bucket card. Daybreak uses soft pastels with dark ink. Night swim
+     * uses deep cards with only a whisper of the bucket's colour, so nothing glares on black; the bucket's name
+     * carries the colour instead.
+     */
+    fun bucketBrush(b: Bucket): Brush = if (isDark) when (b) {
+        Bucket.FIXED -> Brush.linearGradient(listOf(Color(0xFF1E1B36), Color(0xFF141322)))
+        Bucket.FUEL -> Brush.linearGradient(listOf(Color(0xFF26221A), Color(0xFF17150F)))
+        Bucket.FUTURE -> Brush.linearGradient(listOf(Color(0xFF281D19), Color(0xFF181210)))
+    } else when (b) {
         Bucket.FIXED -> Brush.linearGradient(listOf(fixed.lighten(0.62f), fixed.lighten(0.3f)))
         Bucket.FUEL -> Brush.linearGradient(listOf(sun.lighten(0.5f), fuel.lighten(0.15f)))
         Bucket.FUTURE -> Brush.linearGradient(listOf(future.lighten(0.6f), future.lighten(0.25f)))
     }
 
+    /** Brand blue safe for text and small icons on the canvas: the brand by day, a lighter blue at night. */
+    val brandInk: Color get() = if (isDark) brand.lighten(0.42f) else brand
+
+    /** The main brand cards: deep blue in both moods, with light text. */
     val heroBrush: Brush get() = Brush.linearGradient(listOf(heroTop, heroBottom))
-    val amberBrush: Brush get() = Brush.linearGradient(listOf(sun, fuelDeep))
-    /** A lighter amber for whole cards; buttons and the dock keep the full [amberBrush]. */
-    val softAmberBrush: Brush get() = Brush.linearGradient(listOf(sun.lighten(0.55f), fuel.lighten(0.2f)))
+    /** Brand fills: primary buttons, the chosen tab and segment, the add buttons. */
+    val brandBrush: Brush get() = Brush.linearGradient(listOf(brand.lighten(if (isDark) 0.1f else 0.18f), brandDeep))
+    /** A soft card for invitations (Marketplace, New this week, payments to sort): pale amber by day, deep blue-grey at night. */
+    val softAmberBrush: Brush get() = if (isDark) Brush.linearGradient(listOf(Color(0xFF1A2040), Color(0xFF11152B)))
+        else Brush.linearGradient(listOf(sun.lighten(0.55f), fuel.lighten(0.2f)))
 }
 
 /** Mixes a colour toward white. */
@@ -105,17 +123,21 @@ private val VioletDeep = Color(0xFF6A4BF0)
 private val Tangerine = Color(0xFFFF8A45)
 private val TangerineDeep = Color(0xFFF2651F)
 
+private val Royal = Color(0xFF2338A8)
+private val RoyalDeep = Color(0xFF16216E)
+
 val Daybreak = RuvoColors(
     isDark = false,
-    canvas = Color(0xFFEFECF8),
+    // A cool, slightly blue paper, so the brand blue feels at home.
+    canvas = Color(0xFFEDF0FA),
     surface = Color(0xFFFFFFFF),
     raised = Color(0xFFFFFFFF),
     glass = Color(0x99FFFFFF),
     glassEdge = Color(0xFFFFFFFF),
     ink = Navy,
-    inkSoft = Color(0xFF555A7E),
-    inkFaint = Color(0xFF82859F),
-    hairline = Color(0xFFE1DDEF),
+    inkSoft = Color(0xFF545B7E),
+    inkFaint = Color(0xFF81879F),
+    hairline = Color(0xFFDDE2F0),
     fixed = Violet,
     fixedDeep = VioletDeep,
     fuel = Amber,
@@ -128,12 +150,15 @@ val Daybreak = RuvoColors(
     warning = Color(0xFFD93A63),
     sun = Butter,
     onAccent = Navy,
-    // Feature cards glow like the runway card: soft lavender into warm peach, with dark ink on top.
-    heroTop = Color(0xFFE4DAFF),
-    heroBottom = Color(0xFFFFE3C7),
-    onHero = Navy,
-    glowWarm = Color(0x80FFC23D),
-    glowCool = Color(0x998B6CFF),
+    brand = Royal,
+    brandDeep = RoyalDeep,
+    onBrand = Color(0xFFFFFFFF),
+    // The brand cards: deep royal blue, white text.
+    heroTop = Color(0xFF2A41B8),
+    heroBottom = Color(0xFF141E66),
+    onHero = Color(0xFFFFFFFF),
+    glowWarm = Color(0x66FFC23D),
+    glowCool = Color(0x804D6BFF),
     orbCore = Color(0xFFFFF1B8),
     orbGlow = Amber,
     orbDeep = Color(0xFFD9860A),
@@ -153,24 +178,29 @@ val NightSwim = RuvoColors(
     inkSoft = Color(0xFFA9A9B2),
     inkFaint = Color(0xFF6E6E78),
     hairline = Color(0xFF232328),
-    fixed = Color(0xFFA08BFF),
-    fixedDeep = Violet,
-    fuel = Amber,
-    fuelDeep = AmberDeep,
-    future = Tangerine,
-    futureDeep = TangerineDeep,
-    fixedInk = Color(0xFFB5A4FF),
-    fuelInk = Color(0xFFFFCE5C),
-    futureInk = Color(0xFFFFA46E),
-    warning = Color(0xFFFF6B8B),
-    sun = Butter,
-    onAccent = Navy,
-    heroTop = Color(0xFF2B2167),
-    heroBottom = Color(0xFF3A1D44),
+    // At night the bucket colours step back a little, so they label rather than shout.
+    fixed = Color(0xFF9B8BEB),
+    fixedDeep = Color(0xFF7765D6),
+    fuel = Color(0xFFEDBE4E),
+    fuelDeep = Color(0xFFD9A22F),
+    future = Color(0xFFEC9263),
+    futureDeep = Color(0xFFD9733F),
+    fixedInk = Color(0xFFB3A7F2),
+    fuelInk = Color(0xFFF2CB6B),
+    futureInk = Color(0xFFF2A780),
+    warning = Color(0xFFF2708C),
+    sun = Color(0xFFF2D27A),
+    onAccent = Color(0xFFF2F3FA),
+    // Brighter than by day, so the brand still reads on black.
+    brand = Color(0xFF4A66F0),
+    brandDeep = Color(0xFF2E45C9),
+    onBrand = Color(0xFFFFFFFF),
+    heroTop = Color(0xFF1B2766),
+    heroBottom = Color(0xFF0C1138),
     onHero = Color(0xFFFFFFFF),
-    // Only a breath of colour at the corners, so glass has something to catch; the canvas stays black.
-    glowWarm = Color(0x1FFF8A45),
-    glowCool = Color(0x2E8B6CFF),
+    // Only a breath of blue at the corners, so glass has something to catch; the canvas stays black.
+    glowWarm = Color(0x14EDBE4E),
+    glowCool = Color(0x2E4A66F0),
     orbCore = Color(0xFFFFF1B8),
     orbGlow = Amber,
     orbDeep = Color(0xFFB86E06),

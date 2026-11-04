@@ -46,13 +46,13 @@ private val LogoPaper = Color(0xFFFFFFFF)
 private val LogoHaldi = Color(0xFFFFC23D)
 private val LogoOrange = Color(0xFFFF8A45)
 
-/** The R, a deep purple; and the rupee strokes inside it, a bright lavender. */
-private val LogoR = Color(0xFF2E1A87)
-private val LogoRupee = Color(0xFF9D7BFF)
+/** The R, Ruvo's deep royal blue; and the rupee strokes inside it, a bright sky blue. */
+private val LogoR = Color(0xFF16216E)
+private val LogoRupee = Color(0xFF4F7BFF)
 
 /**
- * The Ruvo mark: a bold R whose left side is a rupee sign. The R's top bar, bowl and leg are deep purple; the
- * rupee's two bars and its diagonal tail are bright lavender, running parallel to the R's leg. On a white tile
+ * The Ruvo mark: a bold R whose left side is a rupee sign. The R's top bar, bowl and leg are deep royal blue; the
+ * rupee's two bars and its diagonal tail are bright sky blue, running parallel to the R's leg. On a white tile
  * with a faint lavender fade, so it stands out on dark and light screens alike.
  *
  * [build] puts it together for the opening: the top and bowl drop in, the leg strikes down, then the rupee bars
@@ -63,7 +63,7 @@ fun RuvoLogo(modifier: Modifier = Modifier, size: Dp = 56.dp, tile: Color? = nul
     Canvas(modifier.size(size).semantics { contentDescription = "Ruvo" }) {
         val s = this.size.width
         if (tile != null) drawRoundRect(tile, cornerRadius = CornerRadius(s * 0.24f))
-        else drawRoundRect(Brush.linearGradient(listOf(LogoPaper, Color(0xFFECE6FF)), Offset(0f, 0f), Offset(s, s)), cornerRadius = CornerRadius(s * 0.24f))
+        else drawRoundRect(Brush.linearGradient(listOf(LogoPaper, Color(0xFFE6ECFF)), Offset(0f, 0f), Offset(s, s)), cornerRadius = CornerRadius(s * 0.24f))
         // Each part appears over its own slice of [build], easing in from an offset.
         fun part(from: Float, to: Float) = ((build - from) / (to - from)).coerceIn(0f, 1f)
         val u = s / 100f
@@ -111,99 +111,3 @@ fun RuvoLogo(modifier: Modifier = Modifier, size: Dp = 56.dp, tile: Color? = nul
     }
 }
 
-
-/**
- * The opening: the white tile spins in, the R builds itself (top and bowl drop in, the leg strikes down, the rupee
- * bars slide in and the tail follows), and as it locks together a ring and a burst of confetti in the brand
- * colours fly out. Then each letter of "RUVO" hops up on a spring, and the line appears. About 2.5 s; a tap skips it. Always dark, so it reads as a cover. Reduced motion shows the
- * finished mark at once.
- */
-@Composable
-fun RuvoSplash(modifier: Modifier = Modifier, onSkip: () -> Unit = {}) {
-    val reduced = Ruvo.reducedMotion
-    val start = if (reduced) 1f else 0f
-    val tile = remember { Animatable(start) }
-    val build = remember { Animatable(start) }
-    val burst = remember { Animatable(start) }
-    val letters = remember { List(4) { Animatable(start) } }
-    val line = remember { Animatable(start) }
-    val hop = androidx.compose.animation.core.spring<Float>(dampingRatio = 0.42f, stiffness = 420f)
-    LaunchedEffect(Unit) {
-        if (reduced) return@LaunchedEffect
-        launch { tile.animateTo(1f, androidx.compose.animation.core.spring(dampingRatio = 0.55f, stiffness = 300f)) }
-        launch { delay(280); build.animateTo(1f, tween(900, easing = FastOutSlowInEasing)) }
-        launch { delay(1050); burst.animateTo(1f, tween(1100, easing = FastOutSlowInEasing)) }
-        letters.forEachIndexed { i, l -> launch { delay(1150L + i * 80L); l.animateTo(1f, hop) } }
-        launch { delay(1800); line.animateTo(1f, Motion.gentle()) }
-    }
-    val brand = listOf(LogoHaldi, LogoOrange, Color(0xFF8B6CFF), Color(0xFFFF8FB0), LogoPaper)
-    Box(
-        modifier.fillMaxSize().background(Color(0xFF0A0D26))
-            .clickable(remember { MutableInteractionSource() }, indication = null, onClickLabel = "Skip", onClick = onSkip),
-        contentAlignment = Alignment.Center,
-    ) {
-        Canvas(Modifier.fillMaxSize()) {
-            val centre = Offset(size.width / 2, size.height * 0.42f)
-            drawRect(Brush.radialGradient(listOf(Color(0xFF2A2272), Color(0xFF0A0D26)), centre, size.height * 0.6f))
-            val b = burst.value
-            if (b > 0f && b < 1f) {
-                // The middle of the 112 dp tile, where the R locks together.
-                val land = centre
-                val ringR = 14.dp.toPx() + 90.dp.toPx() * b
-                drawCircle(LogoRupee.copy(alpha = (1f - b) * 0.8f), ringR, land, style = Stroke(3.dp.toPx() * (1f - b) + 0.5f))
-                // Confetti: little dots and dashes thrown outward, slowing and fading.
-                for (i in 0 until 14) {
-                    val ang = i / 14f * 2f * kotlin.math.PI.toFloat() + 0.3f
-                    val dist = 30.dp.toPx() + 110.dp.toPx() * b * (0.7f + (i % 3) * 0.15f)
-                    val p = land + Offset(kotlin.math.cos(ang) * dist, kotlin.math.sin(ang) * dist + 40.dp.toPx() * b * b)
-                    val col = brand[i % brand.size].copy(alpha = (1f - b))
-                    if (i % 2 == 0) drawCircle(col, 4.dp.toPx(), p)
-                    else drawLine(col, p, p + Offset(kotlin.math.cos(ang + 1f) * 8.dp.toPx(), kotlin.math.sin(ang + 1f) * 8.dp.toPx()), 3.dp.toPx(), androidx.compose.ui.graphics.StrokeCap.Round)
-                }
-            }
-        }
-        Column(
-            Modifier.padding(bottom = 40.dp),
-            horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
-        ) {
-            RuvoLogo(
-                Modifier.graphicsLayer {
-                    val t = tile.value
-                    val sc = 0.3f + 0.7f * t
-                    scaleX = sc; scaleY = sc; alpha = t.coerceIn(0f, 1f)
-                    rotationZ = (1f - t) * -40f
-                },
-                size = 112.dp, build = build.value,
-            )
-            Spacer(Modifier.height(Space.lg))
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                "RUVO".forEachIndexed { i, ch ->
-                    val p = letters[i].value
-                    Text(
-                        ch.toString(),
-                        Modifier.graphicsLayer {
-                            alpha = p.coerceIn(0f, 1f)
-                            // Each letter hops up from below.
-                            translationY = (1f - p) * 26.dp.toPx()
-                            val sc = 0.6f + 0.4f * p
-                            scaleX = sc; scaleY = sc
-                        },
-                        style = Ruvo.type.display.copy(fontSize = Ruvo.type.display.fontSize * 1.2f, fontWeight = androidx.compose.ui.text.font.FontWeight(800)),
-                        color = LogoPaper,
-                    )
-                }
-            }
-            Spacer(Modifier.height(Space.xxs))
-            Text(
-                "Your money, without the mental load.",
-                Modifier.graphicsLayer { alpha = line.value.coerceIn(0f, 1f); translationY = (1f - line.value) * 12.dp.toPx() },
-                style = Ruvo.type.label, color = LogoPaper.copy(alpha = 0.65f),
-            )
-        }
-        Text(
-            "Tap to skip",
-            Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = Space.xl),
-            style = Ruvo.type.caption, color = LogoPaper.copy(alpha = 0.4f),
-        )
-    }
-}

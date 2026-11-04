@@ -109,7 +109,7 @@ fun RuvoRoot(state: AppState, request: LaunchRequest?, consumed: () -> Unit) {
     // The opening plays on every cold start, until it finishes or is tapped, and until the data is ready.
     val reduced = Ruvo.reducedMotion
     var splashDone by rememberSaveable { mutableStateOf(false) }
-    LaunchedEffect(Unit) { kotlinx.coroutines.delay(if (reduced) 500 else 3_100); splashDone = true }
+    LaunchedEffect(Unit) { kotlinx.coroutines.delay(if (reduced) 500 else 3_400); splashDone = true }
     val showApp = state.ready && splashDone
     val unlocked by com.ruvo.data.Session.unlocked.collectAsStateWithLifecycle()
     Box(Modifier.fillMaxSize()) {
@@ -308,8 +308,9 @@ private fun MainShell(state: AppState, request: LaunchRequest?, consumed: () -> 
 fun FloatingDock(selected: Tab, onSelect: (Tab) -> Unit, modifier: Modifier = Modifier) {
     val c = Ruvo.colors
     val shape = RoundedCornerShape(Radius.chip)
-    val bar = if (c.isDark) c.raised else c.ink
-    val idle = if (c.isDark) c.inkSoft else androidx.compose.ui.graphics.Color.White.copy(alpha = 0.72f)
+    // A white pill by day and a deep grey one at night; the chosen tab is the one spot of brand blue.
+    val bar = if (c.isDark) c.raised else c.surface
+    val idle = c.inkSoft
     Row(
         modifier.shadow(18.dp, shape, ambientColor = c.shadow, spotColor = c.shadow)
             .clip(shape).background(bar).padding(6.dp),
@@ -325,7 +326,7 @@ fun FloatingDock(selected: Tab, onSelect: (Tab) -> Unit, modifier: Modifier = Mo
                 Tab.GUIDE -> RuvoIcons.Book
             }
             val weight by androidx.compose.animation.core.animateFloatAsState(if (on) 2.1f else 1f, Motion.bouncy(), label = "w${t.name}")
-            val fill by androidx.compose.animation.animateColorAsState(if (on) c.fuel else bar.copy(alpha = 0f), Motion.soft(), label = "f${t.name}")
+            val fill by androidx.compose.animation.animateColorAsState(if (on) c.brand else bar.copy(alpha = 0f), Motion.soft(), label = "f${t.name}")
             Row(
                 Modifier.weight(weight).height(50.dp).clip(shape).background(fill)
                     .semantics { this.selected = on }
@@ -333,9 +334,9 @@ fun FloatingDock(selected: Tab, onSelect: (Tab) -> Unit, modifier: Modifier = Mo
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(icon, t.label, Modifier.size(21.dp), tint = if (on) c.onAccent else idle)
+                Icon(icon, t.label, Modifier.size(21.dp), tint = if (on) c.onBrand else idle)
                 AnimatedVisibility(on, enter = fadeIn() + androidx.compose.animation.expandHorizontally(), exit = fadeOut() + androidx.compose.animation.shrinkHorizontally()) {
-                    Text(t.label, Modifier.padding(start = 6.dp), style = Ruvo.type.label, color = c.onAccent, maxLines = 1)
+                    Text(t.label, Modifier.padding(start = 6.dp), style = Ruvo.type.label, color = c.onBrand, maxLines = 1)
                 }
             }
         }

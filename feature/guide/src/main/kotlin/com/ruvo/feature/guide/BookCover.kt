@@ -58,6 +58,7 @@ fun BookCover(
     onClick: (() -> Unit)? = null,
 ) {
     val bg = backgroundFor(book.id)
+    val dark = Ruvo.colors.isDark
     val height = width * 1.42f
     val corners = RoundedCornerShape(topStart = 6.dp, bottomStart = 6.dp, topEnd = 18.dp, bottomEnd = 18.dp)
     val interaction = remember { MutableInteractionSource() }
@@ -77,6 +78,8 @@ fun BookCover(
             // Spine: a darker band and a soft highlight, like a printed paperback.
             drawRect(Color.Black.copy(alpha = 0.16f), size = Size(size.width * 0.045f, size.height))
             drawRect(Brush.horizontalGradient(listOf(Color.White.copy(alpha = 0.18f), Color.Transparent), startX = size.width * 0.045f, endX = size.width * 0.16f))
+            // At night the covers dim a touch, so a shelf of them glows instead of glaring.
+            if (dark) drawRect(Color.Black.copy(alpha = 0.22f))
         }
         if (width >= 100.dp) Text(
             if (read) "Read" else "${book.pages.size} pages",
