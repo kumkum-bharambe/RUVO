@@ -171,8 +171,8 @@ fun TodayContent(state: AppState, a: TodayActions) {
         }
         item {
             Row(Modifier.padding(horizontal = Space.gutter).padding(top = Space.md).reveal(8), horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
-                ReviewTile("Your week", "in 3 minutes", RuvoIcons.Calendar, Modifier.weight(1f), a.openWeekly)
-                ReviewTile("Your month", "in 30 seconds", RuvoIcons.Chart, Modifier.weight(1f), a.openMonthly)
+                // One review: this week and this month on one sheet.
+                ReviewTile("Your review", "This week and this month", RuvoIcons.Chart, Modifier.weight(1f), a.openWeekly)
             }
         }
         item { BuyCard(a.openBuy, Modifier.reveal(9)) }
@@ -241,7 +241,7 @@ private fun InsightCard(change: Insights.CategoryChange, onWhy: () -> Unit, onHi
         }
         Spacer(Modifier.height(Space.xs))
         Text(
-            "${change.category} spending is ${change.changePercent}% higher than last week.",
+            "${change.category} spending is ${Insights.changeWords(change.changePercent ?: 0, "last week")}.",
             style = Ruvo.type.title, color = c.ink,
         )
         Text("${IndianFormat.rupees(change.thisPeriod)} this week. Small amounts are easy to miss, and easy to change.", style = Ruvo.type.caption, color = c.inkSoft)

@@ -64,7 +64,7 @@ import com.ruvo.design.Space
 import com.ruvo.engine.Bucket
 import com.ruvo.engine.guide.Library
 import com.ruvo.feature.goals.GoalsScreen
-import com.ruvo.feature.goals.MonthlyReviewSheet
+import com.ruvo.feature.goals.ReviewSheet
 import com.ruvo.feature.goals.rememberTilt
 import com.ruvo.feature.guide.BookReader
 import com.ruvo.feature.guide.GuideActions
@@ -80,7 +80,6 @@ import com.ruvo.feature.today.BeforeYouBuySheet
 import com.ruvo.feature.today.SortStackScreen
 import com.ruvo.feature.today.TodayActions
 import com.ruvo.feature.today.TodayScreen
-import com.ruvo.feature.today.WeeklyReviewSheet
 import com.ruvo.feature.today.WhySheet
 import kotlinx.coroutines.launch
 
@@ -294,8 +293,8 @@ private fun MainShell(state: AppState, request: LaunchRequest?, consumed: () -> 
             onPersonas = { overlay = Overlay.Personas },
             onWeekly = { overlay = Overlay.Weekly },
         )
-        Overlay.Weekly -> WeeklyReviewSheet(onDismiss = { overlay = Overlay.None }, onOpenGuide = { tab = Tab.GUIDE })
-        Overlay.Monthly -> MonthlyReviewSheet(state, onDismiss = { overlay = Overlay.None }, onWeekly = { overlay = Overlay.Weekly })
+        Overlay.Weekly -> ReviewSheet(state, onDismiss = { overlay = Overlay.None }, startWithWeek = true, onOpenGuide = { tab = Tab.GUIDE })
+        Overlay.Monthly -> ReviewSheet(state, onDismiss = { overlay = Overlay.None }, onOpenGuide = { tab = Tab.GUIDE })
         Overlay.Marketplace -> com.ruvo.feature.guide.MarketplaceSheet { overlay = Overlay.None }
     }
 }

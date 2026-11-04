@@ -86,4 +86,15 @@ class InsightsTest {
         assertEquals(Insights.MoodLevel.COMFORTABLE, Insights.mood(r(20_000, 10)).level)
         assertEquals(Insights.MoodLevel.PLAN, Insights.mood(r(1_000, 25)).level)
     }
+
+    @Test fun `changes are said in words and never go past 100 percent`() {
+        assertEquals("34% more than last week", Insights.changeWords(34, "last week"))
+        assertEquals("20% less than last week", Insights.changeWords(-20, "last week"))
+        assertEquals("double last week", Insights.changeWords(100, "last week"))
+        assertEquals("more than double last week", Insights.changeWords(250, "last week"))
+        assertEquals("the same as last week", Insights.changeWords(0, "last week"))
+        assertEquals("+34%", Insights.changeTag(34))
+        assertEquals("-20%", Insights.changeTag(-20))
+        assertEquals("2x or more", Insights.changeTag(250))
+    }
 }

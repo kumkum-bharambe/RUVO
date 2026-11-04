@@ -83,6 +83,24 @@ fun MarketplaceSheet(onDismiss: () -> Unit) {
                 )
             }
         }
+        // Top pick: the current listing worth the most days, so the best first step is obvious.
+        live.maxByOrNull { Perks.daysSaved(it, daily) }?.takeIf { Perks.daysSaved(it, daily) > 0 }?.let { best ->
+            Spacer(Modifier.height(Space.md))
+            RuvoCard(Modifier.fillMaxWidth(), brush = c.softAmberBrush, border = null, elevated = true, onClick = { open = best.id }, onClickLabel = "See ${best.brand}") {
+                Text("Top pick for you", style = Ruvo.type.label, color = c.onAccent.copy(alpha = 0.7f))
+                Spacer(Modifier.height(Space.xs))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    PerkLogo(best.brand)
+                    Spacer(Modifier.width(Space.sm))
+                    Column(Modifier.weight(1f)) {
+                        Text(best.brand, style = Ruvo.type.title, color = c.onAccent)
+                        Text(best.offer, style = Ruvo.type.caption, color = c.onAccent.copy(alpha = 0.75f), maxLines = 2)
+                    }
+                    Spacer(Modifier.width(Space.xs))
+                    DaysBadge(Perks.daysSaved(best, daily), onCard = true)
+                }
+            }
+        }
         Spacer(Modifier.height(Space.md))
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
             KINDS.forEach { k ->
@@ -104,25 +122,14 @@ fun MarketplaceSheet(onDismiss: () -> Unit) {
     open?.let { id -> Perks.all.firstOrNull { it.id == id }?.let { ListingSheet(it, today, daily) { open = null } } }
 }
 
-/** The tint for each kind of listing, so categories read at a glance (with their name, never colour alone). */
-@Composable
-private fun kindTint(kind: String): Color {
-    val c = Ruvo.colors
-    return when (kind) {
-        "Save" -> c.fuel
-        "Earn" -> c.future
-        "Learn" -> c.fixed
-        else -> Color(0xFFFF8FB0)
-    }
-}
-
 private data class StatusLook(val label: String, val tint: Color)
 
+/** Colour only where it means something: Active stays quiet; ending, stale and over each get a tint. */
 @Composable
 private fun statusLook(s: Perks.Status): StatusLook {
     val c = Ruvo.colors
     return when (s.state) {
-        Perks.State.ACTIVE -> StatusLook("Active", c.fuel)
+        Perks.State.ACTIVE -> StatusLook("Active", c.ink.copy(alpha = 0.35f))
         Perks.State.ENDING -> StatusLook("Ends in ${IndianFormat.days(s.daysLeft ?: 0)}", c.future)
         Perks.State.RECHECK -> StatusLook("Needs a re-check", c.fixed)
         Perks.State.EXPIRED -> StatusLook("Ended", c.inkFaint)
@@ -154,36 +161,49 @@ private fun Listing(p: Perks.Perk, today: LocalDate, daily: Long, modifier: Modi
     val over = s.state == Perks.State.EXPIRED
     RuvoCard(modifier.fillMaxWidth().graphicsLayer { alpha = if (over) 0.6f else 1f }, onClick = onOpen, onClickLabel = "See how to get ${p.brand}") {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Pill(p.kind, kindTint(p.kind))
-            Spacer(Modifier.weight(1f))
-            Pill(look.label, look.tint)
-        }
-        Spacer(Modifier.height(Space.sm))
-        Row(verticalAlignment = Alignment.CenterVertically) {
             PerkLogo(p.brand)
             Spacer(Modifier.width(Space.sm))
             Column(Modifier.weight(1f)) {
-                Text(p.brand, style = Ruvo.type.title, color = c.ink)
-                Text(p.offer, style = Ruvo.type.caption, color = c.inkSoft)
+                Text(p.brand, style = Ruvo.type.title, color = c.ink, maxLines = 1)
+                Text(p.offer, style = Ruvo.type.caption, color = c.inkSoft, maxLines = 2)
+            }
+            Spacer(Modifier.width(Space.xs))
+            when {
+                over -> Unit
+                days > 0 -> DaysBadge(days)
+                p.kind == "Earn" -> Pill("Earn", c.future)
+                else -> Pill("Free", c.fixed)
             }
         }
-        if (!over) {
-            Spacer(Modifier.height(Space.xs))
+        Spacer(Modifier.height(Space.sm))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Pill(p.kind, c.ink.copy(alpha = 0.3f))
+            Spacer(Modifier.width(Space.xs))
+            Pill(look.label, look.tint)
+            Spacer(Modifier.weight(1f))
             Text(
-                when {
-                    days > 0 -> "Saves about ${IndianFormat.days(days)} of runway a month"
-                    p.kind == "Earn" -> "Adds days instead of saving them"
-                    else -> "Free while you study"
-                },
-                style = Ruvo.type.bodyStrong, color = c.futureInk,
+                p.ends?.let { e -> if (over) "Ended ${IndianFormat.date(e, today)}" else "Ends ${IndianFormat.date(e, today)}" } ?: "No end date",
+                style = Ruvo.type.caption, color = c.inkFaint,
             )
         }
-        Spacer(Modifier.height(Space.sm))
-        Facts(p, s, today)
-        Spacer(Modifier.height(Space.sm))
-        FillBar(s.timeLeft, look.tint, height = 6.dp)
+        Spacer(Modifier.height(Space.xs))
+        FillBar(s.timeLeft, if (s.state == Perks.State.ACTIVE) c.fuel else look.tint, height = 4.dp)
         Spacer(Modifier.height(Space.xxs))
-        Text(if (over) "This offer has ended." else "Time left in this offer", style = Ruvo.type.caption, color = c.inkFaint)
+        Text("${p.source} · checked ${ago(s.checkedDaysAgo)}", style = Ruvo.type.caption, color = c.inkFaint, maxLines = 1)
+    }
+}
+
+/** "+5 days": what a listing is worth in runway, the one number worth reading first. */
+@Composable
+private fun DaysBadge(days: Int, onCard: Boolean = false) {
+    val c = Ruvo.colors
+    Column(
+        Modifier.clip(RoundedCornerShape(14.dp)).background(if (onCard) Color.White.copy(alpha = 0.7f) else c.future.copy(alpha = if (c.isDark) 0.22f else 0.16f))
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text("+$days", style = Ruvo.type.title, color = if (onCard) Color(0xFF141B4D) else c.futureInk)
+        Text(if (days == 1) "day / month" else "days / month", style = Ruvo.type.caption, color = if (onCard) Color(0xFF141B4D).copy(alpha = 0.7f) else c.inkSoft)
     }
 }
 

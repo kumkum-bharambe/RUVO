@@ -81,7 +81,6 @@ fun ProfileSheet(
             Cadence.IRREGULAR -> "Money that varies"
         }
     val read = Library.all.count { it.id in state.settings.readBooks }
-    val ideas = state.settings.savedIdeas.size
 
     RuvoSheet("Profile", onDismiss) {
         // Who you are, on navy, with the three numbers that sum it up.
@@ -120,7 +119,7 @@ fun ProfileSheet(
         Spacer(Modifier.height(Space.md))
         val from = state.today.withDayOfMonth(1)
         val flow = Insights.flow(state.activity.map { it.txn }, from, state.today)
-        RuvoCard(Modifier.fillMaxWidth().reveal(1), brush = c.bucketBrush(com.ruvo.engine.Bucket.FIXED), border = null, elevated = !c.isDark) {
+        RuvoCard(Modifier.fillMaxWidth().reveal(1), brush = c.heroBrush, border = null, elevated = !c.isDark) {
             Eyebrow("${state.today.month.name.lowercase().replaceFirstChar { it.uppercase() }} so far")
             Spacer(Modifier.height(Space.xs))
             Row {
@@ -161,8 +160,6 @@ fun ProfileSheet(
 
         Spacer(Modifier.height(Space.md))
         RuvoCard(Modifier.fillMaxWidth().reveal(5), padding = PaddingValues(horizontal = Space.md, vertical = Space.xs)) {
-            Shortcut(RuvoIcons.Calendar, "Your week", "Seven days, gently reviewed") { onDismiss(); onWeekly() }
-            Shortcut(RuvoIcons.Bookmark, "Saved ideas", if (ideas == 0) "Save ideas while you read" else "$ideas saved from the Guide") { onDismiss(); onGuide() }
             Shortcut(RuvoIcons.User, if (state.isDemo) "Switch sample student" else "Try a sample student", "Five made-up students to explore") { onDismiss(); onPersonas() }
             Shortcut(RuvoIcons.Lock, "Change PIN", "The 4-digit PIN you open Ruvo with") { changingPin = true }
             Shortcut(RuvoIcons.Shield, "Private by design", "Your account and data stay on this phone, encrypted", onClick = null)

@@ -82,7 +82,7 @@ import com.ruvo.engine.Insights
 import com.ruvo.engine.TxnStatus
 import kotlinx.coroutines.launch
 
-private enum class MoneyTab(val label: String) { OVERVIEW("Overview"), ACTIVITY("Activity"), HISTORY("History"), OWED("Owed") }
+private enum class MoneyTab(val label: String) { OVERVIEW("Overview"), ACTIVITY("Transactions"), HISTORY("History"), OWED("Owed") }
 
 /** How Activity is grouped: by week, by month, or everything. [offset] steps back through earlier periods. */
 private enum class Span(val label: String) { WEEK("Weekly"), MONTH("Monthly"), ALL("All") }
@@ -658,7 +658,6 @@ fun TxnSheet(id: String, startWithSplit: Boolean, onDismiss: () -> Unit) {
     val repo = RuvoGraph.repository
     var name by remember(id) { mutableStateOf(t.merchant) }
     var splitOpen by remember(id) { mutableStateOf(startWithSplit) }
-    var people by remember(id) { mutableStateOf(item.shares.joinToString(", ") { it.person }) }
     val categories = listOf("Food", "Groceries", "Transport", "Shopping", "Entertainment", "Subscriptions", "Bills", "Education", "Health", "Other")
 
     RuvoSheet(IndianFormat.rupees(t.amount), onDismiss, eyebrow = "${IndianFormat.relativeDay(t.date, state.today)} · ${if (t.direction == Direction.CREDIT) "money in" else "payment"}") {
@@ -680,7 +679,8 @@ fun TxnSheet(id: String, startWithSplit: Boolean, onDismiss: () -> Unit) {
             Eyebrow("Bucket")
             Spacer(Modifier.height(Space.xs))
             Row(horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
-                Bucket.entries.forEach { b -> Chip(bucketName(b), t.bucket == b, { scope.launch { repo.setBucket(id, b) } }, accent = c.bucket(b)) }
+                // A payment is planned (Fixed) or everyday (Fuel); money for goals moves by pouring, not by paying.
+                listOf(Bucket.FIXED, Bucket.FUEL).forEach { b -> Chip(bucketName(b), t.bucket == b, { scope.launch { repo.setBucket(id, b) } }, accent = c.bucket(b)) }
             }
             Spacer(Modifier.height(Space.md))
             RuvoCard {
@@ -689,16 +689,13 @@ fun TxnSheet(id: String, startWithSplit: Boolean, onDismiss: () -> Unit) {
                     Spacer(Modifier.height(Space.xs))
                     GhostButton(if (t.othersShare > 0) "Change split" else "Split it", { splitOpen = true }, Modifier.fillMaxWidth())
                 } else {
-                    Spacer(Modifier.height(Space.xs))
-                    RuvoField(people, { people = it }, "Names, separated by commas")
-                    val names = people.split(',').map { it.trim() }.filter { it.isNotEmpty() }
-                    if (names.isNotEmpty()) {
-                        Text("${IndianFormat.rupees(t.amount / (names.size + 1))} each, you included", style = Ruvo.type.caption, color = c.inkSoft)
-                    }
-                    Spacer(Modifier.height(Space.xs))
+                    Spacer(Modifier.height(Space.sm))
+                    var owed by remember(id) { mutableStateOf(item.shares.map { it.person to it.amount }) }
+                    com.ruvo.design.SplitEditor(t.amount, item.shares.map { it.person to it.amount }) { owed = it }
+                    Spacer(Modifier.height(Space.sm))
                     Row(horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
                         if (t.othersShare > 0) GhostButton("Not shared", { scope.launch { repo.unsplit(id) }; splitOpen = false }, Modifier.weight(1f))
-                        PrimaryButton("Split equally", { if (names.isNotEmpty()) scope.launch { repo.split(id, names) }; splitOpen = false }, Modifier.weight(1f), enabled = names.isNotEmpty())
+                        PrimaryButton("Save split", { scope.launch { repo.splitByAmounts(id, owed) }; splitOpen = false }, Modifier.weight(1f), enabled = owed.isNotEmpty())
                     }
                 }
             }

@@ -190,7 +190,7 @@ object Library {
             situation = "Rhea's evening Blinkit order became a habit. Keeping the ones she enjoyed and skipping the bored ones saved ₹900 a month.",
             why = "Small spends are easy to miss and easy to change. They are where most extra days hide.",
             reflect = "Which small spend do you enjoy most? Which one happens out of habit?",
-            tryIt = "This week, mark small spends as worth it or not in your weekly review.",
+            tryIt = "This week, open your review and look at the small spends it lists.",
             check = Check("₹100 a day for 30 days is…", listOf("₹1,000", "₹3,000", "₹300"), 1, "₹100 × 30 = ₹3,000. Daily amounts multiply quickly."),
             applyLabel = "Try Before you buy on your next snack.", apply = Apply.BEFORE_YOU_BUY,
         ),

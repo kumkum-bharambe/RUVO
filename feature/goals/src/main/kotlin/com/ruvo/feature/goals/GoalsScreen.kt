@@ -155,16 +155,16 @@ fun GoalsScreen(startNewGoal: Boolean = false, onNewGoalShown: () -> Unit = {}, 
         }
         if (state.goals.isNotEmpty()) item { GoalInsights(state, Modifier.padding(horizontal = Space.gutter).padding(top = Space.md).reveal(3)) }
         item {
-            RuvoCard(Modifier.fillMaxWidth().padding(horizontal = Space.gutter).padding(top = Space.xl), brush = c.heroBrush, border = null, elevated = true, onClick = { review = true }, onClickLabel = "Open monthly review") {
-                Eyebrow("Monthly review", color = c.onHero.copy(alpha = 0.7f))
-                Text("Your month in 30 seconds", style = Ruvo.type.title, color = c.onHero)
-                Text("What came in, what went out, what you protected.", style = Ruvo.type.caption, color = c.onHero.copy(alpha = 0.7f))
+            RuvoCard(Modifier.fillMaxWidth().padding(horizontal = Space.gutter).padding(top = Space.xl), brush = c.heroBrush, border = null, elevated = true, onClick = { review = true }, onClickLabel = "Open your review") {
+                Eyebrow("Your review", color = c.onHero.copy(alpha = 0.7f))
+                Text("This week and this month", style = Ruvo.type.title, color = c.onHero)
+                Text("What you spent, what came in, what you protected.", style = Ruvo.type.caption, color = c.onHero.copy(alpha = 0.7f))
             }
         }
     }
     openGoal?.let { id -> GoalSheet(id, state) { openGoal = null } }
     if (newGoal) NewGoalSheet { newGoal = false }
-    if (review) MonthlyReviewSheet(state, onDismiss = { review = false }, onWeekly = onWeekly)
+    if (review) ReviewSheet(state, onDismiss = { review = false })
 }
 
 /** Where a goal stands: on track if what is protected keeps pace with a straight line to the target date. */
@@ -399,13 +399,16 @@ private fun GoalSheet(id: String, state: AppState, onDismiss: () -> Unit) {
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun NewGoalSheet(onDismiss: () -> Unit) {
     var name by remember { mutableStateOf("") }
     var target by remember { mutableStateOf("") }
     var monthly by remember { mutableStateOf("") }
     var months by remember { mutableStateOf(6) }
+    // A date you picked yourself; when set it replaces the 3, 6 or 12 month choice.
+    var customDate by remember { mutableStateOf<LocalDate?>(null) }
+    var choosingDate by remember { mutableStateOf(false) }
     var picked by remember { mutableStateOf<GoalScene?>(null) }
     val scope = rememberCoroutineScope()
     val tilt by rememberTilt()
@@ -423,8 +426,30 @@ fun NewGoalSheet(onDismiss: () -> Unit) {
         Spacer(Modifier.height(Space.md))
         Eyebrow("By when")
         Spacer(Modifier.height(Space.xs))
-        Row(horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
-            listOf(3, 6, 12).forEach { m -> Chip("$m months", months == m, { months = m }) }
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.xs), verticalArrangement = Arrangement.spacedBy(Space.xs)) {
+            listOf(3, 6, 12).forEach { m -> Chip("$m months", customDate == null && months == m, { months = m; customDate = null }) }
+            Chip(customDate?.let { IndianFormat.date(it, LocalDate.now()) } ?: "Pick a date", customDate != null, { choosingDate = true })
+        }
+        if (choosingDate) {
+            val today = LocalDate.now()
+            val zone = java.time.ZoneOffset.UTC
+            val picker = androidx.compose.material3.rememberDatePickerState(
+                initialSelectedDateMillis = (customDate ?: today.plusMonths(months.toLong())).atStartOfDay(zone).toInstant().toEpochMilli(),
+                selectableDates = object : androidx.compose.material3.SelectableDates {
+                    // Only days from tomorrow on: a goal needs time to save for.
+                    override fun isSelectableDate(utcTimeMillis: Long) = utcTimeMillis > today.atStartOfDay(zone).toInstant().toEpochMilli()
+                },
+            )
+            androidx.compose.material3.DatePickerDialog(
+                onDismissRequest = { choosingDate = false },
+                confirmButton = {
+                    androidx.compose.material3.TextButton({
+                        picker.selectedDateMillis?.let { customDate = java.time.Instant.ofEpochMilli(it).atZone(zone).toLocalDate() }
+                        choosingDate = false
+                    }) { Text("Use this date", color = c.ink) }
+                },
+                dismissButton = { androidx.compose.material3.TextButton({ choosingDate = false }) { Text("Cancel", color = c.inkSoft) } },
+            ) { androidx.compose.material3.DatePicker(picker) }
         }
         Spacer(Modifier.height(Space.md))
         Eyebrow("Pick a picture")
@@ -448,18 +473,69 @@ fun NewGoalSheet(onDismiss: () -> Unit) {
         }
         Spacer(Modifier.height(Space.lg))
         val t = parseRupees(target) ?: 0
+        val by = customDate ?: LocalDate.now().plusMonths(months.toLong())
+        val spanMonths = java.time.temporal.ChronoUnit.MONTHS.between(LocalDate.now().withDayOfMonth(1), by.withDayOfMonth(1)).coerceAtLeast(1)
+        if (t > 0) Text("About ${IndianFormat.rupees(t / spanMonths)} a month gets you there by ${IndianFormat.date(by, LocalDate.now())}.", Modifier.padding(bottom = Space.sm), style = Ruvo.type.caption, color = c.inkSoft)
         PrimaryButton("Create goal", {
             scope.launch {
-                RuvoGraph.repository.addGoal(name.ifBlank { "My goal" }, t, LocalDate.now().plusMonths(months.toLong()), parseRupees(monthly) ?: (t / months), picked?.let { PICKED_SCENE + it.ordinal } ?: 0)
+                RuvoGraph.repository.addGoal(name.ifBlank { "My goal" }, t, by, parseRupees(monthly) ?: (t / spanMonths), picked?.let { PICKED_SCENE + it.ordinal } ?: 0)
             }
             onDismiss()
         }, Modifier.fillMaxWidth(), enabled = t > 0)
     }
 }
 
-/** Your month in 30 seconds: what came in, went out, was saved and is still free, then what to do next. */
+/**
+ * One review with two views: this week (what you spent against last week, and which categories moved) and this
+ * month (what came in, went out, was saved and is still free, then what to do next). Nothing to judge or grade.
+ */
 @Composable
-fun MonthlyReviewSheet(state: AppState, onDismiss: () -> Unit, onWeekly: () -> Unit = {}) {
+fun ReviewSheet(state: AppState, onDismiss: () -> Unit, startWithWeek: Boolean = false, onOpenGuide: () -> Unit = {}) {
+    val c = Ruvo.colors
+    var week by remember { mutableStateOf(startWithWeek) }
+    RuvoSheet("Your review", onDismiss, eyebrow = if (week) "This week" else "${state.today.month.name.lowercase().replaceFirstChar { it.uppercase() }} so far") {
+        com.ruvo.design.SegmentedControl(listOf("This week", "This month"), if (week) 0 else 1, { week = it == 0 })
+        Spacer(Modifier.height(Space.md))
+        if (week) WeekReview(state) else MonthReview(state, onDismiss) { week = true }
+        Spacer(Modifier.height(Space.lg))
+        if (week) PrimaryButton("Open Ruvo Guide", { onDismiss(); onOpenGuide() }, Modifier.fillMaxWidth())
+        else PrimaryButton("Close", onDismiss, Modifier.fillMaxWidth())
+    }
+}
+
+@Composable
+private fun WeekReview(state: AppState) {
+    val c = Ruvo.colors
+    val week = remember(state.input.transactions, state.today) { com.ruvo.engine.Insights.week(state.input.transactions, state.today) }
+    RuvoCard(Modifier.fillMaxWidth(), brush = c.heroBrush, border = null) {
+        Eyebrow("Spent in the last 7 days", color = c.onHero.copy(alpha = 0.7f))
+        Amount(week.total, style = Ruvo.type.display, color = c.onHero, countUp = true)
+        Text(
+            week.changePercent?.let { com.ruvo.engine.Insights.changeWords(it, "last week").replaceFirstChar { ch -> ch.uppercase() } }
+                ?: "Nothing to compare with last week yet.",
+            style = Ruvo.type.body, color = c.onHero.copy(alpha = 0.85f),
+        )
+    }
+    if (week.categories.isEmpty()) {
+        Spacer(Modifier.height(Space.md))
+        Text("No spending recorded this week yet.", style = Ruvo.type.body, color = c.inkSoft)
+    }
+    val top = week.categories.maxOfOrNull { it.thisPeriod }?.coerceAtLeast(1) ?: 1
+    week.categories.take(5).forEach { cat ->
+        Spacer(Modifier.height(Space.sm))
+        Row(Modifier.fillMaxWidth()) {
+            Text(cat.category, Modifier.weight(1f), style = Ruvo.type.bodyStrong, color = c.ink)
+            cat.changePercent?.let { p -> Text(com.ruvo.engine.Insights.changeTag(p), style = Ruvo.type.label, color = if (p > 0) c.warning else c.futureInk) }
+            Spacer(Modifier.width(Space.sm))
+            Amount(cat.thisPeriod, style = Ruvo.type.label)
+        }
+        Spacer(Modifier.height(4.dp))
+        FillBar(cat.thisPeriod.toFloat() / top, c.fuel)
+    }
+}
+
+@Composable
+private fun MonthReview(state: AppState, onDismiss: () -> Unit, onSeeWeek: () -> Unit) {
     val c = Ruvo.colors
     val month = state.today.withDayOfMonth(1)
     val tx = state.activity.map { it.txn }.filter { !it.date.isBefore(month) && it.status != com.ruvo.engine.TxnStatus.IGNORED }
@@ -467,7 +543,7 @@ fun MonthlyReviewSheet(state: AppState, onDismiss: () -> Unit, onWeekly: () -> U
     val went = tx.filter { it.countsAsSpending }.sumOf { it.yourShare }
     val top = tx.filter { it.countsAsSpending }.groupBy { it.category }.mapValues { (_, l) -> l.sumOf { it.yourShare } }.maxByOrNull { it.value }
     var giveJob by remember { mutableStateOf(false) }
-    RuvoSheet("Your month in 30 seconds", onDismiss, eyebrow = "${month.month.name.lowercase().replaceFirstChar { it.uppercase() }} so far") {
+    Column {
         Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
             RuvoCard(Modifier.weight(1f).reveal(0), brush = c.bucketBrush(com.ruvo.engine.Bucket.FUTURE), border = null) {
                 Eyebrow("Received", color = androidx.compose.ui.graphics.Color(0xFF0B1A33).copy(alpha = 0.75f))
@@ -485,13 +561,11 @@ fun MonthlyReviewSheet(state: AppState, onDismiss: () -> Unit, onWeekly: () -> U
         val firstGoal = state.goals.firstOrNull { !it.isComplete }
         Spacer(Modifier.height(Space.xs))
         NextStep("Save better", if (firstGoal != null) "You could move a little earlier toward ${firstGoal.name}, the day money arrives." else "Give your next money a job with a small goal.", "Give it a job") { giveJob = true }
-        top?.let { NextStep("Spending pattern", "${it.key} was your biggest category, at ${IndianFormat.rupees(it.value)}.", "See what changed") { onDismiss(); onWeekly() } }
+        top?.let { NextStep("Spending pattern", "${it.key} was your biggest category, at ${IndianFormat.rupees(it.value)}.", "See this week", onSeeWeek) }
         NextStep("Plan ahead", "Bills and fees are predictable. Give the next one a date and set money aside early.", "Got it", onDismiss)
         if (giveJob) {
             if (firstGoal != null) GoalSheet(firstGoal.id, state) { giveJob = false } else NewGoalSheet { giveJob = false }
         }
-        Spacer(Modifier.height(Space.lg))
-        PrimaryButton("Close", onDismiss, Modifier.fillMaxWidth())
     }
 }
 

@@ -64,6 +64,29 @@ class DecisionsTest {
         assertEquals(rupees(300), s.yourShare)
     }
 
+    @Test fun `split by amounts gives you whatever is left`() {
+        val s = Splits.byAmounts("t", rupees(1_200), listOf("Isha" to rupees(500), "Kunal" to rupees(300)))
+        assertEquals(rupees(800), s.othersTotal)
+        assertEquals(rupees(400), s.yourShare)
+        // People with nothing to pay are left out.
+        assertEquals(listOf("Isha"), Splits.byAmounts("t", rupees(1_200), listOf("Isha" to rupees(500), "Kunal" to 0, " " to rupees(10))).shares.map { it.person })
+    }
+
+    @Test fun `split by amounts never asks friends for more than the bill`() {
+        val s = Splits.byAmounts("t", rupees(1_000), listOf("Isha" to rupees(700), "Kunal" to rupees(700)))
+        assertEquals(rupees(1_000), s.othersTotal)
+        assertEquals(0, s.yourShare)
+        assertEquals(rupees(300), s.shares[1].amount)
+    }
+
+    @Test fun `you can name your own share and split the rest equally`() {
+        val s = Splits.yourShare("t", rupees(1_000), rupees(400), listOf("Isha", "Kunal"))
+        assertEquals(rupees(400), s.yourShare)
+        assertEquals(listOf(rupees(300), rupees(300)), s.shares.map { it.amount })
+        // A share bigger than the bill is capped at the bill.
+        assertEquals(rupees(1_000), Splits.yourShare("t", rupees(1_000), rupees(5_000), listOf("Isha")).yourShare)
+    }
+
     @Test fun `upi link carries amount and note`() {
         val link = Splits.upiLink("kumkum@okaxis", "Kumkum", rupees(333) + 33, "Groceries split")
         assertEquals("upi://pay?pa=kumkum%40okaxis&pn=Kumkum&am=333.33&cu=INR&tn=Groceries%20split", link)

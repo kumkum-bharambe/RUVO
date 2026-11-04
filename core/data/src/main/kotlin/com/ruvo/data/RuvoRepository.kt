@@ -237,6 +237,16 @@ class RuvoRepository(
         dao.upsertTxn(t.copy(othersShare = split.othersTotal))
     }
 
+    /** A split where each friend owes the amount typed for them; you keep the rest. */
+    suspend fun splitByAmounts(txnId: String, owed: List<Pair<String, Paise>>) {
+        val t = dao.txn(txnId) ?: return
+        val split = Splits.byAmounts(txnId, t.amount, owed)
+        if (split.shares.isEmpty()) return unsplit(txnId)
+        dao.deleteSharesFor(txnId)
+        dao.insertShares(split.shares.map { SplitShareEntity(txnId = txnId, person = it.person, amount = it.amount) })
+        dao.upsertTxn(t.copy(othersShare = split.othersTotal))
+    }
+
     suspend fun unsplit(txnId: String) {
         dao.deleteSharesFor(txnId)
         edit(txnId) { it.copy(othersShare = 0) }

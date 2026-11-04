@@ -29,8 +29,8 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.PathMeasure
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.contentDescription
@@ -46,47 +46,63 @@ private val LogoPaper = Color(0xFFFFFFFF)
 private val LogoHaldi = Color(0xFFFFC23D)
 private val LogoOrange = Color(0xFFFF8A45)
 
+private val LogoRunway = Color(0xFF8B6CFF)
+private val LogoRunwayDeep = Color(0xFF5B3FE0)
+
 /**
- * The Ruvo mark: a lowercase r whose shoulder lifts off like a runway, followed by a sun-yellow dot, the "."
- * of "ruvo." and the day the next money arrives. White stem, orange-to-yellow arc, on a night-blue tile that
- * warms to violet. [draw] builds it (stem first, then the arc), and [dot] pops the dot, which is how the
- * opening animates it; both are 1 when the mark is still.
+ * The Ruvo mark: a runway leading to a sunrise. A violet runway narrows to the horizon with white centre
+ * dashes, and a yellow half-sun rises behind it: the day the next money arrives. On a night-blue tile that warms
+ * to violet. [runway] builds the strip from the near end to the horizon, [sun] raises the sun (0 hidden, 1 risen,
+ * a little more overshoots), and [dashShift] moves the dashes toward you; the opening animates all three.
  */
 @Composable
-fun RuvoLogo(modifier: Modifier = Modifier, size: Dp = 56.dp, tile: Color? = null, draw: Float = 1f, dot: Float = 1f, dotDrop: Float = 0f) {
+fun RuvoLogo(modifier: Modifier = Modifier, size: Dp = 56.dp, tile: Color? = null, runway: Float = 1f, sun: Float = 1f, dashShift: Float = 0f) {
     Canvas(modifier.size(size).semantics { contentDescription = "Ruvo" }) {
         val s = this.size.width
         if (tile != null) drawRoundRect(tile, cornerRadius = CornerRadius(s * 0.24f))
         else drawRoundRect(Brush.linearGradient(listOf(LogoViolet, LogoInk), Offset(0f, 0f), Offset(s, s)), cornerRadius = CornerRadius(s * 0.24f))
-        val w = s * 0.11f
-        val stemT = (draw / 0.4f).coerceIn(0f, 1f)
-        val arcT = ((draw - 0.3f) / 0.7f).coerceIn(0f, 1f)
-        if (stemT > 0f) {
-            val bottom = s * 0.72f
-            drawLine(LogoPaper, Offset(s * 0.36f, bottom), Offset(s * 0.36f, bottom - (bottom - s * 0.54f) * stemT), w, StrokeCap.Round)
-        }
-        if (arcT > 0f) {
-            val arc = Path().apply {
-                moveTo(s * 0.36f, s * 0.54f)
-                cubicTo(s * 0.36f, s * 0.38f, s * 0.47f, s * 0.31f, s * 0.61f, s * 0.315f)
+        val horizon = s * 0.55f
+        // The sun, clipped at the horizon so it rises from behind it.
+        if (sun > 0f) {
+            val r = s * 0.2f
+            val cy = horizon + r * (1f - sun)
+            clipRect(bottom = horizon) {
+                drawCircle(LogoHaldi.copy(alpha = 0.25f), r * 1.45f, Offset(s / 2, cy))
+                drawCircle(Brush.verticalGradient(listOf(LogoHaldi, LogoOrange), cy - r, cy + r), r, Offset(s / 2, cy))
             }
-            val measure = PathMeasure().apply { setPath(arc, false) }
-            val part = Path().also { measure.getSegment(0f, measure.length * arcT, it, true) }
-            drawPath(
-                part, Brush.linearGradient(listOf(LogoOrange, LogoHaldi), Offset(s * 0.36f, s * 0.54f), Offset(s * 0.61f, s * 0.31f)),
-                style = Stroke(w, cap = StrokeCap.Round),
-            )
         }
-        // [dotDrop] lifts the dot above its place (in tile heights), which is how the opening bounces it in.
-        if (dot > 0f) drawCircle(LogoHaldi, s * 0.072f * dot, Offset(s * 0.745f, s * 0.31f - s * dotDrop))
+        // The horizon glow line.
+        drawLine(LogoOrange.copy(alpha = 0.9f), Offset(s * 0.2f, horizon), Offset(s * 0.8f, horizon), s * 0.022f, StrokeCap.Round)
+        // The runway: a trapezoid from near (wide, bottom) to far (narrow, at the horizon), built near end first.
+        val t = runway.coerceIn(0f, 1f)
+        if (t > 0f) {
+            val nearY = s * 0.82f
+            val farY = horizon + s * 0.025f
+            val topY = nearY - (nearY - farY) * t
+            fun halfWidth(y: Float) = s * (0.04f + 0.24f * (y - farY) / (nearY - farY))
+            val strip = Path().apply {
+                moveTo(s / 2 - halfWidth(nearY), nearY); lineTo(s / 2 + halfWidth(nearY), nearY)
+                lineTo(s / 2 + halfWidth(topY), topY); lineTo(s / 2 - halfWidth(topY), topY); close()
+            }
+            drawPath(strip, Brush.verticalGradient(listOf(LogoRunwayDeep, LogoRunway), farY, nearY))
+            // Centre dashes, longer and wider as they come closer, sliding toward you with [dashShift].
+            for (i in 0 until 3) {
+                val p = ((i + dashShift) / 3f) % 1f
+                val y0 = farY + (nearY - farY) * (0.12f + 0.8f * p * p)
+                val len = s * (0.025f + 0.05f * p)
+                if (y0 + len > topY && y0 < nearY - s * 0.01f) {
+                    drawLine(LogoPaper, Offset(s / 2, maxOf(y0, topY)), Offset(s / 2, minOf(y0 + len, nearY - s * 0.01f)), s * (0.012f + 0.018f * p), StrokeCap.Round)
+                }
+            }
+        }
     }
 }
 
 
 /**
- * The opening: the tile spins in, the r draws itself (stem up, then the runway arc lifting off), the yellow dot
- * drops in from above and bounces into place like a ball, and as it lands a ring and a burst of confetti in the
- * brand colours fly out. Then each letter of "ruvo." hops up on a spring, the final dot dropping in last, and
+ * The opening: the tile spins in, the runway draws itself out to the horizon with its dashes rushing toward you,
+ * then the sun rises behind it with a little bounce, and as it clears the horizon a ring and a burst of
+ * confetti in the brand colours fly out. Then each letter of "ruvo." hops up on a spring, the final dot dropping in last, and
  * the line appears. About 2.5 s; a tap skips it. Always dark, so it reads as a cover. Reduced motion shows the
  * finished mark at once.
  */
@@ -95,28 +111,22 @@ fun RuvoSplash(modifier: Modifier = Modifier, onSkip: () -> Unit = {}) {
     val reduced = Ruvo.reducedMotion
     val start = if (reduced) 1f else 0f
     val tile = remember { Animatable(start) }
-    val draw = remember { Animatable(start) }
-    val drop = remember { Animatable(if (reduced) 0f else 2.2f) }
+    val runway = remember { Animatable(start) }
+    val sun = remember { Animatable(start) }
+    val dashes = remember { Animatable(0f) }
     val burst = remember { Animatable(start) }
     val letters = remember { List(5) { Animatable(start) } }
     val line = remember { Animatable(start) }
-    // Falls, bounces, bounces smaller, settles: like a ball, never sinking below where it rests.
-    val ball = androidx.compose.animation.core.keyframes<Float> {
-        durationMillis = 860
-        2.2f at 0 using androidx.compose.animation.core.FastOutLinearInEasing
-        0f at 380 using androidx.compose.animation.core.LinearOutSlowInEasing
-        0.55f at 530 using androidx.compose.animation.core.FastOutLinearInEasing
-        0f at 670 using androidx.compose.animation.core.LinearOutSlowInEasing
-        0.16f at 760 using androidx.compose.animation.core.FastOutLinearInEasing
-        0f at 860
-    }
+    // The sun overshoots a touch as it rises, then settles, like it popped up over the horizon.
+    val rise = androidx.compose.animation.core.spring<Float>(dampingRatio = 0.45f, stiffness = 180f)
     val hop = androidx.compose.animation.core.spring<Float>(dampingRatio = 0.42f, stiffness = 420f)
     LaunchedEffect(Unit) {
         if (reduced) return@LaunchedEffect
         launch { tile.animateTo(1f, androidx.compose.animation.core.spring(dampingRatio = 0.55f, stiffness = 300f)) }
-        launch { delay(280); draw.animateTo(1f, tween(620, easing = FastOutSlowInEasing)) }
-        launch { delay(820); drop.animateTo(0f, ball) }
-        launch { delay(1200); burst.animateTo(1f, tween(1100, easing = FastOutSlowInEasing)) }
+        launch { delay(260); runway.animateTo(1f, tween(600, easing = FastOutSlowInEasing)) }
+        launch { delay(260); dashes.animateTo(3f, tween(1400, easing = androidx.compose.animation.core.LinearOutSlowInEasing)) }
+        launch { delay(820); sun.animateTo(1f, rise) }
+        launch { delay(1050); burst.animateTo(1f, tween(1100, easing = FastOutSlowInEasing)) }
         letters.forEachIndexed { i, l -> launch { delay(1150L + i * 80L + if (i == 4) 160L else 0L); l.animateTo(1f, hop) } }
         launch { delay(1800); line.animateTo(1f, Motion.gentle()) }
     }
@@ -131,8 +141,8 @@ fun RuvoSplash(modifier: Modifier = Modifier, onSkip: () -> Unit = {}) {
             drawRect(Brush.radialGradient(listOf(Color(0xFF2A2272), Color(0xFF0A0D26)), centre, size.height * 0.6f))
             val b = burst.value
             if (b > 0f && b < 1f) {
-                // Where the dot lands, relative to the centre of the 112 dp tile.
-                val land = centre + Offset(27.dp.toPx(), -21.dp.toPx())
+                // The sun's centre, just above the middle of the 112 dp tile.
+                val land = centre + Offset(0f, -6.dp.toPx())
                 val ringR = 14.dp.toPx() + 90.dp.toPx() * b
                 drawCircle(LogoHaldi.copy(alpha = (1f - b) * 0.7f), ringR, land, style = Stroke(3.dp.toPx() * (1f - b) + 0.5f))
                 // Confetti: little dots and dashes thrown outward, slowing and fading.
@@ -157,7 +167,7 @@ fun RuvoSplash(modifier: Modifier = Modifier, onSkip: () -> Unit = {}) {
                     scaleX = sc; scaleY = sc; alpha = t.coerceIn(0f, 1f)
                     rotationZ = (1f - t) * -40f
                 },
-                size = 112.dp, draw = draw.value, dot = if (drop.value > 2f) 0f else 1f, dotDrop = drop.value,
+                size = 112.dp, runway = runway.value, sun = sun.value, dashShift = dashes.value,
             )
             Spacer(Modifier.height(Space.lg))
             Row {

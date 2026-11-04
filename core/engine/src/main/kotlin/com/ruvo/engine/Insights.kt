@@ -10,6 +10,25 @@ import java.time.temporal.ChronoUnit
  */
 object Insights {
 
+    /**
+     * A change said in words, never as a percentage over 100: "34% more than last week", "double last week",
+     * "more than double last week". Drops can't go past 100% anyway.
+     */
+    fun changeWords(percent: Int, than: String): String = when {
+        percent > 100 -> "more than double $than"
+        percent == 100 -> "double $than"
+        percent > 0 -> "$percent% more than $than"
+        percent < 0 -> "${minOf(-percent, 100)}% less than $than"
+        else -> "the same as $than"
+    }
+
+    /** The short tag beside a category: "+34%", "-20%", or "2x or more" past 100%. */
+    fun changeTag(percent: Int): String = when {
+        percent > 100 -> "2x or more"
+        percent >= 0 -> "+$percent%"
+        else -> "-${minOf(-percent, 100)}%"
+    }
+
     data class Day(val date: LocalDate, val spent: Paise)
 
     /** Your share of spending for each of the last [days] days, oldest first, ending today. */

@@ -76,6 +76,8 @@ fun QuickAddSheet(onDismiss: () -> Unit) {
     var what by remember { mutableStateOf("") }
     var moneyIn by remember { mutableStateOf(false) }
     var bucket by remember { mutableStateOf(Bucket.FUEL) }
+    var sharing by remember { mutableStateOf(false) }
+    var owed by remember { mutableStateOf<List<Pair<String, Long>>>(emptyList()) }
     val paise = parseRupees(amount) ?: 0
     val quick = listOf("Food", "Transport", "Groceries", "Shopping", "Entertainment", "Education", "Bills", "Other")
 
@@ -83,10 +85,12 @@ fun QuickAddSheet(onDismiss: () -> Unit) {
         if (paise <= 0) return
         Haptics.confirm(view)
         scope.launch {
-            RuvoGraph.repository.addManual(
+            val id = RuvoGraph.repository.addManual(
                 paise, what.ifBlank { category }, if (moneyIn) "Income" else category,
                 if (moneyIn) Bucket.FUEL else bucket, if (moneyIn) Direction.CREDIT else Direction.DEBIT,
             )
+            // Shared on the way in: friends' parts go straight to Owed in Money.
+            if (!moneyIn && sharing && owed.isNotEmpty()) RuvoGraph.repository.splitByAmounts(id, owed)
         }
         onDismiss()
     }
@@ -112,7 +116,17 @@ fun QuickAddSheet(onDismiss: () -> Unit) {
             PrimaryButton("Add ${if (paise > 0) IndianFormat.rupees(paise) else ""}", { save("Income") }, Modifier.fillMaxWidth(), enabled = paise > 0)
         } else {
             Row(horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
-                Bucket.entries.forEach { b -> Chip(bucketName(b), bucket == b, { bucket = b }, accent = c.bucket(b)) }
+                // A payment is planned (Fixed) or everyday (Fuel); money for goals moves by pouring, not by paying.
+                listOf(Bucket.FIXED, Bucket.FUEL).forEach { b -> Chip(bucketName(b), bucket == b, { bucket = b }, accent = c.bucket(b)) }
+            }
+            Spacer(Modifier.height(Space.md))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Shared with friends?", Modifier.weight(1f), style = Ruvo.type.bodyStrong, color = c.ink)
+                androidx.compose.material3.Switch(sharing, { sharing = it }, enabled = paise > 0)
+            }
+            if (sharing && paise > 0) {
+                Spacer(Modifier.height(Space.xs))
+                com.ruvo.design.SplitEditor(paise, emptyList()) { owed = it }
             }
             Spacer(Modifier.height(Space.md))
             Eyebrow("Tap a category to save")

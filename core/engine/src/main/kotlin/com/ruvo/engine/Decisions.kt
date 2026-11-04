@@ -70,6 +70,28 @@ object Splits {
         return Split(txnId, total, people.map { Share(it, each) })
     }
 
+    /**
+     * Each friend owes the amount you type for them, as in GPay; you keep whatever is left. Blank names and zero
+     * amounts are dropped, and the friends' total is capped at the bill so nobody is asked for more than it cost.
+     */
+    fun byAmounts(txnId: String, total: Paise, owed: List<Pair<String, Paise>>): Split {
+        var room = total
+        val shares = owed.filter { it.first.isNotBlank() && it.second > 0 }.map { (name, amount) ->
+            val take = amount.coerceAtMost(room)
+            room -= take
+            Share(name.trim(), take)
+        }.filter { it.amount > 0 }
+        return Split(txnId, total, shares)
+    }
+
+    /** You say what your part is; the rest is shared equally between [people], rounding paise staying with you. */
+    fun yourShare(txnId: String, total: Paise, yours: Paise, people: List<String>): Split {
+        require(people.isNotEmpty()) { "a split needs at least one other person" }
+        val rest = total - yours.coerceIn(0, total)
+        val each = rest / people.size
+        return Split(txnId, total, people.map { Share(it, each) })
+    }
+
     fun owedToYou(splits: List<Split>): Paise = splits.sumOf { it.owedToYou }
 
     /** UPI payment link a friend can tap to pay you back. Amount in rupees with two decimals. */

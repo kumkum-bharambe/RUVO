@@ -228,7 +228,8 @@ private fun SwipeCard(
             Eyebrow("Which bucket?")
             Spacer(Modifier.height(Space.xs))
             Row(horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
-                Bucket.entries.forEach { b -> Chip(bucketName(b), t.bucket == b, { onBucket(b) }, accent = c.bucket(b)) }
+                // A payment is planned (Fixed) or everyday (Fuel); money for goals moves by pouring, not by paying.
+                listOf(Bucket.FIXED, Bucket.FUEL).forEach { b -> Chip(bucketName(b), t.bucket == b, { onBucket(b) }, accent = c.bucket(b)) }
             }
         }
         Spacer(Modifier.height(Space.sm))
