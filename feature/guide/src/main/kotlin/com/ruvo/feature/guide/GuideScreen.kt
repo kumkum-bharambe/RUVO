@@ -157,7 +157,7 @@ private fun SlowSpark() {
     val reduced = Ruvo.reducedMotion
     val t = rememberInfiniteTransition(label = "spark")
     val r by t.animateFloat(0f, 360f, infiniteRepeatable(tween(24_000, easing = LinearEasing), RepeatMode.Restart), label = "r")
-    Box(Modifier.size(56.dp).clip(RoundedCornerShape(Radius.card)).border(1.5.dp, c.fuel, RoundedCornerShape(Radius.card)), contentAlignment = Alignment.Center) {
+    Box(Modifier.size(56.dp).clip(CircleShape).background(c.fuel.copy(alpha = 0.18f)), contentAlignment = Alignment.Center) {
         Icon(RuvoIcons.Spark, null, Modifier.size(30.dp).graphicsLayer { rotationZ = if (reduced) 0f else r }, tint = c.fuel)
     }
 }

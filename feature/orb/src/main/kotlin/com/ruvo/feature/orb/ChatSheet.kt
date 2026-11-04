@@ -6,6 +6,7 @@ import android.speech.SpeechRecognizer
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.layout.Arrangement
@@ -38,6 +39,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -106,43 +108,44 @@ fun ChatSheet(onDismiss: () -> Unit, firstQuestion: String? = null) {
     }
     LaunchedEffect(firstQuestion) { firstQuestion?.let { ask(it) } }
 
-    RuvoSheet("Ruvo", onDismiss, eyebrow = if (LiveRuvo.enabled) "Live answers" else "Works offline") {
-        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Space.sm)) {
-            bubbles.forEachIndexed { i, b ->
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = if (b.fromUser) Arrangement.End else Arrangement.Start) {
-                    Box(
-                        Modifier.widthIn(max = 300.dp)
-                            .clip(RoundedCornerShape(topStart = Radius.inner, topEnd = Radius.inner, bottomStart = if (b.fromUser) Radius.inner else 4.dp, bottomEnd = if (b.fromUser) 4.dp else Radius.inner))
-                            .background(if (b.fromUser) c.ink else c.surface)
-                            .padding(horizontal = Space.md, vertical = Space.sm)
-                            .semantics { if (!b.fromUser) liveRegion = LiveRegionMode.Polite },
-                    ) {
-                        Text(b.text, style = Ruvo.type.body, color = if (b.fromUser) c.canvas else c.ink)
-                    }
-                }
-                if (!b.fromUser && i > 0) {
-                    Text(
-                        "Listen", Modifier.clip(RoundedCornerShape(Radius.chip)).clickable(role = Role.Button, onClickLabel = "Read this answer aloud") { speech.speak(b.text, b.language) }
-                            .padding(horizontal = Space.xs, vertical = 4.dp),
-                        style = Ruvo.type.label, color = c.inkSoft,
-                    )
-                }
-                if (!b.fromUser && i == bubbles.lastIndex && b.suggestions.isNotEmpty()) {
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.xs), verticalArrangement = Arrangement.spacedBy(Space.xs)) {
-                        b.suggestions.forEach { s -> Chip(s, false, { ask(s) }) }
-                    }
-                }
+    RuvoSheet("Ask Ruvo", onDismiss, eyebrow = if (LiveRuvo.enabled) "Your money guide · live" else "Your money guide · works offline") {
+        // Language pill and menu: each language in its own script, with its English name.
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                Modifier.clip(RoundedCornerShape(Radius.chip)).background(c.glass).border(1.dp, c.hairline, RoundedCornerShape(Radius.chip))
+                    .clickable(role = Role.Button, onClickLabel = "Choose language") { picking = !picking }
+                    .padding(horizontal = 14.dp, vertical = 9.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                androidx.compose.material3.Icon(RuvoIcons.Message, null, Modifier.size(16.dp), tint = c.ink)
+                Spacer(Modifier.size(6.dp))
+                Text(langName.first, style = Ruvo.type.bodyStrong, color = c.ink)
             }
-            if (thinking) Text("Ruvo is thinking", style = Ruvo.type.caption, color = c.inkFaint)
+            Spacer(Modifier.weight(1f))
+            IconCircle(
+                RuvoIcons.Speaker, if (state.settings.spokenReplies) "Turn off spoken replies" else "Turn on spoken replies",
+                { scope.launch { RuvoGraph.repository.setSpokenReplies(!state.settings.spokenReplies) } },
+                tint = if (state.settings.spokenReplies) c.onAccent else c.inkFaint, background = if (state.settings.spokenReplies) c.fuel else c.glass,
+            )
         }
-        Spacer(Modifier.height(Space.md))
-        // Language: changes dictation, and replies too when live answers are on.
-        Chip("Language · ${langName.first}", picking, { picking = !picking })
-        if (picking) {
-            Spacer(Modifier.height(Space.xs))
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.xs), verticalArrangement = Arrangement.spacedBy(Space.xs)) {
+        androidx.compose.animation.AnimatedVisibility(picking) {
+            Column(
+                Modifier.padding(top = Space.xs).fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(c.surface).border(1.dp, c.hairline, RoundedCornerShape(20.dp)).padding(6.dp),
+            ) {
                 LANGUAGES.forEach { (tag, names) ->
-                    Chip(names.first, lang == tag, { scope.launch { RuvoGraph.repository.setChatLanguage(tag) }; picking = false })
+                    val on = lang == tag
+                    Row(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(if (on) c.fuel.copy(alpha = 0.18f) else androidx.compose.ui.graphics.Color.Transparent)
+                            .clickable(role = Role.RadioButton) { scope.launch { RuvoGraph.repository.setChatLanguage(tag) }; picking = false }
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(names.first, style = Ruvo.type.bodyStrong, color = c.ink)
+                            Text(names.second, style = Ruvo.type.caption, color = c.inkFaint)
+                        }
+                        if (on) androidx.compose.material3.Icon(RuvoIcons.Check, null, Modifier.size(18.dp), tint = c.fuelInk)
+                    }
                 }
             }
         }
@@ -152,38 +155,98 @@ fun ChatSheet(onDismiss: () -> Unit, firstQuestion: String? = null) {
                 Modifier.padding(top = Space.xs), style = Ruvo.type.caption, color = c.inkFaint,
             )
         }
-        Spacer(Modifier.height(Space.sm))
-        Row(Modifier.fillMaxWidth().imePadding(), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.weight(1f)) { RuvoField(input, { input = it }, if (lang.startsWith("en")) "Ask about your money" else "Ask in ${langName.second}") }
-            Spacer(Modifier.size(Space.xs))
-            IconCircle(
-                RuvoIcons.Mic, if (canDictate) "Speak your question" else "Speech input is not available on this phone",
-                {
-                    if (canDictate) runCatching {
-                        dictate.launch(
-                            Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
-                                .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                                .putExtra(RecognizerIntent.EXTRA_LANGUAGE, lang)
-                                .putExtra(RecognizerIntent.EXTRA_PROMPT, "Ask Ruvo"),
+        Spacer(Modifier.height(Space.md))
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Space.md)) {
+            bubbles.forEachIndexed { i, b ->
+                if (b.fromUser) {
+                    // Your message: navy (amber in Night swim), tail on the right.
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        Text(
+                            b.text,
+                            Modifier.widthIn(max = 290.dp).clip(RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp, bottomStart = 22.dp, bottomEnd = 6.dp))
+                                .background(if (c.isDark) c.fuel else c.ink).padding(horizontal = 16.dp, vertical = 12.dp),
+                            style = Ruvo.type.bodyStrong, color = if (c.isDark) c.onAccent else c.surface,
                         )
                     }
-                },
-                tint = if (canDictate) c.ink else c.inkFaint,
-            )
-            Spacer(Modifier.size(Space.xs))
-            IconCircle(RuvoIcons.Send, "Send", { ask(input) }, background = c.fuel, tint = c.onAccent)
+                } else {
+                    // Ruvo's answer: glass bubble beside a small amber orb.
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+                        Box(
+                            Modifier.size(32.dp).clip(androidx.compose.foundation.shape.CircleShape)
+                                .background(androidx.compose.ui.graphics.Brush.radialGradient(listOf(c.orbCore, c.orbGlow, c.orbDeep))),
+                        )
+                        Spacer(Modifier.size(10.dp))
+                        Column(
+                            Modifier.weight(1f).clip(RoundedCornerShape(topStart = 6.dp, topEnd = 22.dp, bottomStart = 22.dp, bottomEnd = 22.dp))
+                                .background(c.glass).border(1.dp, c.glassEdge, RoundedCornerShape(topStart = 6.dp, topEnd = 22.dp, bottomStart = 22.dp, bottomEnd = 22.dp))
+                                .padding(horizontal = 16.dp, vertical = 14.dp)
+                                .semantics { liveRegion = LiveRegionMode.Polite },
+                        ) {
+                            Text(b.text, style = Ruvo.type.body.copy(fontWeight = androidx.compose.ui.text.font.FontWeight(500)), color = c.ink)
+                            if (i > 0) {
+                                Spacer(Modifier.height(Space.xs))
+                                Row(
+                                    Modifier.clip(RoundedCornerShape(Radius.chip)).clickable(role = Role.Button, onClickLabel = "Read this answer aloud") { speech.speak(b.text, b.language) }
+                                        .padding(vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    androidx.compose.material3.Icon(RuvoIcons.Speaker, null, Modifier.size(16.dp), tint = c.inkSoft)
+                                    Spacer(Modifier.size(6.dp))
+                                    Text("Listen", style = Ruvo.type.label, color = c.inkSoft)
+                                }
+                            }
+                        }
+                    }
+                }
+                if (!b.fromUser && i == bubbles.lastIndex && b.suggestions.isNotEmpty()) {
+                    androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
+                        items(b.suggestions.size) { k -> Chip(b.suggestions[k], false, { ask(b.suggestions[k]) }) }
+                    }
+                }
+            }
+            if (thinking) Text("Ruvo is thinking", style = Ruvo.type.caption, color = c.inkFaint)
+        }
+        Spacer(Modifier.height(Space.md))
+        // The pill input: the mic turns into Send as soon as there is text.
+        Row(
+            Modifier.fillMaxWidth().imePadding().clip(RoundedCornerShape(32.dp)).background(c.glass)
+                .border(1.dp, c.hairline, RoundedCornerShape(32.dp)).padding(start = 18.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(Modifier.weight(1f).padding(vertical = 10.dp)) {
+                if (input.isEmpty()) Text(if (lang.startsWith("en")) "Ask anything..." else "Ask in ${langName.second}...", style = Ruvo.type.body, color = c.inkFaint)
+                androidx.compose.foundation.text.BasicTextField(
+                    input, { input = it }, Modifier.fillMaxWidth(),
+                    textStyle = Ruvo.type.body.copy(color = c.ink), singleLine = true,
+                    cursorBrush = androidx.compose.ui.graphics.SolidColor(c.ink),
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Send),
+                    keyboardActions = androidx.compose.foundation.text.KeyboardActions(onSend = { ask(input) }),
+                )
+            }
+            val typing = input.isNotBlank()
+            Box(
+                Modifier.size(46.dp).clip(androidx.compose.foundation.shape.CircleShape).background(c.fuel)
+                    .clickable(role = Role.Button, onClickLabel = if (typing) "Send" else "Speak your question") {
+                        if (typing) ask(input)
+                        else if (canDictate) runCatching {
+                            dictate.launch(
+                                Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+                                    .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                                    .putExtra(RecognizerIntent.EXTRA_LANGUAGE, lang)
+                                    .putExtra(RecognizerIntent.EXTRA_PROMPT, "Ask Ruvo"),
+                            )
+                        }
+                    }
+                    .semantics { contentDescription = if (typing) "Send" else if (canDictate) "Speak your question" else "Speech input is not available on this phone" },
+                contentAlignment = Alignment.Center,
+            ) {
+                androidx.compose.material3.Icon(if (typing) RuvoIcons.Send else RuvoIcons.Mic, null, Modifier.size(22.dp), tint = c.onAccent)
+            }
         }
         Spacer(Modifier.height(Space.xs))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                "Ruvo explains your own numbers. It never recommends specific investments or loans.",
-                Modifier.weight(1f), style = Ruvo.type.caption, color = c.inkFaint,
-            )
-            IconCircle(
-                RuvoIcons.Speaker, if (state.settings.spokenReplies) "Turn off spoken replies" else "Turn on spoken replies",
-                { scope.launch { RuvoGraph.repository.setSpokenReplies(!state.settings.spokenReplies) } },
-                tint = if (state.settings.spokenReplies) c.fuel else c.inkFaint,
-            )
-        }
+        Text(
+            "Ruvo explains your own numbers. It never recommends specific investments or loans.",
+            style = Ruvo.type.caption, color = c.inkFaint,
+        )
     }
 }

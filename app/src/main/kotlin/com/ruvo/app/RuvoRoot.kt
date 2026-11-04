@@ -194,7 +194,10 @@ private fun MainShell(state: AppState, request: LaunchRequest?, consumed: () -> 
                 .background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(c.canvas.copy(alpha = 0f), c.canvas.copy(alpha = 0.9f)))),
         )
 
-        FloatingDock(tab, { tab = it }, Modifier.align(Alignment.BottomCenter).fillMaxWidth())
+        FloatingDock(
+            tab, { tab = it },
+            Modifier.align(Alignment.BottomCenter).fillMaxWidth().navigationBarsPadding().padding(horizontal = Space.gutter, vertical = Space.md),
+        )
 
         val anyComplete = state.goals.any { it.isComplete }
         RuvoOrb(
@@ -204,7 +207,7 @@ private fun MainShell(state: AppState, request: LaunchRequest?, consumed: () -> 
             onQuickAdd = { overlay = Overlay.QuickAdd },
             size = 64.dp,
             // Floats above the dock's right end, with room below it to be pulled down.
-            modifier = Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(end = Space.gutter, bottom = 88.dp),
+            modifier = Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(end = Space.gutter + 4.dp, bottom = 100.dp),
         )
 
         AnimatedVisibility(
@@ -266,39 +269,46 @@ private fun MainShell(state: AppState, request: LaunchRequest?, consumed: () -> 
 }
 
 /**
- * The dock: a flat ledger strip on the bottom edge, ruled across the top. The chosen tab is printed in ink on a
- * small block that slides between tabs; its icon lifts slightly as it is chosen. Only the Orb floats above it.
+ * The floating dock: four destinations on a glass pill that floats above the content. The selected item sits
+ * on an amber pill that slides between items on a spring and glows softly; the icon lifts as it is chosen.
+ * It leaves room on the right for the Orb, which floats just above it.
  */
 @Composable
 fun FloatingDock(selected: Tab, onSelect: (Tab) -> Unit, modifier: Modifier = Modifier) {
     val c = Ruvo.colors
-    Column(modifier.background(c.surface)) {
-        Box(Modifier.fillMaxWidth().height(1.5.dp).background(c.ink))
-        BoxWithConstraints(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = Space.sm, vertical = 6.dp)) {
-            val itemWidth = maxWidth / Tab.entries.size
-            val x by animateDpAsState(itemWidth * selected.ordinal, Motion.snappy(), label = "dock")
-            Box(Modifier.offset(x = x).width(itemWidth).height(56.dp).padding(horizontal = 6.dp).clip(RoundedCornerShape(Radius.chip)).background(c.ink))
-            Row {
-                Tab.entries.forEach { t ->
-                    val on = t == selected
-                    val icon = when (t) {
-                        Tab.TODAY -> RuvoIcons.Today
-                        Tab.MONEY -> RuvoIcons.Money
-                        Tab.GOALS -> RuvoIcons.Goals
-                        Tab.GUIDE -> RuvoIcons.Book
-                    }
-                    val lift by animateDpAsState(if (on) (-1).dp else 0.dp, Motion.bouncy(), label = "lift${t.name}")
-                    Column(
-                        Modifier.width(itemWidth).height(56.dp)
-                            .semantics { this.selected = on }
-                            .clickable(role = Role.Tab, onClickLabel = "Open ${t.label}") { onSelect(t) },
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center,
-                    ) {
-                        Icon(icon, null, Modifier.size(22.dp).offset(y = lift), tint = if (on) c.canvas else c.inkSoft)
-                        Spacer(Modifier.height(2.dp))
-                        Text(t.label, style = Ruvo.type.caption, color = if (on) c.canvas else c.inkSoft, maxLines = 1)
-                    }
+    val shape = RoundedCornerShape(Radius.chip)
+    BoxWithConstraints(
+        modifier.shadow(20.dp, shape, ambientColor = c.shadow, spotColor = c.shadow)
+            .clip(shape).background(if (c.isDark) c.surface else c.surface.copy(alpha = 0.94f))
+            .border(1.dp, c.glassEdge, shape).padding(6.dp),
+    ) {
+        val itemWidth = maxWidth / Tab.entries.size
+        val x by animateDpAsState(itemWidth * selected.ordinal, Motion.snappy(), label = "dock")
+        Box(
+            Modifier.offset(x = x).width(itemWidth).height(58.dp)
+                .shadow(10.dp, shape, ambientColor = c.fuelDeep, spotColor = c.fuelDeep)
+                .clip(shape).background(c.amberBrush),
+        )
+        Row {
+            Tab.entries.forEach { t ->
+                val on = t == selected
+                val icon = when (t) {
+                    Tab.TODAY -> RuvoIcons.Today
+                    Tab.MONEY -> RuvoIcons.Money
+                    Tab.GOALS -> RuvoIcons.Goals
+                    Tab.GUIDE -> RuvoIcons.Book
+                }
+                val lift by animateDpAsState(if (on) (-1).dp else 0.dp, Motion.bouncy(), label = "lift${t.name}")
+                Column(
+                    Modifier.width(itemWidth).height(58.dp).clip(shape)
+                        .semantics { this.selected = on }
+                        .clickable(role = Role.Tab, onClickLabel = "Open ${t.label}") { onSelect(t) },
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    Icon(icon, null, Modifier.size(22.dp).offset(y = lift), tint = if (on) c.onAccent else c.inkSoft)
+                    Spacer(Modifier.height(2.dp))
+                    Text(t.label, style = Ruvo.type.caption, color = if (on) c.onAccent else c.inkSoft, maxLines = 1)
                 }
             }
         }

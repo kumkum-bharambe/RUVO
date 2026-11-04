@@ -8,16 +8,15 @@ import androidx.compose.ui.unit.dp
 import com.ruvo.engine.Bucket
 
 /**
- * Ruvo's two moods in the "Ticket & Ledger" language: Indian print culture, newsprint and rubber stamps.
- * Daybreak (light): warm paper, ink type, ruled lines; the runway ticket is printed in ink.
- * Night swim (dark): ink-blue night with paper-coloured type; the runway ticket turns to paper.
+ * Ruvo's two moods, drawn from the navy-and-amber language of the first Ruvo prototype and refined.
+ * Daybreak (light): a soft, cool canvas lit by an amber dawn glow and a lavender dusk glow; navy ink; white glass.
+ * Night swim (dark): deep navy water where the same accents glow from inside.
  *
- * Colours are named after things every Indian student knows:
- *   Haldi (turmeric) = Fuel, yours to spend. Neela (blue) = Future, protected. Jamun (violet) = Fixed, already planned.
- *   No greens: Kumkum asked for amber and blue in the first prototype.
- *   Sindoor (vermilion) = shortfalls and the stamp, never blame.
+ * The three buckets keep one colour each in both moods:
+ *   Fuel (yours to spend) = amber, Future (protected) = sky blue, Fixed (already planned) = lavender.
  * Every colour in the app comes from here.
- */@Immutable
+ */
+@Immutable
 data class RuvoColors(
     val isDark: Boolean,
     val canvas: Color,
@@ -61,7 +60,7 @@ data class RuvoColors(
     val orbGlow: Color,
     val orbDeep: Color,
     val scrim: Color,
-    /** The hard offset shadow under stamped elements: ink in Daybreak, paper in Night swim. */
+    /** Soft coloured shadow under raised elements. */
     val shadow: Color,
 ) {
     fun bucket(b: Bucket): Color = when (b) {
@@ -78,15 +77,13 @@ data class RuvoColors(
 
     /** Top-left to bottom-right fill for a filled bucket card. */
     fun bucketBrush(b: Bucket): Brush = when (b) {
-        Bucket.FIXED -> Brush.verticalGradient(listOf(fixed, fixed))
-        Bucket.FUEL -> Brush.verticalGradient(listOf(fuel, fuel))
-        Bucket.FUTURE -> Brush.verticalGradient(listOf(future, future))
+        Bucket.FIXED -> Brush.linearGradient(listOf(fixed.copy(alpha = 1f).lighten(0.25f), fixedDeep))
+        Bucket.FUEL -> Brush.linearGradient(listOf(sun, fuelDeep))
+        Bucket.FUTURE -> Brush.linearGradient(listOf(future.lighten(0.3f), futureDeep))
     }
 
-    /** The runway ticket and other "printed" panels: ink in Daybreak, paper in Night swim. */
-    val heroBrush: Brush get() = Brush.verticalGradient(listOf(heroTop, heroBottom))
-    /** Haldi, printed flat. */
-    val amberBrush: Brush get() = Brush.verticalGradient(listOf(fuel, fuel))
+    val heroBrush: Brush get() = Brush.linearGradient(listOf(heroTop, heroBottom))
+    val amberBrush: Brush get() = Brush.linearGradient(listOf(sun, fuelDeep))
 }
 
 /** Mixes a colour toward white. */
@@ -97,78 +94,81 @@ fun Color.lighten(amount: Float) = Color(
     alpha,
 )
 
-private val Paper = Color(0xFFF4EEE3)
-private val Ink = Color(0xFF1C1A17)
+private val Navy = Color(0xFF0F1B3D)
+private val Amber = Color(0xFFFDB913)
+private val AmberDeep = Color(0xFFF5A50B)
+private val Butter = Color(0xFFFFD54F)
 
 val Daybreak = RuvoColors(
     isDark = false,
-    canvas = Paper,
-    surface = Color(0xFFFBF8F2),
+    canvas = Color(0xFFF2F2F7),
+    surface = Color(0xFFFFFFFF),
     raised = Color(0xFFFFFFFF),
-    glass = Color(0xFFFBF8F2),
-    glassEdge = Color(0xFFD9CEBC),
-    ink = Ink,
-    inkSoft = Color(0xFF5F594F),
-    inkFaint = Color(0xFF8C857A),
-    hairline = Color(0xFFE3D9C9),
-    fixed = Color(0xFFAB8FDD),
-    fixedDeep = Color(0xFF8C6CCB),
-    fuel = Color(0xFFF0B232),
-    fuelDeep = Color(0xFFDC9819),
-    future = Color(0xFF4A8EDB),
-    futureDeep = Color(0xFF2C6DB8),
-    fixedInk = Color(0xFF6342A8),
-    fuelInk = Color(0xFF8A5A00),
-    futureInk = Color(0xFF1E5AA3),
-    warning = Color(0xFFD5432A),
-    sun = Color(0xFFF7CB4D),
-    onAccent = Ink,
-    heroTop = Color(0xFF26231E),
-    heroBottom = Ink,
-    onHero = Paper,
-    glowWarm = Color(0x24F0B232),
-    glowCool = Color(0x1AAB8FDD),
-    orbCore = Color(0xFFFFF3C4),
-    orbGlow = Color(0xFFF0B232),
-    orbDeep = Color(0xFFB9770F),
-    scrim = Color(0x801C1A17),
-    shadow = Ink,
+    glass = Color(0xA6FFFFFF),
+    glassEdge = Color(0xD9FFFFFF),
+    ink = Navy,
+    inkSoft = Color(0xFF545C78),
+    inkFaint = Color(0xFF80869C),
+    hairline = Color(0xFFE2E4EE),
+    fixed = Color(0xFFB79CF2),
+    fixedDeep = Color(0xFF9A7BEA),
+    fuel = Amber,
+    fuelDeep = AmberDeep,
+    future = Color(0xFF4A9BEA),
+    futureDeep = Color(0xFF3A86D4),
+    fixedInk = Color(0xFF6C4CCF),
+    fuelInk = Color(0xFF9A6500),
+    futureInk = Color(0xFF1F67B8),
+    warning = Color(0xFFE2581A),
+    sun = Butter,
+    onAccent = Navy,
+    heroTop = Color(0xFF1F2E70),
+    heroBottom = Navy,
+    onHero = Color(0xFFFFFFFF),
+    glowWarm = Color(0x73FFC48C),
+    glowCool = Color(0x73B79CF2),
+    orbCore = Color(0xFFFFF1B8),
+    orbGlow = Amber,
+    orbDeep = Color(0xFFD9860A),
+    scrim = Color(0x730F1B3D),
+    shadow = Color(0x380F1B3D),
 )
 
 val NightSwim = RuvoColors(
     isDark = true,
-    canvas = Color(0xFF11131C),
-    surface = Color(0xFF191C28),
-    raised = Color(0xFF212535),
-    glass = Color(0xFF191C28),
-    glassEdge = Color(0xFF2E3346),
-    ink = Color(0xFFF1EADD),
-    inkSoft = Color(0xFFB3AC9F),
-    inkFaint = Color(0xFF7D786C),
-    hairline = Color(0xFF2A2E3D),
-    fixed = Color(0xFFC2ABF5),
-    fixedDeep = Color(0xFF9F84E6),
-    fuel = Color(0xFFF5B84A),
-    fuelDeep = Color(0xFFE09A22),
-    future = Color(0xFF64A6F2),
-    futureDeep = Color(0xFF3B82D3),
-    fixedInk = Color(0xFFCDBBF8),
-    fuelInk = Color(0xFFF7C668),
-    futureInk = Color(0xFF8ABDF6),
-    warning = Color(0xFFFF6E50),
-    sun = Color(0xFFF9D46A),
-    onAccent = Color(0xFF14130F),
-    heroTop = Color(0xFFF6F0E5),
-    heroBottom = Color(0xFFE9DFCD),
-    onHero = Ink,
-    glowWarm = Color(0x1FF5B84A),
-    glowCool = Color(0x26C2ABF5),
-    orbCore = Color(0xFFFFF3C4),
-    orbGlow = Color(0xFFF5B84A),
-    orbDeep = Color(0xFFB0700C),
-    scrim = Color(0xB3050608),
-    shadow = Color(0xFFF1EADD),
+    canvas = Color(0xFF0A1029),
+    surface = Color(0xFF141C45),
+    raised = Color(0xFF1B2556),
+    glass = Color(0x1FFFFFFF),
+    glassEdge = Color(0x33FFFFFF),
+    ink = Color(0xFFF5F7FF),
+    inkSoft = Color(0xFFAAB1CE),
+    inkFaint = Color(0xFF7780A6),
+    hairline = Color(0xFF27325E),
+    fixed = Color(0xFFC3AAF7),
+    fixedDeep = Color(0xFF9C7DEB),
+    fuel = Amber,
+    fuelDeep = AmberDeep,
+    future = Color(0xFF62AEF2),
+    futureDeep = Color(0xFF3C86D6),
+    fixedInk = Color(0xFFC9B3FA),
+    fuelInk = Color(0xFFFFCB45),
+    futureInk = Color(0xFF7CBDF6),
+    warning = Color(0xFFFF8F57),
+    sun = Butter,
+    onAccent = Navy,
+    heroTop = Color(0xFF26368A),
+    heroBottom = Color(0xFF131E52),
+    onHero = Color(0xFFFFFFFF),
+    glowWarm = Color(0x40F59E2B),
+    glowCool = Color(0x596E5ADC),
+    orbCore = Color(0xFFFFF1B8),
+    orbGlow = Amber,
+    orbDeep = Color(0xFFB86E06),
+    scrim = Color(0xA6050818),
+    shadow = Color(0x80000000),
 )
+
 /** Spacing on a 4 dp grid, plus the few radii the app uses. */
 object Space {
     val xxs = 4.dp
@@ -184,16 +184,11 @@ object Space {
     val dockClearance = 196.dp
 }
 
-/**
- * Crisp corners: paper is cut, not moulded. Only living things (the Orb, avatars) are round.
- */
 object Radius {
-    val card = 6.dp
-    val inner = 4.dp
-    val chip = 4.dp
-    val sheet = 14.dp
-    /** Depth of the hard offset shadow under stamped elements. */
-    val stamp = 4.dp
+    val card = 26.dp
+    val inner = 18.dp
+    val chip = 999.dp
+    val sheet = 34.dp
 }
 
 /**
@@ -201,28 +196,28 @@ object Radius {
  * brand, the same in both moods, because covers are objects, not surfaces.
  */
 object Covers {
-    private val Ink = Color(0xFF1C1A17)
-    private val Paper = Color(0xFFF4EEE3)
-    private val Haldi = Color(0xFFF0B232)
-    private val Neela = Color(0xFF2C6DB8)
-    private val Neel = Color(0xFF3A47A6)
-    private val Sindoor = Color(0xFFD5432A)
-    private val Rose = Color(0xFFF2B8A8)
-    private val Ice = Color(0xFFCFE3F7)
-    private val Jamun = Color(0xFF6342A8)
+    private val Navy = Color(0xFF0F1B3D)
+    private val White = Color(0xFFFFFFFF)
+    private val Amber = Color(0xFFFDB913)
+    private val Sky = Color(0xFF4A9BEA)
+    private val Lavender = Color(0xFFB79CF2)
+    private val Coral = Color(0xFFF26B1D)
+    private val Cream = Color(0xFFFFE2B8)
+    private val Ice = Color(0xFFCFE6FA)
 
     val palettes: List<Triple<Color, Color, Color>> = listOf(
-        Triple(Haldi, Ink, Paper),
-        Triple(Ink, Haldi, Sindoor),
-        Triple(Neela, Paper, Haldi),
-        Triple(Neel, Paper, Haldi),
-        Triple(Sindoor, Paper, Ink),
-        Triple(Paper, Ink, Sindoor),
-        Triple(Ink, Paper, Neela),
-        Triple(Ice, Ink, Sindoor),
-        Triple(Rose, Jamun, Ink),
+        Triple(Amber, Navy, White),
+        Triple(Navy, Amber, Sky),
+        Triple(Sky, Navy, White),
+        Triple(Lavender, Navy, Amber),
+        Triple(Coral, Navy, Cream),
+        Triple(White, Navy, Coral),
+        Triple(Navy, Lavender, Amber),
+        Triple(Ice, Navy, Amber),
+        Triple(Cream, Coral, Navy),
     )
-    val label: Color = Paper
-    val labelInk: Color = Ink
+    val label: Color = White
+    val labelInk: Color = Navy
 }
+
 val LocalRuvoColors = staticCompositionLocalOf { Daybreak }

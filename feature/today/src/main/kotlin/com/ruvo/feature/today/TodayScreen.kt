@@ -42,6 +42,8 @@ import com.ruvo.design.Pill
 import com.ruvo.design.PillBars
 import com.ruvo.design.Segment
 import com.ruvo.design.SplitBar
+import com.ruvo.design.StatusChips
+import com.ruvo.design.StatusItem
 import com.ruvo.design.reveal
 import com.ruvo.design.Eyebrow
 import com.ruvo.design.IconCircle
@@ -114,6 +116,21 @@ fun TodayContent(state: AppState, a: TodayActions) {
         contentPadding = PaddingValues(bottom = Space.dockClearance),
     ) {
         item { Header(state, a) }
+        // Ruvo 6's black status chips: the four numbers that matter, each one tap from its detail.
+        item {
+            val r0 = state.runway
+            val upcoming = comingUp(state).sumOf { it.first.amount }
+            StatusChips(
+                listOf(
+                    StatusItem(if (r0.unlimited) "No end · runway" else "${IndianFormat.days(r0.runwayDays)} runway", c.fuel, a.openWhy),
+                    StatusItem("${IndianFormat.rupees(r0.fuel.coerceAtLeast(0))} available", c.fuel, a.openMoney),
+                    StatusItem("${IndianFormat.rupees(r0.futureProtected)} protected", c.future, a.openGoals),
+                    StatusItem("${IndianFormat.rupees(upcoming)} coming up", c.fixed, a.openMoney),
+                ),
+                Modifier.reveal(0),
+            )
+            Spacer(Modifier.height(Space.xs))
+        }
         item {
             RunwayHero(r, a.openWhy, Modifier.padding(horizontal = Space.gutter).reveal(0))
             Spacer(Modifier.height(Space.md))
@@ -244,13 +261,18 @@ private fun DailySpendingCard(state: AppState, modifier: Modifier) {
     val c = Ruvo.colors
     val days = remember(state.input.transactions, state.today) { Insights.dailySpending(state.input.transactions, state.today, 7) }
     val total = days.sumOf { it.spent }
+    // Tap a day to see what went out. It starts on the biggest day.
+    var chosen by rememberSaveable { mutableStateOf<Int?>(null) }
+    val sel = chosen ?: days.indices.maxByOrNull { days[it].spent } ?: days.lastIndex
+    val day = days[sel]
+    val payments = state.input.transactions.filter { it.countsAsSpending && it.date == day.date }
     RuvoCard(Modifier.padding(horizontal = Space.gutter).padding(top = Space.sm).then(modifier)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Eyebrow("Daily spending")
-                Amount(total, style = Ruvo.type.title)
+                Amount(total, style = Ruvo.type.title, countUp = true)
             }
-            Text("last 7 days", style = Ruvo.type.caption, color = c.inkFaint)
+            com.ruvo.design.Tag("Last 7 days")
         }
         Spacer(Modifier.height(Space.md))
         PillBars(
@@ -258,17 +280,37 @@ private fun DailySpendingCard(state: AppState, modifier: Modifier) {
                 Pill(
                     d.date.dayOfWeek.getDisplayName(TextStyle.NARROW, Locale.ENGLISH),
                     (d.spent / 100).toFloat(),
-                    highlight = d.date == state.today,
-                    spoken = "${IndianFormat.date(d.date, state.today)}: ${IndianFormat.spoken(d.spent)}",
+                    spoken = "${IndianFormat.date(d.date, state.today)}, ${IndianFormat.spoken(d.spent)}",
                 )
             },
-            height = 96.dp,
+            height = 104.dp,
+            selected = sel, onSelect = { chosen = it }, tooltip = { IndianFormat.rupees(days[it].spent) },
         )
-        Spacer(Modifier.height(Space.xs))
-        Text("The tallest pill is your biggest day.", style = Ruvo.type.caption, color = c.inkFaint)
+        Spacer(Modifier.height(Space.md))
+        Box(Modifier.fillMaxWidth().height(1.dp).background(c.hairline))
+        Spacer(Modifier.height(Space.sm))
+        Row {
+            Text(
+                day.date.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.ENGLISH) + ", " + IndianFormat.date(day.date),
+                Modifier.weight(1f), style = Ruvo.type.bodyStrong, color = c.ink,
+            )
+            Amount(day.spent, style = Ruvo.type.bodyStrong)
+        }
+        if (payments.isEmpty()) {
+            Text("Nothing spent on this day.", Modifier.padding(top = Space.xs), style = Ruvo.type.caption, color = c.inkFaint)
+        } else {
+            payments.forEach { p ->
+                Row(Modifier.fillMaxWidth().padding(top = Space.xs), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(p.merchant.ifBlank { p.category }, style = Ruvo.type.label, color = c.ink, maxLines = 1)
+                        Text(p.category, style = Ruvo.type.caption, color = c.inkFaint)
+                    }
+                    Amount(-p.yourShare, style = Ruvo.type.label)
+                }
+            }
+        }
     }
 }
-
 /** This month's plan: what arrives, split into Fixed, goals and Fuel, with a daily amount. */
 @Composable
 private fun PlanCard(state: AppState, modifier: Modifier, open: () -> Unit) {
@@ -282,7 +324,7 @@ private fun PlanCard(state: AppState, modifier: Modifier, open: () -> Unit) {
     RuvoCard(Modifier.padding(horizontal = Space.gutter).padding(top = Space.sm).then(modifier), onClick = open, onClickLabel = "See your money plan") {
         Eyebrow("This month's plan")
         Row(verticalAlignment = Alignment.Bottom) {
-            Amount(income, style = Ruvo.type.display)
+            Amount(income, style = Ruvo.type.display, countUp = true)
             Spacer(Modifier.width(Space.xs))
             Text("comes in", Modifier.padding(bottom = 6.dp), style = Ruvo.type.caption, color = c.inkSoft)
         }

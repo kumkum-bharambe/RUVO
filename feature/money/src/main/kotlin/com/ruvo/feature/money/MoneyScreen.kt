@@ -109,6 +109,7 @@ fun MoneyScreen(openTxn: (String) -> Unit, openAdd: () -> Unit = {}) {
     var span by rememberSaveable { mutableStateOf(Span.WEEK) }
     var back by rememberSaveable { mutableStateOf(0) }
     var editMonth by remember { mutableStateOf<java.time.YearMonth?>(null) }
+    var category by rememberSaveable { mutableStateOf<String?>(null) }
     var balanceSheet by remember { mutableStateOf(false) }
     val c = Ruvo.colors
 
@@ -132,7 +133,7 @@ fun MoneyScreen(openTxn: (String) -> Unit, openAdd: () -> Unit = {}) {
         }
         when (tab) {
             MoneyTab.OVERVIEW -> {
-                item { WhereItWent(state, Modifier.reveal(2)) }
+                item { WhereItWent(state, Modifier.reveal(2)) { cat -> category = cat; span = Span.MONTH; back = 0; tab = MoneyTab.ACTIVITY } }
                 item { Buckets(state) }
             }
             MoneyTab.ACTIVITY -> {
@@ -142,11 +143,18 @@ fun MoneyScreen(openTxn: (String) -> Unit, openAdd: () -> Unit = {}) {
                         Row(horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
                             Span.entries.forEach { s -> Chip(s.label, span == s, { span = s; back = 0 }) }
                         }
+                        category?.let { cat ->
+                            Spacer(Modifier.height(Space.xs))
+                            Chip("$cat  ×", true, { category = null })
+                        }
                         Spacer(Modifier.height(Space.sm))
                         FlowCard(state, span, back, range, onBack = { back++ }, onForward = { if (back > 0) back-- }, onUpdateBalance = { balanceSheet = true }, onAdd = openAdd)
                     }
                 }
-                val inPeriod = state.activity.filter { entry -> range == null || (!entry.txn.date.isBefore(range.first) && !entry.txn.date.isAfter(range.second)) }
+                val inPeriod = state.activity.filter { entry ->
+                    (range == null || (!entry.txn.date.isBefore(range.first) && !entry.txn.date.isAfter(range.second))) &&
+                        (category == null || entry.txn.category == category)
+                }
                 val groups = inPeriod.groupBy { it.txn.date }.toSortedMap(compareByDescending { it })
                 if (groups.isEmpty()) item { Empty(if (state.activity.isEmpty()) "Nothing yet. Tap + Add to record a payment, or turn on SMS tracking in Settings." else "Nothing recorded in ${spanLabel(span, back, range, state.today).lowercase()}.") }
                 groups.forEach { (date, items) ->
@@ -260,7 +268,7 @@ private fun BalanceCard(state: AppState, modifier: Modifier, onUpdate: () -> Uni
             Column(Modifier.weight(1f)) {
                 Eyebrow("You have", color = c.onHero.copy(alpha = 0.7f))
                 if (hidden) Text("₹ ••••", style = Ruvo.type.display, color = c.onHero)
-                else Amount(r.balance, style = Ruvo.type.display, color = c.onHero)
+                else Amount(r.balance, style = Ruvo.type.display, color = c.onHero, countUp = true)
             }
             IconCircle(
                 if (hidden) RuvoIcons.Eye else RuvoIcons.EyeOff, if (hidden) "Show balance" else "Hide balance",
@@ -290,7 +298,7 @@ private fun BalanceCard(state: AppState, modifier: Modifier, onUpdate: () -> Uni
 
 /** Spending by category over the last 30 days. */
 @Composable
-private fun WhereItWent(state: AppState, modifier: Modifier) {
+private fun WhereItWent(state: AppState, modifier: Modifier, onCategory: (String) -> Unit = {}) {
     val c = Ruvo.colors
     val cats = remember(state.input.transactions, state.today) { Insights.byCategory(state.input.transactions, state.today, 30) }
     if (cats.isEmpty()) return
@@ -306,7 +314,12 @@ private fun WhereItWent(state: AppState, modifier: Modifier) {
         }
         cats.take(6).forEachIndexed { i, (cat, v) ->
             Spacer(Modifier.height(Space.sm))
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            // Each category opens its transactions for this month.
+            Row(
+                Modifier.clip(RoundedCornerShape(Radius.inner)).clickable(role = androidx.compose.ui.semantics.Role.Button, onClickLabel = "See $cat transactions") { onCategory(cat) }
+                    .padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text(cat, Modifier.width(104.dp), style = Ruvo.type.label, color = c.ink, maxLines = 1)
                 FillBar(v / top, palette[i % palette.size], Modifier.weight(1f))
                 Spacer(Modifier.width(Space.sm))

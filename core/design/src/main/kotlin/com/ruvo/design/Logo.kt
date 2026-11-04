@@ -41,12 +41,12 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-private val LogoInk = Color(0xFF1C1A17)
-private val LogoPaper = Color(0xFFF4EEE3)
-private val LogoHaldi = Color(0xFFF0B232)
-private val LogoNeela = Color(0xFF4A8EDB)
+private val LogoInk = Color(0xFF0F1B3D)
+private val LogoPaper = Color(0xFFFFFFFF)
+private val LogoHaldi = Color(0xFFFDB913)
+private val LogoNeela = Color(0xFF4A9BEA)
 
-/** The Ruvo mark: three rising bars, paper, haldi and neela, on an ink tile. No coin. */
+/** The Ruvo mark: three rising bars, white, amber and blue, on a navy tile. No coin. */
 @Composable
 fun RuvoLogo(modifier: Modifier = Modifier, size: Dp = 56.dp, tile: Color = LogoInk) {
     Canvas(modifier.size(size).semantics { contentDescription = "Ruvo" }) {
@@ -64,8 +64,9 @@ fun RuvoLogo(modifier: Modifier = Modifier, size: Dp = 56.dp, tile: Color = Logo
 }
 
 /**
- * The splash: calm and dark. A soft haldi glow, the mark fading up, "ruvo." and its line, and a thin loading
- * line along the bottom. No bounce, no confetti. Always dark, whatever the mood, so it reads as a cover.
+ * The splash, as in Ruvo 6: deep navy lit from above, a soft amber glow growing behind the mark, "ruvo." whose
+ * letters tighten as they appear (the dot is amber), the line, and an amber bar filling along the bottom.
+ * No bounce, no confetti. Always dark, whatever the mood, so it reads as a cover.
  */
 @Composable
 fun RuvoSplash(modifier: Modifier = Modifier) {
@@ -81,11 +82,13 @@ fun RuvoSplash(modifier: Modifier = Modifier) {
     val loading = rememberInfiniteTransition(label = "loading")
     val sweep by loading.animateFloat(0f, 1f, infiniteRepeatable(tween(1400, easing = LinearEasing), RepeatMode.Restart), label = "sweep")
     Box(
-        modifier.fillMaxSize().background(Color(0xFF11131C)),
+        modifier.fillMaxSize().background(Color(0xFF0B1230)),
         contentAlignment = Alignment.Center,
     ) {
         Canvas(Modifier.fillMaxSize()) {
-            drawRect(Brush.radialGradient(listOf(LogoHaldi.copy(alpha = 0.22f), Color.Transparent), Offset(size.width / 2, size.height * 0.42f), size.width * 0.8f))
+            drawRect(Brush.radialGradient(listOf(Color(0xFF1C2C62), Color(0xFF0B1230), Color(0xFF060A1C)), Offset(size.width / 2, size.height * 0.28f), size.height * 0.75f))
+            val g = 0.6f + 0.4f * mark.value
+            drawCircle(Brush.radialGradient(listOf(LogoHaldi.copy(alpha = 0.26f), Color.Transparent), Offset(size.width / 2, size.height * 0.4f), size.width * 0.5f * g), size.width * 0.5f * g, Offset(size.width / 2, size.height * 0.4f))
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
             RuvoLogo(
@@ -97,7 +100,14 @@ fun RuvoSplash(modifier: Modifier = Modifier) {
                 Modifier.graphicsLayer { alpha = words.value; translationY = (1f - words.value) * 24f },
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Text("ruvo.", style = Ruvo.type.display, color = LogoPaper)
+                Text(
+                    androidx.compose.ui.text.buildAnnotatedString {
+                        append("ruvo")
+                        pushStyle(androidx.compose.ui.text.SpanStyle(color = LogoHaldi)); append("."); pop()
+                    },
+                    style = Ruvo.type.display.copy(fontSize = Ruvo.type.display.fontSize * 1.15f, letterSpacing = androidx.compose.ui.unit.TextUnit((1f - words.value) * 0.18f - 0.04f, androidx.compose.ui.unit.TextUnitType.Em)),
+                    color = LogoPaper,
+                )
                 Spacer(Modifier.height(Space.xxs))
                 Text("Your money, without the mental load.", style = Ruvo.type.label, color = LogoPaper.copy(alpha = 0.6f))
             }

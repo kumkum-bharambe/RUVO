@@ -1,5 +1,9 @@
 # Ruvo design review and direction: "Ticket & Ledger"
 
+> **Update, 4 Nov 2026:** after trying Ticket & Ledger on the phone, Kumkum chose to return to the Ruvo 6 HTML look
+> (navy and amber, Outfit, rounded glass) and bring in its newest features. Ticket & Ledger stays in git history
+> (commit a463879) and in this review as the road not taken.
+
 Reviewed on a OnePlus Nord CE 3 Lite (Android 15), both moods, every tab, 4 Nov 2026.
 
 ## What the navy-and-amber version gets right

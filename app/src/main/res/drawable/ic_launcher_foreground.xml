@@ -1,6 +1,6 @@
-<!-- The Ruvo mark: three rising bars, paper, haldi and neela, on an ink tile. No coin, no rupee sign. -->
+<!-- The Ruvo mark: three rising bars, white, amber and blue, on a navy tile. No coin, no rupee sign. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
-    <path android:fillColor="#F4EEE3" android:pathData="M41,54h0a4.5,4.5 0,0 1,4.5 4.5v7a4.5,4.5 0,0 1,-4.5 4.5h0a4.5,4.5 0,0 1,-4.5 -4.5v-7a4.5,4.5 0,0 1,4.5 -4.5z"/>
-    <path android:fillColor="#F0B232" android:pathData="M54,46h0a4.5,4.5 0,0 1,4.5 4.5v15a4.5,4.5 0,0 1,-4.5 4.5h0a4.5,4.5 0,0 1,-4.5 -4.5v-15a4.5,4.5 0,0 1,4.5 -4.5z"/>
-    <path android:fillColor="#4A8EDB" android:pathData="M67,38h0a4.5,4.5 0,0 1,4.5 4.5v23a4.5,4.5 0,0 1,-4.5 4.5h0a4.5,4.5 0,0 1,-4.5 -4.5v-23a4.5,4.5 0,0 1,4.5 -4.5z"/>
+    <path android:fillColor="#FFFFFF" android:pathData="M41,54h0a4.5,4.5 0,0 1,4.5 4.5v7a4.5,4.5 0,0 1,-4.5 4.5h0a4.5,4.5 0,0 1,-4.5 -4.5v-7a4.5,4.5 0,0 1,4.5 -4.5z"/>
+    <path android:fillColor="#FDB913" android:pathData="M54,46h0a4.5,4.5 0,0 1,4.5 4.5v15a4.5,4.5 0,0 1,-4.5 4.5h0a4.5,4.5 0,0 1,-4.5 -4.5v-15a4.5,4.5 0,0 1,4.5 -4.5z"/>
+    <path android:fillColor="#4A9BEA" android:pathData="M67,38h0a4.5,4.5 0,0 1,4.5 4.5v23a4.5,4.5 0,0 1,-4.5 4.5h0a4.5,4.5 0,0 1,-4.5 -4.5v-23a4.5,4.5 0,0 1,4.5 -4.5z"/>
 </vector>
