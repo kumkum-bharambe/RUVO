@@ -146,15 +146,11 @@ fun GoalsScreen(startNewGoal: Boolean = false, onNewGoalShown: () -> Unit = {}, 
         }
         item {
             Column(Modifier.padding(horizontal = Space.gutter), verticalArrangement = Arrangement.spacedBy(Space.sm)) {
-                state.goals.chunked(2).forEachIndexed { row, pair ->
-                    Row(Modifier.reveal(row), horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
-                        pair.forEach { g ->
-                            GoalCard(g, state.goalShapes[g.id] ?: 0, tilt, state.today, Modifier.weight(1f)) { openGoal = g.id }
-                        }
-                        if (pair.size == 1) NewGoalCard(Modifier.weight(1f)) { newGoal = true }
-                    }
+                // One big card per goal: the picture of what it's for leads, the numbers follow.
+                state.goals.forEachIndexed { i, g ->
+                    GoalCard(g, state.goalShapes[g.id] ?: 0, tilt, state.today, state.runway.fuel, Modifier.fillMaxWidth().reveal(i)) { openGoal = g.id }
                 }
-                if (state.goals.size % 2 == 0) NewGoalCard(Modifier.fillMaxWidth()) { newGoal = true }
+                NewGoalCard(Modifier.fillMaxWidth()) { newGoal = true }
             }
         }
         if (state.goals.isNotEmpty()) item { GoalInsights(state, Modifier.padding(horizontal = Space.gutter).padding(top = Space.md).reveal(3)) }
@@ -214,31 +210,88 @@ private fun GoalInsights(state: AppState, modifier: Modifier) {
 }
 
 @Composable
-private fun GoalCard(g: Goal, shape: Int, tilt: Float, today: LocalDate, modifier: Modifier, onClick: () -> Unit) {
+private fun GoalCard(g: Goal, shape: Int, tilt: Float, today: LocalDate, fuel: Long, modifier: Modifier, onClick: () -> Unit) {
     val c = Ruvo.colors
-    RuvoCard(modifier, onClick = onClick, onClickLabel = "Open ${g.name}", padding = PaddingValues(Space.sm)) {
-        GoalIllustration(
-            sceneFor(g.name, shape), tilt,
-            Modifier.fillMaxWidth().height(112.dp).clearAndSetSemantics { contentDescription = "${g.name}, ${(g.progress * 100).toInt()} percent saved" },
-            complete = g.isComplete,
-        )
-        Spacer(Modifier.height(Space.sm))
-        FillBar(g.progress.toFloat(), if (g.isComplete) c.sun else c.future, height = 6.dp)
-        Spacer(Modifier.height(Space.xs))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(g.name, Modifier.weight(1f), style = Ruvo.type.bodyStrong, color = c.ink, maxLines = 1)
-            Text("${(g.progress * 100).toInt()}%", style = Ruvo.type.bodyStrong, color = c.futureInk)
-        }
-        Text("${IndianFormat.rupees(g.protectedAmount)} of ${IndianFormat.compact(g.target)}", style = Ruvo.type.caption, color = c.inkSoft)
-        g.targetDate?.let { Text("by ${IndianFormat.date(it, today)}", style = Ruvo.type.caption, color = c.inkFaint) }
-        val ok = onTrack(g, today)
-        if (ok != null) {
-            Spacer(Modifier.height(Space.xs))
-            com.ruvo.design.Tag(
-                if (g.isComplete) "Complete" else if (ok) "On track" else "Catching up",
-                color = (if (g.isComplete) c.sun else if (ok) c.future else c.fuel).copy(alpha = 0.22f),
-                content = if (ok) c.futureInk else c.fuelInk,
+    val scope = rememberCoroutineScope()
+    val view = LocalView.current
+    val pct = (g.progress * 100).toInt()
+    val left = (g.target - g.protectedAmount).coerceAtLeast(0)
+    RuvoCard(modifier, onClick = onClick, onClickLabel = "Open ${g.name}", padding = PaddingValues(Space.sm), elevated = !c.isDark) {
+        Box {
+            GoalIllustration(
+                sceneFor(g.name, shape), tilt,
+                Modifier.fillMaxWidth().height(170.dp).clearAndSetSemantics { contentDescription = "${g.name}, $pct percent saved" },
+                complete = g.isComplete,
             )
+            // A glass badge on the picture: how far along, at a glance.
+            Row(
+                Modifier.align(Alignment.TopEnd).padding(Space.xs).clip(RoundedCornerShape(Radius.chip))
+                    .background(androidx.compose.ui.graphics.Color.White.copy(alpha = 0.75f))
+                    .border(1.dp, androidx.compose.ui.graphics.Color.White, RoundedCornerShape(Radius.chip))
+                    .padding(horizontal = 10.dp, vertical = 5.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(if (g.isComplete) "Done" else "$pct%", style = Ruvo.type.bodyStrong, color = androidx.compose.ui.graphics.Color(0xFF141B4D))
+            }
+        }
+        Column(Modifier.padding(horizontal = Space.xs, vertical = Space.sm)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(g.name, style = Ruvo.type.title, color = c.ink, maxLines = 1)
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        Amount(g.protectedAmount, style = Ruvo.type.bodyStrong, countUp = true)
+                        Text(" of ${IndianFormat.rupees(g.target)}", style = Ruvo.type.caption, color = c.inkSoft)
+                    }
+                }
+                val ok = onTrack(g, today)
+                if (ok != null) com.ruvo.design.Tag(
+                    if (g.isComplete) "Complete" else if (ok) "On track" else "Catching up",
+                    color = (if (g.isComplete) c.sun else if (ok) c.future else c.fuel).copy(alpha = 0.22f),
+                    content = if (ok) c.futureInk else c.fuelInk,
+                )
+            }
+            Spacer(Modifier.height(Space.sm))
+            MilestoneBar(g.progress.toFloat(), if (g.isComplete) c.sun else c.future)
+            Spacer(Modifier.height(Space.xs))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    if (g.isComplete) "Every rupee is there." else "${IndianFormat.rupees(left)} to go" + (g.targetDate?.let { " · by ${IndianFormat.date(it, today)}" } ?: ""),
+                    Modifier.weight(1f), style = Ruvo.type.caption, color = c.inkSoft,
+                )
+                // One tap to move a little Fuel into the goal; only offered when there's Fuel to move.
+                if (!g.isComplete && fuel >= 100_00) {
+                    Text(
+                        "+ ₹100",
+                        Modifier.clip(RoundedCornerShape(Radius.chip)).background(c.future.copy(alpha = 0.18f))
+                            .clickable(role = androidx.compose.ui.semantics.Role.Button, onClickLabel = "Add 100 rupees to ${g.name} from Fuel") {
+                                Haptics.confirm(view)
+                                scope.launch { RuvoGraph.repository.pour(g.id, 100_00) }
+                            }
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        style = Ruvo.type.label, color = c.futureInk,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** Progress with marks at a quarter, a half and three quarters; each lights up once it's passed. */
+@Composable
+private fun MilestoneBar(progress: Float, accent: androidx.compose.ui.graphics.Color) {
+    val c = Ruvo.colors
+    Box(Modifier.fillMaxWidth().height(14.dp), contentAlignment = Alignment.CenterStart) {
+        FillBar(progress, accent, height = 8.dp)
+        Row(Modifier.fillMaxWidth()) {
+            listOf(0.25f, 0.5f, 0.75f).forEach { m ->
+                Spacer(Modifier.weight(if (m == 0.25f) 0.25f else 0.25f))
+                Box(
+                    Modifier.size(12.dp).clip(androidx.compose.foundation.shape.CircleShape)
+                        .background(if (progress >= m) accent else c.surface)
+                        .border(2.dp, if (progress >= m) androidx.compose.ui.graphics.Color.White else c.hairline, androidx.compose.foundation.shape.CircleShape),
+                )
+            }
+            Spacer(Modifier.weight(0.25f))
         }
     }
 }

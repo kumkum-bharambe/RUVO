@@ -76,9 +76,10 @@ data class RuvoColors(
 
     /** Top-left to bottom-right fill for a filled bucket card. */
     fun bucketBrush(b: Bucket): Brush = when (b) {
-        Bucket.FIXED -> Brush.linearGradient(listOf(fixed.copy(alpha = 1f).lighten(0.25f), fixedDeep))
-        Bucket.FUEL -> Brush.linearGradient(listOf(sun, fuelDeep))
-        Bucket.FUTURE -> Brush.linearGradient(listOf(future.lighten(0.3f), futureDeep))
+        // Soft, light fills: the colour says which bucket, the ink stays easy to read.
+        Bucket.FIXED -> Brush.linearGradient(listOf(fixed.lighten(0.62f), fixed.lighten(0.3f)))
+        Bucket.FUEL -> Brush.linearGradient(listOf(sun.lighten(0.5f), fuel.lighten(0.15f)))
+        Bucket.FUTURE -> Brush.linearGradient(listOf(future.lighten(0.6f), future.lighten(0.25f)))
     }
 
     val heroBrush: Brush get() = Brush.linearGradient(listOf(heroTop, heroBottom))
@@ -107,7 +108,7 @@ val Daybreak = RuvoColors(
     canvas = Color(0xFFEFECF8),
     surface = Color(0xFFFFFFFF),
     raised = Color(0xFFFFFFFF),
-    glass = Color(0xCCFFFFFF),
+    glass = Color(0x99FFFFFF),
     glassEdge = Color(0xFFFFFFFF),
     ink = Navy,
     inkSoft = Color(0xFF555A7E),
@@ -128,8 +129,8 @@ val Daybreak = RuvoColors(
     heroTop = Color(0xFF2E2680),
     heroBottom = Navy,
     onHero = Color(0xFFFFFFFF),
-    glowWarm = Color(0x66FFC23D),
-    glowCool = Color(0x808B6CFF),
+    glowWarm = Color(0x80FFC23D),
+    glowCool = Color(0x998B6CFF),
     orbCore = Color(0xFFFFF1B8),
     orbGlow = Amber,
     orbDeep = Color(0xFFD9860A),
@@ -143,8 +144,8 @@ val NightSwim = RuvoColors(
     canvas = Color(0xFF000000),
     surface = Color(0xFF111114),
     raised = Color(0xFF1A1A1F),
-    glass = Color(0xFF111114),
-    glassEdge = Color(0x1FFFFFFF),
+    glass = Color(0x1AFFFFFF),
+    glassEdge = Color(0x33FFFFFF),
     ink = Color(0xFFF5F5F7),
     inkSoft = Color(0xFFA9A9B2),
     inkFaint = Color(0xFF6E6E78),
@@ -164,8 +165,9 @@ val NightSwim = RuvoColors(
     heroTop = Color(0xFF241D66),
     heroBottom = Color(0xFF10153D),
     onHero = Color(0xFFFFFFFF),
-    glowWarm = Color(0x00000000),
-    glowCool = Color(0x00000000),
+    // Only a breath of colour at the corners, so glass has something to catch; the canvas stays black.
+    glowWarm = Color(0x1FFF8A45),
+    glowCool = Color(0x2E8B6CFF),
     orbCore = Color(0xFFFFF1B8),
     orbGlow = Amber,
     orbDeep = Color(0xFFB86E06),

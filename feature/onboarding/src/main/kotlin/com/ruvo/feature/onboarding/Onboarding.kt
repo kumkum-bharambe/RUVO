@@ -41,8 +41,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -108,7 +106,6 @@ fun OnboardingFlow(onDone: () -> Unit) {
     val c = Ruvo.colors
     val scope = rememberCoroutineScope()
     var step by remember { mutableIntStateOf(0) }
-    var adult by remember { mutableStateOf(false) }
     var name by remember { mutableStateOf("") }
     var cadence by remember { mutableStateOf(Cadence.MONTHLY) }
     var balance by remember { mutableStateOf("") }
@@ -152,7 +149,7 @@ fun OnboardingFlow(onDone: () -> Unit) {
         ) { s ->
             Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = Space.gutter, vertical = Space.lg)) {
                 when (s) {
-                    0 -> Welcome(adult, { adult = it })
+                    0 -> Welcome()
                     1 -> {
                         Title("How does money reach you?", "Your rhythm changes the maths.")
                         listOf(
@@ -224,7 +221,7 @@ fun OnboardingFlow(onDone: () -> Unit) {
         Column(Modifier.padding(Space.gutter), verticalArrangement = Arrangement.spacedBy(Space.sm)) {
             when (step) {
                 0 -> {
-                    PrimaryButton("Start with my money", { step = 1 }, Modifier.fillMaxWidth(), enabled = adult)
+                    PrimaryButton("Start with my money", { step = 1 }, Modifier.fillMaxWidth())
                     GhostButton("Explore with a sample student", { personaPicker = true }, Modifier.fillMaxWidth())
                 }
                 in 1..4 -> Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
@@ -267,7 +264,7 @@ private fun OptionCard(title: String, subtitle: String, selected: Boolean, onCli
 }
 
 @Composable
-private fun Welcome(adult: Boolean, setAdult: (Boolean) -> Unit) {
+private fun Welcome() {
     val c = Ruvo.colors
     val pager = rememberPagerState { 4 }
     Spacer(Modifier.height(Space.md))
@@ -303,14 +300,6 @@ private fun Welcome(adult: Boolean, setAdult: (Boolean) -> Unit) {
     }
     Spacer(Modifier.height(Space.xs))
     Text("$line Everything stays on this phone.", style = Ruvo.type.body, color = c.inkSoft)
-    Spacer(Modifier.height(Space.lg))
-    Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(Radius.inner)).clickable(role = Role.Checkbox) { setAdult(!adult) }.padding(vertical = Space.xs),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Checkbox(adult, setAdult, colors = CheckboxDefaults.colors(checkedColor = c.fuel, uncheckedColor = c.inkSoft, checkmarkColor = c.onAccent))
-        Text("I am 18 or older", style = Ruvo.type.bodyStrong, color = c.ink)
-    }
 }
 
 /** Slide 1: Ruvo's pet, happy to meet you, on amber. */

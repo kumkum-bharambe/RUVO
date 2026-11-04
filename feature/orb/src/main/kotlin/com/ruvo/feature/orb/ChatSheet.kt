@@ -55,7 +55,14 @@ import com.ruvo.design.Space
 import com.ruvo.engine.guide.RuvoGuide
 import kotlinx.coroutines.launch
 
-private data class Bubble(val fromUser: Boolean, val text: String, val suggestions: List<String> = emptyList(), val language: String = "en-IN")
+/** One message. [english] keeps Ruvo's original wording so it can be translated again when the language changes. */
+private data class Bubble(
+    val fromUser: Boolean,
+    val text: String,
+    val suggestions: List<String> = emptyList(),
+    val language: String = "en-IN",
+    val english: String = text,
+)
 
 /** Languages for dictation and, with live answers, for replies. Shown in their own script. */
 private val LANGUAGES = listOf(
@@ -81,10 +88,12 @@ fun ChatSheet(onDismiss: () -> Unit, firstQuestion: String? = null) {
     var thinking by remember { mutableStateOf(false) }
     var picking by remember { mutableStateOf(false) }
     var speechTrouble by remember { mutableStateOf(false) }
+    // What the on-phone translator is doing, shown under the language pill.
+    var langStatus by remember { mutableStateOf<String?>(null) }
     val lang = state.settings.chatLanguage
     val langName = LANGUAGES.firstOrNull { it.first == lang }?.second ?: ("English" to "English")
-    // Answers can only be in another language when live answers are on; scripted answers are English.
-    val answerLang = if (LiveRuvo.enabled) lang else "en-IN"
+    // Live answers are written in the chosen language; offline answers are translated on the phone.
+    val translateOnPhone = !lang.startsWith("en") && OnDeviceTranslate.supports(lang)
     val dictate = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         val heard = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
         if (!heard.isNullOrBlank()) input = heard
@@ -98,15 +107,48 @@ fun ChatSheet(onDismiss: () -> Unit, firstQuestion: String? = null) {
         input = ""
         thinking = true
         scope.launch {
-            val scripted = RuvoGuide.answer(q, ctx)
-            val asked = if (answerLang.startsWith("en")) q else "$q\n\n(Reply in ${langName.second}, simply and warmly.)"
+            // A question in Hindi, Tamil and so on is read in English first, so the offline answers can match it.
+            val english = if (translateOnPhone) OnDeviceTranslate.toEnglish(q, lang) ?: q else q
+            val scripted = RuvoGuide.answer(english, ctx)
+            val asked = if (lang.startsWith("en")) q else "$q\n\n(Reply in ${langName.second}, simply and warmly.)"
             val live = LiveRuvo.answer(asked, ctx, bubbles.dropLast(1).map { it.fromUser to it.text })
-            val text = live ?: scripted.text
-            val spokenIn = if (live != null) answerLang else "en-IN"
-            bubbles += Bubble(false, text, scripted.suggestions, spokenIn)
+            var text = live ?: scripted.text
+            var spokenIn = if (live != null) lang else "en-IN"
+            if (live == null && translateOnPhone) {
+                val t = OnDeviceTranslate.fromEnglish(scripted.text, lang)
+                if (t != null) { text = t; spokenIn = lang }
+                else langStatus = "Couldn't translate just now, so this answer is in English. The first time, ${langName.second} needs internet to download."
+            }
+            bubbles += Bubble(false, text, scripted.suggestions, spokenIn, english = scripted.text)
             thinking = false
             if (state.settings.spokenReplies && !speech.speak(text, spokenIn, "b${bubbles.lastIndex}")) speechTrouble = true
         }
+    }
+
+    /** After picking a language: get it ready on the phone, then show the conversation so far in it. */
+    suspend fun switchLanguage(tag: String, name: String) {
+        speech.stop()
+        if (tag.startsWith("en")) {
+            for (i in bubbles.indices) if (!bubbles[i].fromUser) bubbles[i] = bubbles[i].copy(text = bubbles[i].english, language = "en-IN")
+            langStatus = null
+            return
+        }
+        if (!OnDeviceTranslate.supports(tag)) return
+        langStatus = "Getting $name ready on this phone. The first time downloads about 30 MB, then it works offline."
+        if (!OnDeviceTranslate.prepare(tag)) {
+            langStatus = "Couldn't download $name. Connect to the internet once, then pick it again. Answers stay in English for now."
+            return
+        }
+        for (i in bubbles.indices) {
+            val b = bubbles[i]
+            if (b.fromUser) continue
+            OnDeviceTranslate.fromEnglish(b.english, tag)?.let { bubbles[i] = b.copy(text = it, language = tag) }
+        }
+        langStatus = "Ruvo now answers in $name. Translated on your phone; nothing is sent anywhere."
+    }
+    LaunchedEffect(Unit) {
+        // Opening the chat in a language other than English: greet in it too.
+        if (translateOnPhone) OnDeviceTranslate.fromEnglish(bubbles[0].english, lang)?.let { bubbles[0] = bubbles[0].copy(text = it, language = lang) }
     }
     LaunchedEffect(firstQuestion) { firstQuestion?.let { ask(it) } }
 
@@ -152,7 +194,13 @@ fun ChatSheet(onDismiss: () -> Unit, firstQuestion: String? = null) {
                     val on = lang == tag
                     Row(
                         Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(if (on) c.fuel.copy(alpha = 0.18f) else androidx.compose.ui.graphics.Color.Transparent)
-                            .clickable(role = Role.RadioButton) { scope.launch { RuvoGraph.repository.setChatLanguage(tag) }; picking = false }
+                            .clickable(role = Role.RadioButton) {
+                                picking = false
+                                scope.launch {
+                                    RuvoGraph.repository.setChatLanguage(tag)
+                                    switchLanguage(tag, names.second)
+                                }
+                            }
                             .padding(horizontal = 12.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
@@ -165,11 +213,8 @@ fun ChatSheet(onDismiss: () -> Unit, firstQuestion: String? = null) {
                 }
             }
         }
-        if (!lang.startsWith("en") && !LiveRuvo.enabled) {
-            Text(
-                "You can speak in ${langName.second}. Offline answers stay in English; with live answers on, Ruvo replies in ${langName.second}.",
-                Modifier.padding(top = Space.xs), style = Ruvo.type.caption, color = c.inkFaint,
-            )
+        langStatus?.let {
+            Text(it, Modifier.padding(top = Space.xs).semantics { liveRegion = LiveRegionMode.Polite }, style = Ruvo.type.caption, color = c.inkSoft)
         }
         Spacer(Modifier.height(Space.md))
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Space.md)) {

@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.ruvo.design.Covers
 import com.ruvo.design.Ruvo
+import com.ruvo.design.lighten
 import com.ruvo.design.pressable
 import com.ruvo.engine.guide.Library
 import kotlin.math.sin
@@ -68,7 +69,10 @@ fun BookCover(
     }
     Box(m.semantics { contentDescription = "${book.title}, ${book.minutes} minute read${if (read) ", finished" else ""}" }) {
         Canvas(Modifier.fillMaxSize()) {
-            drawRect(bg)
+            // Two colours fading into each other, and a soft glow of a third, so every cover is lively.
+            val (second, third) = accentsFor(book.id, bg)
+            drawRect(Brush.linearGradient(listOf(bg.lighten(0.18f), second), Offset(0f, 0f), Offset(size.width, size.height)))
+            drawCircle(Brush.radialGradient(listOf(third.copy(alpha = 0.55f), Color.Transparent), Offset(size.width * 0.1f, size.height * 0.85f), size.width * 0.8f), size.width * 0.8f, Offset(size.width * 0.1f, size.height * 0.85f))
             drawIllustration(book.id)
             // Spine: a darker band and a soft highlight, like a printed paperback.
             drawRect(Color.Black.copy(alpha = 0.16f), size = Size(size.width * 0.045f, size.height))
@@ -299,4 +303,18 @@ private fun DrawScope.drawIllustration(id: String) {
         }
         else -> coin(0.5f, 0.3f, 0.16f)
     }
+}
+
+/** The second and third colours for a cover: picked from the palette by the book, never repeating its background. */
+private fun accentsFor(id: String, bg: Color): Pair<Color, Color> {
+    val wheel = listOf(Y, O, PK, P, L, C, DP)
+    val pool = wheel.filter { it != bg }
+    val h = hashOf(id)
+    val second = pool[h % pool.size]
+    val third = pool.filter { it != second }[(h / 7) % (pool.size - 1)]
+    // Dark covers carry light pictures, so they deepen into another dark colour instead of a pale one.
+    if (bg == N) return DP to third
+    if (bg == DP) return N to third
+    // Soften the second colour so the picture stays the star.
+    return second.lighten(0.25f) to third
 }

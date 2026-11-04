@@ -95,8 +95,6 @@ fun GuideScreen(a: GuideActions) {
                         Modifier.weight(1f).semantics { heading() },
                         style = Ruvo.type.headline, color = c.onHero,
                     )
-                    Spacer(Modifier.width(Space.sm))
-                    GuideMark()
                 }
                 Spacer(Modifier.height(Space.lg))
                 // One spine per book: tall amber ones are read, short outlines are still to read.
@@ -161,19 +159,6 @@ fun GuideScreen(a: GuideActions) {
         }
     }
     if (readingOpen) ReadingSheet(read, onOpen = a.openBook, onDismiss = { readingOpen = false })
-}
-
-/** The Guide's mark: an open book with a soft halo that breathes very slowly. */
-@Composable
-private fun GuideMark() {
-    val c = Ruvo.colors
-    val reduced = Ruvo.reducedMotion
-    val t = rememberInfiniteTransition(label = "halo")
-    val b by t.animateFloat(0f, 1f, infiniteRepeatable(tween(3_600, easing = LinearEasing), RepeatMode.Reverse), label = "b")
-    Box(Modifier.size(52.dp), contentAlignment = Alignment.Center) {
-        Box(Modifier.size(52.dp).graphicsLayer { val s = if (reduced) 1f else 0.9f + 0.1f * b; scaleX = s; scaleY = s }.clip(CircleShape).background(c.fuel.copy(alpha = 0.18f)))
-        Icon(RuvoIcons.Book, null, Modifier.size(26.dp), tint = c.fuelInk)
-    }
 }
 
 @Composable

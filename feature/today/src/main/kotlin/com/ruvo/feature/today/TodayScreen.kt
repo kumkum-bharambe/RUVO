@@ -137,10 +137,11 @@ fun TodayContent(state: AppState, a: TodayActions) {
         item {
             Row(Modifier.padding(horizontal = Space.gutter).padding(top = Space.sm).reveal(2), horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
                 val promised = r.reservedCommitments.size
-                BucketCard(Bucket.FIXED, r.fixedReserved, if (promised == 1) "1 planned" else "$promised planned", Modifier.weight(1f), a.openMoney)
-                BucketCard(Bucket.FUEL, r.fuel.coerceAtLeast(0), "To spend", Modifier.weight(1f), a.openWhy)
+                val total = (r.fixedReserved + r.fuel.coerceAtLeast(0) + r.futureProtected).coerceAtLeast(1).toFloat()
+                BucketCard(Bucket.FIXED, r.fixedReserved, if (promised == 1) "1 planned" else "$promised planned", Modifier.weight(1f), r.fixedReserved / total, a.openMoney)
+                BucketCard(Bucket.FUEL, r.fuel.coerceAtLeast(0), "To spend", Modifier.weight(1f), r.fuel.coerceAtLeast(0) / total, a.openWhy)
                 val goals = state.goals.size
-                BucketCard(Bucket.FUTURE, r.futureProtected, if (goals == 1) "1 goal" else "$goals goals", Modifier.weight(1f), a.openGoals)
+                BucketCard(Bucket.FUTURE, r.futureProtected, if (goals == 1) "1 goal" else "$goals goals", Modifier.weight(1f), r.futureProtected / total, a.openGoals)
             }
         }
         if (state.toSort.isNotEmpty()) {

@@ -135,6 +135,11 @@ fun RunwayHero(r: RunwayResult, onWhy: () -> Unit, modifier: Modifier = Modifier
             Text(runwaySubline(r), style = Ruvo.type.bodyStrong, color = if (r.makesIt) c.ink else c.warning)
             Spacer(Modifier.height(Space.xxs))
             Text("${IndianFormat.rupees(r.fuel.coerceAtLeast(0))} of Fuel at about ${IndianFormat.rupees(r.dailySpend)} a day", style = Ruvo.type.caption, color = c.inkSoft)
+            val toIncome = r.daysToNextIncome
+            if (!r.unlimited && toIncome != null && toIncome > 0) {
+                Spacer(Modifier.height(Space.md))
+                RunwayStrip(r)
+            }
             Spacer(Modifier.height(Space.md))
             @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
             androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.xs), verticalArrangement = Arrangement.spacedBy(Space.xs)) {
@@ -244,5 +249,61 @@ private fun DayPill(d: DayStrip.Day, fill: Float) {
             d.date.dayOfMonth.toString(), style = Ruvo.type.caption, textAlign = TextAlign.Center,
             color = if (d.isToday || d.state == DayStrip.State.INCOME) c.ink else c.inkFaint,
         )
+    }
+}
+
+/**
+ * The runway, drawn as one: a dashed airstrip from today to the next money, filled in amber for the days the
+ * Fuel lasts. A paper plane glides out to where the Fuel ends and then floats there. Short of next money, the
+ * plane stops before the flag and the gap is tinted rose; with days spare it sails past the flag.
+ */
+@Composable
+private fun RunwayStrip(r: RunwayResult) {
+    val c = Ruvo.colors
+    val reduced = Ruvo.reducedMotion
+    val toIncome = r.daysToNextIncome ?: return
+    // The strip shows a little past next money, so spare days have somewhere to go.
+    val span = maxOf(toIncome, r.runwayDays).toFloat() * 1.12f
+    val fuelEnd = (r.runwayDays / span).coerceIn(0.04f, 1f)
+    val flagAt = (toIncome / span).coerceIn(0f, 1f)
+    val glide = remember { androidx.compose.animation.core.Animatable(if (reduced) 1f else 0f) }
+    LaunchedEffect(r.runwayDays) { if (!reduced) { glide.snapTo(0f); glide.animateTo(1f, androidx.compose.animation.core.tween(1400, easing = androidx.compose.animation.core.FastOutSlowInEasing)) } }
+    val loop = rememberInfiniteTransition(label = "plane")
+    val bob by loop.animateFloat(-1f, 1f, infiniteRepeatable(tween(1600), RepeatMode.Reverse), label = "bob")
+    Column {
+        Canvas(Modifier.fillMaxWidth().height(34.dp)) {
+            val y = size.height * 0.62f
+            val w = size.width
+            val track = 8.dp.toPx()
+            drawRoundRect(c.ink.copy(alpha = 0.08f), Offset(0f, y - track / 2), Size(w, track), androidx.compose.ui.geometry.CornerRadius(track / 2))
+            val p = glide.value
+            val fuelX = w * fuelEnd * p
+            if (!r.makesIt) {
+                drawRect(c.warning.copy(alpha = 0.18f), Offset(w * fuelEnd, y - track / 2), Size((w * (flagAt - fuelEnd)).coerceAtLeast(0f), track))
+            }
+            drawRoundRect(Brush.horizontalGradient(listOf(c.sun, c.fuel)), Offset(0f, y - track / 2), Size(fuelX.coerceAtLeast(track), track), androidx.compose.ui.geometry.CornerRadius(track / 2))
+            // Dashed centre line, like runway markings.
+            drawLine(Color.White.copy(alpha = 0.85f), Offset(track, y), Offset((fuelX - track).coerceAtLeast(track), y), 1.5.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 8f)))
+            // The flag at next money.
+            val fx = w * flagAt
+            drawLine(c.ink, Offset(fx, y + track / 2), Offset(fx, 2.dp.toPx()), 1.5.dp.toPx())
+            drawPath(Path().apply { moveTo(fx, 2.dp.toPx()); lineTo(fx + 11.dp.toPx(), 6.dp.toPx()); lineTo(fx, 10.dp.toPx()); close() }, c.fixed)
+            // The paper plane, tilted up as if taking off, floating gently.
+            val px = fuelX
+            val py = y - 11.dp.toPx() + (if (reduced) 0f else bob) * 1.5.dp.toPx()
+            val s = 9.dp.toPx()
+            val plane = Path().apply {
+                moveTo(px + s, py - s * 0.35f); lineTo(px - s, py - s * 0.15f); lineTo(px - s * 0.3f, py + s * 0.15f); close()
+                moveTo(px + s, py - s * 0.35f); lineTo(px - s * 0.3f, py + s * 0.15f); lineTo(px - s * 0.2f, py + s * 0.65f); close()
+            }
+            drawPath(plane, c.ink)
+        }
+        Row(Modifier.fillMaxWidth()) {
+            Text("Today", style = Ruvo.type.caption, color = c.inkFaint, modifier = Modifier.weight(1f))
+            Text(
+                r.nextIncomeDate?.let { "Next money · ${IndianFormat.date(it, r.today)}" } ?: "Next money",
+                style = Ruvo.type.caption, color = c.inkFaint,
+            )
+        }
     }
 }

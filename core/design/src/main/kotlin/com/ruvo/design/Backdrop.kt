@@ -42,8 +42,7 @@ fun AmbientBackdrop(modifier: Modifier = Modifier, content: @Composable BoxScope
     val a by drift.animateFloat(0f, 1f, infiniteRepeatable(tween(23_000, easing = LinearEasing), RepeatMode.Restart), label = "a")
     val b by drift.animateFloat(0f, 1f, infiniteRepeatable(tween(31_000, easing = LinearEasing), RepeatMode.Restart), label = "b")
     Box(modifier.fillMaxSize().background(c.canvas)) {
-        // Night swim is true black: no glow behind anything.
-        if (!c.isDark) Canvas(Modifier.fillMaxSize()) {
+        Canvas(Modifier.fillMaxSize()) {
             val ta = if (reduced) 0.1f else a
             val tb = if (reduced) 0.6f else b
             val warm = Offset(

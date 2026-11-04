@@ -9,14 +9,16 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -25,7 +27,7 @@ import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
 
-/** The pet's face follows the money: happy, calm, worried, or thinking while Ruvo answers. */
+/** The pet's colours and eyes follow the money: happy, calm, worried, or thinking while Ruvo answers. */
 enum class PetMood { HAPPY, CALM, WORRIED, THINKING }
 
 /** Happy when the runway is comfortable, calm when the cushion is thin, worried when money is short. */
@@ -35,30 +37,23 @@ fun OrbMood.pet(): PetMood = when {
     else -> PetMood.HAPPY
 }
 
-private class Fur(val light: Color, val mid: Color, val deep: Color)
-
-private fun furFor(m: PetMood) = when (m) {
-    PetMood.HAPPY -> Fur(Color(0xFFFFE28A), Color(0xFFFFC23D), Color(0xFFFF9A3D))
-    PetMood.CALM -> Fur(Color(0xFFCDBFFF), Color(0xFF9C82FF), Color(0xFF6A4BF0))
-    PetMood.WORRIED -> Fur(Color(0xFFFFC08F), Color(0xFFFF8A45), Color(0xFFE5571A))
-    PetMood.THINKING -> Fur(Color(0xFFC3B8FF), Color(0xFF8A7BFF), Color(0xFF4F3FD0))
+/** Four liquid colours that swirl inside the sphere, deepest first. */
+private fun swirlFor(m: PetMood): List<Color> = when (m) {
+    PetMood.HAPPY -> listOf(Color(0xFFFF7A3D), Color(0xFFFFC23D), Color(0xFFFF6FA8), Color(0xFF8B6CFF))
+    PetMood.CALM -> listOf(Color(0xFF5B3FE0), Color(0xFF3FA9FF), Color(0xFFFF6FA8), Color(0xFFB79CFF))
+    PetMood.WORRIED -> listOf(Color(0xFFE5402F), Color(0xFFFF8A45), Color(0xFFFF5C8A), Color(0xFFFFC23D))
+    PetMood.THINKING -> listOf(Color(0xFF3B2BB8), Color(0xFF8B6CFF), Color(0xFF3FD0FF), Color(0xFFFF8FC8))
 }
 
-private val EyeInk = Color(0xFF141B4D)
-private val Mouth = Color(0xFF3A1640)
-private val Tongue = Color(0xFFFF7A9C)
-private val Blush = Color(0xFFFF8FB0)
-private val Glow = Color(0xFFFFD86B)
-
-/** A fixed pseudo-random number in 0..1 for strand [i], so the fur looks shaggy but never flickers. */
-private fun strand(i: Int): Float {
+/** A fixed pseudo-random number in 0..1 for sparkle [i], so the ring looks scattered but never flickers. */
+private fun seed(i: Int): Float {
     val x = sin(i * 12.9898f) * 43758.547f
     return x - kotlin.math.floor(x)
 }
 
 /**
- * Ruvo's pet: a round, fuzzy creature with big eyes and a little antenna tipped with a coin-light. It breathes,
- * its fur ruffles, it blinks and glances about, and the coin-light glows brighter when money is comfortable.
+ * Ruvo's pet: a glossy liquid orb. Colours swirl slowly inside a glassy sphere, it wobbles like jelly as it
+ * breathes, two white pill eyes blink and glance about, and a faint ring of sparkles drifts round it.
  * Drawn on a 100 x 100 unit artboard. Every loop is an infinite transition so tests can go idle; reduced
  * motion holds it still.
  */
@@ -66,20 +61,22 @@ private fun strand(i: Int): Float {
 fun RuvoPet(mood: PetMood, modifier: Modifier = Modifier) {
     val reduced = Ruvo.reducedMotion
     val loop = rememberInfiniteTransition(label = "pet")
-    val breath by loop.animateFloat(0f, 1f, infiniteRepeatable(tween(2800, easing = LinearEasing)), label = "breath")
-    val ruffle by loop.animateFloat(0f, 1f, infiniteRepeatable(tween(1900, easing = LinearEasing)), label = "ruffle")
+    val swirl by loop.animateFloat(0f, 1f, infiniteRepeatable(tween(9000, easing = LinearEasing)), label = "swirl")
+    val breath by loop.animateFloat(0f, 1f, infiniteRepeatable(tween(2600, easing = LinearEasing)), label = "breath")
     val blink by loop.animateFloat(0f, 1f, infiniteRepeatable(tween(4300, easing = LinearEasing)), label = "blink")
     val look by loop.animateFloat(0f, 1f, infiniteRepeatable(tween(7000, easing = LinearEasing)), label = "look")
+    val drift by loop.animateFloat(0f, 1f, infiniteRepeatable(tween(16000, easing = LinearEasing)), label = "drift")
     Canvas(modifier.clearAndSetSemantics { }) {
         val unit = minOf(size.width, size.height) / 100f
         translate((size.width - 100f * unit) / 2f, (size.height - 100f * unit) / 2f) {
             scale(unit, unit, pivot = Offset.Zero) {
                 drawPet(
                     mood,
+                    swirl = if (reduced) 0.15f else swirl,
                     breath = if (reduced) 0f else sin(2 * PI * breath).toFloat(),
-                    ruffle = if (reduced) 0f else ruffle,
                     eyeOpen = if (reduced) 1f else blinkOpen(blink),
                     look = if (reduced) 0f else lookAround(look),
+                    drift = if (reduced) 0f else drift,
                 )
             }
         }
@@ -89,7 +86,7 @@ fun RuvoPet(mood: PetMood, modifier: Modifier = Modifier) {
 /** Eyes stay open most of the loop and close briefly, twice in a row now and then. */
 private fun blinkOpen(t: Float): Float {
     fun dip(at: Float) = (1f - kotlin.math.abs(t - at) / 0.014f).coerceIn(0f, 1f)
-    return 1f - maxOf(dip(0.62f), dip(0.69f)) * 0.95f
+    return 1f - maxOf(dip(0.62f), dip(0.69f)) * 0.92f
 }
 
 /** Glances left, back to centre, right, back: mostly still, moving in short hops. */
@@ -104,98 +101,69 @@ private fun lookAround(t: Float): Float = when {
     else -> 1f - (t - 0.9f) / 0.1f
 }
 
-private fun DrawScope.drawPet(mood: PetMood, breath: Float, ruffle: Float, eyeOpen: Float, look: Float) {
-    val fur = furFor(mood)
-    val cx = 50f
-    val cy = 56f + breath * 0.8f
-    val r = 31f
-    val squash = 1f + breath * 0.025f
+private fun DrawScope.drawPet(mood: PetMood, swirl: Float, breath: Float, eyeOpen: Float, look: Float, drift: Float) {
+    val colours = swirlFor(mood)
+    val c = Offset(50f, 50f)
+    val r = 36f
+    val tau = 2f * PI.toFloat()
 
-    // Feet first, so the body sits on them.
-    drawOval(fur.deep, Offset(33f, 84f), Size(14f, 8f))
-    drawOval(fur.deep, Offset(53f, 84f), Size(14f, 8f))
-
-    // Antenna with its coin-light: brighter and with a halo when things are comfortable.
-    val sway = breath * 2.2f + look * 1.5f
-    val tip = Offset(cx + 6f + sway, cy - r - 17f)
-    val stalk = Path().apply { moveTo(cx, cy - r + 2f); quadraticTo(cx + 1f, cy - r - 8f, tip.x, tip.y) }
-    drawPath(stalk, fur.deep, style = Stroke(2.6f, cap = StrokeCap.Round))
-    val halo = when (mood) { PetMood.HAPPY -> 1f; PetMood.CALM, PetMood.THINKING -> 0.6f; PetMood.WORRIED -> 0.35f }
-    drawCircle(Brush.radialGradient(listOf(Glow.copy(alpha = 0.55f * halo), Color.Transparent), tip, 11f), 11f, tip)
-    drawCircle(Glow, 4.6f, tip)
-    drawCircle(Color.White.copy(alpha = 0.7f), 1.5f, tip + Offset(-1.4f, -1.4f))
-
-    // Fur: short strands all round the edge, each with its own length, ruffling in a slow wave.
-    scale(1f / squash, squash, pivot = Offset(cx, 90f)) {
-        // A soft halo fills the gaps between strands so the edge reads as fluff, not spikes.
-        drawCircle(fur.mid.copy(alpha = 0.85f), r + 2.5f, Offset(cx, cy))
-        val strands = 170
-        for (i in 0 until strands) {
-            val a = (i.toFloat() / strands) * 2f * PI.toFloat()
-            val len = 2.5f + strand(i) * 3f - if (sin(a) > 0.6f) 1.5f else 0f
-            val wiggle = 0.06f * sin(ruffle * 2f * PI.toFloat() + i * 0.45f)
-            val base = Offset(cx + cos(a) * (r - 3f), cy + sin(a) * (r - 3f))
-            val tipA = a + wiggle
-            val end = Offset(cx + cos(tipA) * (r + len), cy + sin(tipA) * (r + len))
-            drawLine(if (i % 3 == 0) fur.light else fur.mid, base, end, 4.6f, StrokeCap.Round)
-        }
-        // The body itself, lit from the top left.
-        drawCircle(Brush.radialGradient(listOf(fur.light, fur.mid, fur.deep), Offset(cx - 12f, cy - 14f), r * 1.7f), r, Offset(cx, cy))
-        // A few strands drawn over the body edge so it reads as fluff, not a circle.
-        for (i in 0 until 40) {
-            val a = (i.toFloat() / 40) * 2f * PI.toFloat() + 0.07f
-            val base = Offset(cx + cos(a) * (r - 7f), cy + sin(a) * (r - 7f))
-            val end = Offset(cx + cos(a) * (r - 1f), cy + sin(a) * (r - 1f))
-            drawLine(fur.light.copy(alpha = 0.5f), base, end, 2f, StrokeCap.Round)
-        }
+    // Sparkle ring: tiny warm specks orbiting slowly, each twinkling on its own beat.
+    for (i in 0 until 26) {
+        val a = (i / 26f + drift) * tau + seed(i) * 0.5f
+        val dist = r + 6f + seed(i + 40) * 8f
+        val tw = 0.25f + 0.75f * ((sin((drift * 6f + seed(i + 80)) * tau) + 1f) / 2f)
+        drawCircle(Color(0xFFFFE3A3).copy(alpha = 0.55f * tw), 0.5f + seed(i + 120) * 0.9f, c + Offset(cos(a) * dist, sin(a) * dist))
     }
 
-    // Cheeks.
-    drawOval(Blush.copy(alpha = 0.45f), Offset(cx - 25f, cy + 2f), Size(10f, 6f))
-    drawOval(Blush.copy(alpha = 0.45f), Offset(cx + 15f, cy + 2f), Size(10f, 6f))
+    // Soft glow and a fine dark rim, so the sphere reads on light and dark backgrounds alike.
+    drawCircle(Brush.radialGradient(listOf(colours[1].copy(alpha = 0.35f), Color.Transparent), c, r * 1.45f), r * 1.45f, c)
 
-    // Eyes: big whites, dark pupils that glance about (and up while thinking), a bright catchlight.
-    val eyeY = cy - 7f
-    val lookX = look * 2.4f
-    val lookY = if (mood == PetMood.THINKING) -3f else 0.5f
-    listOf(cx - 11f, cx + 11f).forEach { ex ->
-        if (eyeOpen < 0.35f) {
-            // Mid-blink: a soft closed-eye curve, not a slit.
-            val lid = Path().apply { moveTo(ex - 6.5f, eyeY); quadraticTo(ex, eyeY + 4.5f, ex + 6.5f, eyeY) }
-            drawPath(lid, EyeInk, style = Stroke(2.4f, cap = StrokeCap.Round))
-            return@forEach
-        }
-        val h = 19f * eyeOpen
-        drawOval(Color.White, Offset(ex - 8f, eyeY - h / 2f), Size(16f, h))
-        run {
-            val p = Offset(ex + lookX, eyeY + lookY + 1f)
-            drawCircle(EyeInk, 5.6f, p)
-            drawCircle(Color.White, 1.9f, p + Offset(-1.8f, -2.2f))
-        }
-    }
-    if (mood == PetMood.WORRIED) {
-        drawLine(EyeInk, Offset(cx - 17f, eyeY - 13f), Offset(cx - 7f, eyeY - 15.5f), 2.2f, StrokeCap.Round)
-        drawLine(EyeInk, Offset(cx + 17f, eyeY - 13f), Offset(cx + 7f, eyeY - 15.5f), 2.2f, StrokeCap.Round)
-    }
-
-    // Mouth: open smile, gentle smile, a wobble, or a small "o" while thinking.
-    val my = cy + 8f
-    when (mood) {
-        PetMood.HAPPY -> {
-            val m = Path().apply { moveTo(cx - 7f, my); quadraticTo(cx, my + 10f, cx + 7f, my); close() }
-            drawPath(m, Mouth)
-            drawOval(Tongue, Offset(cx - 3.5f, my + 3.2f), Size(7f, 3.6f))
-        }
-        PetMood.CALM -> {
-            val m = Path().apply { moveTo(cx - 5f, my + 1f); quadraticTo(cx, my + 5.5f, cx + 5f, my + 1f) }
-            drawPath(m, Mouth, style = Stroke(2.3f, cap = StrokeCap.Round))
-        }
-        PetMood.WORRIED -> {
-            val m = Path().apply {
-                moveTo(cx - 6f, my + 3f); quadraticTo(cx - 3f, my + 0.5f, cx, my + 3f); quadraticTo(cx + 3f, my + 5.5f, cx + 6f, my + 3f)
+    // Jelly wobble: a little wider as it breathes out, a little taller as it breathes in.
+    scale(1f + breath * 0.025f, 1f - breath * 0.025f, pivot = Offset(50f, 86f)) {
+        drawCircle(Color(0xFF0B0D24).copy(alpha = 0.55f), r + 1.6f, c)
+        val sphere = Path().apply { addOval(androidx.compose.ui.geometry.Rect(c, r)) }
+        clipPath(sphere) {
+            drawCircle(colours[0], r, c)
+            // Liquid: three soft blobs of colour circling at different speeds and depths.
+            for (k in 1..3) {
+                val speed = when (k) { 1 -> 1f; 2 -> -1.6f; else -> 2.3f }
+                val a = (swirl * speed + k * 0.31f) * tau
+                val orbit = r * (0.42f - k * 0.05f)
+                val centre = c + Offset(cos(a) * orbit, sin(a * 0.8f) * orbit)
+                val blob = r * (1.05f - k * 0.12f)
+                drawCircle(Brush.radialGradient(listOf(colours[k], colours[k].copy(alpha = 0f)), centre, blob), blob, centre)
             }
-            drawPath(m, Mouth, style = Stroke(2.2f, cap = StrokeCap.Round))
+            // A light ribbon sweeping through, like a fold in the liquid.
+            val ribbon = Path().apply {
+                val y = 50f + sin(swirl * tau) * 6f
+                moveTo(c.x - r, y + 10f)
+                cubicTo(c.x - 10f, y - 14f, c.x + 8f, y + 22f, c.x + r, y - 6f)
+            }
+            drawPath(ribbon, Color.White.copy(alpha = 0.22f), style = Stroke(9f))
+            // Glass: a broad sheen top left, a bright glint, and a warm rim light bottom right.
+            drawOval(Brush.radialGradient(listOf(Color.White.copy(alpha = 0.55f), Color.Transparent), Offset(36f, 30f), 22f), Offset(16f, 14f), Size(40f, 30f))
+            drawCircle(Brush.radialGradient(listOf(Color.Transparent, Color.Transparent, Color.White.copy(alpha = 0.28f)), c, r), r, c)
         }
-        PetMood.THINKING -> drawOval(Mouth, Offset(cx + 1f, my + 1f), Size(5f, 5.5f))
+        drawCircle(Color.White.copy(alpha = 0.85f), 2.2f, Offset(33f, 27f))
+        drawCircle(Color.White.copy(alpha = 0.5f), 1.1f, Offset(39f, 24f))
+    }
+
+    // Eyes: two white pills. They glance about, lift while thinking, lean in when worried, and squash to blink.
+    val lookX = look * 3f
+    val eyeY = when (mood) { PetMood.THINKING -> 44f; else -> 49f } + breath * 0.6f
+    val h = (17f * eyeOpen).coerceAtLeast(2.6f) * if (mood == PetMood.HAPPY) 0.92f else 1f
+    val w = 8f
+    listOf(41.5f, 58.5f).forEachIndexed { i, ex ->
+        val lean = if (mood == PetMood.WORRIED) (if (i == 0) 6f else -6f) else 0f
+        rotate(lean, Offset(ex + lookX, eyeY)) {
+            drawRoundRect(
+                Color.White, Offset(ex + lookX - w / 2f, eyeY - h / 2f), Size(w, h), CornerRadius(w / 2f),
+            )
+        }
+    }
+    if (mood == PetMood.HAPPY && eyeOpen > 0.5f) {
+        // Happy cheeks: two faint warm dots under the eyes.
+        drawCircle(Color(0xFFFFE0F0).copy(alpha = 0.45f), 3.2f, Offset(35f, 61f))
+        drawCircle(Color(0xFFFFE0F0).copy(alpha = 0.45f), 3.2f, Offset(65f, 61f))
     }
 }

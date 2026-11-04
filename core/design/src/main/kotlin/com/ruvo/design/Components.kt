@@ -29,6 +29,9 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.geometry.Offset
+import kotlin.math.cos
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -171,7 +174,15 @@ fun RuvoCard(
     m = when {
         brush != null -> m.background(brush)
         color != Color.Unspecified -> m.background(color)
-        else -> m.background(c.glass)
+        // Frosted glass: brighter at the top where light falls, with a thin highlight along the top edge.
+        else -> m.background(Brush.verticalGradient(listOf(c.glass.copy(alpha = (c.glass.alpha * 1.45f).coerceAtMost(1f)), c.glass)))
+            .drawWithContent {
+                drawContent()
+                drawRect(
+                    Brush.horizontalGradient(listOf(Color.Transparent, Color.White.copy(alpha = if (c.isDark) 0.18f else 0.9f), Color.Transparent)),
+                    size = androidx.compose.ui.geometry.Size(size.width, 1.5.dp.toPx()),
+                )
+            }
     }
     when {
         border == null -> {}
@@ -486,17 +497,38 @@ fun StatusChips(items: List<StatusItem>, modifier: Modifier = Modifier) {
  * carries its name, so colour is never the only cue.
  */
 @Composable
-fun BucketCard(bucket: Bucket, amount: Paise, caption: String, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
+fun BucketCard(bucket: Bucket, amount: Paise, caption: String, modifier: Modifier = Modifier, share: Float = 0f, onClick: (() -> Unit)? = null) {
     val c = Ruvo.colors
-    RuvoCard(
-        modifier.height(108.dp), brush = c.bucketBrush(bucket), border = null, elevated = !c.isDark,
-        onClick = onClick, onClickLabel = "Open ${bucketName(bucket)}", padding = PaddingValues(14.dp),
+    val reduced = Ruvo.reducedMotion
+    val ink = c.onAccent
+    val loop = rememberInfiniteTransition(label = "bucket")
+    val drift by loop.animateFloat(0f, 1f, infiniteRepeatable(tween(9000 + bucket.ordinal * 1700, easing = LinearEasing)), label = "drift")
+    val shape = RoundedCornerShape(Radius.card)
+    Box(
+        modifier.height(118.dp)
+            .shadow(if (c.isDark) 0.dp else 10.dp, shape, ambientColor = c.bucket(bucket), spotColor = c.bucket(bucket))
+            .clip(shape).background(c.bucketBrush(bucket))
+            .border(1.dp, Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.9f), Color.White.copy(alpha = 0.15f))), shape)
+            .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClickLabel = "Open ${bucketName(bucket)}", onClick = onClick) else Modifier),
     ) {
-        // Name first, then the number: the word carries the meaning, so no icon is needed.
-        Text(bucketName(bucket), style = Ruvo.type.bodyStrong, color = c.onAccent, maxLines = 1)
-        Spacer(Modifier.weight(1f))
-        Amount(amount, style = Ruvo.type.title, color = c.onAccent)
-        Text(caption, style = Ruvo.type.caption, color = c.onAccent.copy(alpha = 0.72f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        // A soft blob of the bucket's own colour drifting in the corner, like liquid behind glass.
+        Canvas(Modifier.matchParentSize()) {
+            val t = if (reduced) 0.3f else drift
+            val a = t * 2f * PI.toFloat()
+            val centre = Offset(size.width * (0.82f + 0.08f * cos(a)), size.height * (0.18f + 0.1f * sin(a)))
+            drawCircle(Brush.radialGradient(listOf(c.bucket(bucket).copy(alpha = 0.55f), Color.Transparent), centre, size.width * 0.55f), size.width * 0.55f, centre)
+            drawRect(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.35f), Color.Transparent), endY = size.height * 0.45f))
+        }
+        Column(Modifier.matchParentSize().padding(12.dp)) {
+            // Name first, then the number: the word carries the meaning, so no icon is needed.
+            Text(bucketName(bucket), style = Ruvo.type.bodyStrong, color = ink, maxLines = 1)
+            Text(caption, style = Ruvo.type.caption, color = ink.copy(alpha = 0.68f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Spacer(Modifier.weight(1f))
+            Amount(amount, style = Ruvo.type.title, color = ink, countUp = true)
+            Spacer(Modifier.height(6.dp))
+            // Its share of everything you have, so the three boxes compare at a glance.
+            FillBar(share, c.bucket(bucket).copy(alpha = 1f), height = 5.dp, track = Color.White.copy(alpha = 0.55f))
+        }
     }
 }
 

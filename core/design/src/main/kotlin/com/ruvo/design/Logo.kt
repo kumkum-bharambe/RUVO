@@ -53,7 +53,7 @@ private val LogoOrange = Color(0xFFFF8A45)
  * opening animates it; both are 1 when the mark is still.
  */
 @Composable
-fun RuvoLogo(modifier: Modifier = Modifier, size: Dp = 56.dp, tile: Color? = null, draw: Float = 1f, dot: Float = 1f) {
+fun RuvoLogo(modifier: Modifier = Modifier, size: Dp = 56.dp, tile: Color? = null, draw: Float = 1f, dot: Float = 1f, dotDrop: Float = 0f) {
     Canvas(modifier.size(size).semantics { contentDescription = "Ruvo" }) {
         val s = this.size.width
         if (tile != null) drawRoundRect(tile, cornerRadius = CornerRadius(s * 0.24f))
@@ -77,15 +77,18 @@ fun RuvoLogo(modifier: Modifier = Modifier, size: Dp = 56.dp, tile: Color? = nul
                 style = Stroke(w, cap = StrokeCap.Round),
             )
         }
-        if (dot > 0f) drawCircle(LogoHaldi, s * 0.072f * dot, Offset(s * 0.745f, s * 0.31f))
+        // [dotDrop] lifts the dot above its place (in tile heights), which is how the opening bounces it in.
+        if (dot > 0f) drawCircle(LogoHaldi, s * 0.072f * dot, Offset(s * 0.745f, s * 0.31f - s * dotDrop))
     }
 }
 
 
 /**
- * The opening, after Ruvo 7: the tile pops in, the r draws itself (stem up, then the runway arc lifting off), the
- * sun dot pops with an amber ring pulsing out behind it, "ruvo." rises letter by letter (the dot is amber), then the line. About 2.4 s; a tap skips it.
- * Always dark, whatever the mood, so it reads as a cover. Reduced motion shows the finished mark at once.
+ * The opening: the tile spins in, the r draws itself (stem up, then the runway arc lifting off), the yellow dot
+ * drops in from above and bounces into place like a ball, and as it lands a ring and a burst of confetti in the
+ * brand colours fly out. Then each letter of "ruvo." hops up on a spring, the final dot dropping in last, and
+ * the line appears. About 2.5 s; a tap skips it. Always dark, so it reads as a cover. Reduced motion shows the
+ * finished mark at once.
  */
 @Composable
 fun RuvoSplash(modifier: Modifier = Modifier, onSkip: () -> Unit = {}) {
@@ -93,19 +96,31 @@ fun RuvoSplash(modifier: Modifier = Modifier, onSkip: () -> Unit = {}) {
     val start = if (reduced) 1f else 0f
     val tile = remember { Animatable(start) }
     val draw = remember { Animatable(start) }
-    val dot = remember { Animatable(start) }
-    val ring = remember { Animatable(start) }
+    val drop = remember { Animatable(if (reduced) 0f else 2.2f) }
+    val burst = remember { Animatable(start) }
     val letters = remember { List(5) { Animatable(start) } }
     val line = remember { Animatable(start) }
+    // Falls, bounces, bounces smaller, settles: like a ball, never sinking below where it rests.
+    val ball = androidx.compose.animation.core.keyframes<Float> {
+        durationMillis = 860
+        2.2f at 0 using androidx.compose.animation.core.FastOutLinearInEasing
+        0f at 380 using androidx.compose.animation.core.LinearOutSlowInEasing
+        0.55f at 530 using androidx.compose.animation.core.FastOutLinearInEasing
+        0f at 670 using androidx.compose.animation.core.LinearOutSlowInEasing
+        0.16f at 760 using androidx.compose.animation.core.FastOutLinearInEasing
+        0f at 860
+    }
+    val hop = androidx.compose.animation.core.spring<Float>(dampingRatio = 0.42f, stiffness = 420f)
     LaunchedEffect(Unit) {
         if (reduced) return@LaunchedEffect
-        launch { tile.animateTo(1f, Motion.bouncy()) }
-        launch { delay(250); draw.animateTo(1f, tween(700, easing = FastOutSlowInEasing)) }
-        launch { delay(900); dot.animateTo(1f, Motion.bouncy()) }
-        launch { delay(900); ring.animateTo(1f, tween(1300, easing = FastOutSlowInEasing)) }
-        letters.forEachIndexed { i, l -> launch { delay(1000L + i * 60L); l.animateTo(1f, Motion.gentle()) } }
-        launch { delay(1700); line.animateTo(1f, Motion.gentle()) }
+        launch { tile.animateTo(1f, androidx.compose.animation.core.spring(dampingRatio = 0.55f, stiffness = 300f)) }
+        launch { delay(280); draw.animateTo(1f, tween(620, easing = FastOutSlowInEasing)) }
+        launch { delay(820); drop.animateTo(0f, ball) }
+        launch { delay(1200); burst.animateTo(1f, tween(1100, easing = FastOutSlowInEasing)) }
+        letters.forEachIndexed { i, l -> launch { delay(1150L + i * 80L + if (i == 4) 160L else 0L); l.animateTo(1f, hop) } }
+        launch { delay(1800); line.animateTo(1f, Motion.gentle()) }
     }
+    val brand = listOf(LogoHaldi, LogoOrange, Color(0xFF8B6CFF), Color(0xFFFF8FB0), LogoPaper)
     Box(
         modifier.fillMaxSize().background(Color(0xFF0A0D26))
             .clickable(remember { MutableInteractionSource() }, indication = null, onClickLabel = "Skip", onClick = onSkip),
@@ -114,12 +129,21 @@ fun RuvoSplash(modifier: Modifier = Modifier, onSkip: () -> Unit = {}) {
         Canvas(Modifier.fillMaxSize()) {
             val centre = Offset(size.width / 2, size.height * 0.42f)
             drawRect(Brush.radialGradient(listOf(Color(0xFF2A2272), Color(0xFF0A0D26)), centre, size.height * 0.6f))
-            // The ring: a soft amber disc that swells and fades as the dot lands.
-            val r = 70.dp.toPx() * (0.6f + 1.6f * ring.value)
-            val a = (1f - ring.value) * 0.55f
-            if (a > 0.01f) {
-                drawCircle(LogoHaldi.copy(alpha = a * 0.5f), r, centre)
-                drawCircle(LogoHaldi.copy(alpha = a), r, centre, style = Stroke(3.dp.toPx()))
+            val b = burst.value
+            if (b > 0f && b < 1f) {
+                // Where the dot lands, relative to the centre of the 112 dp tile.
+                val land = centre + Offset(27.dp.toPx(), -21.dp.toPx())
+                val ringR = 14.dp.toPx() + 90.dp.toPx() * b
+                drawCircle(LogoHaldi.copy(alpha = (1f - b) * 0.7f), ringR, land, style = Stroke(3.dp.toPx() * (1f - b) + 0.5f))
+                // Confetti: little dots and dashes thrown outward, slowing and fading.
+                for (i in 0 until 14) {
+                    val ang = i / 14f * 2f * kotlin.math.PI.toFloat() + 0.3f
+                    val dist = 30.dp.toPx() + 110.dp.toPx() * b * (0.7f + (i % 3) * 0.15f)
+                    val p = land + Offset(kotlin.math.cos(ang) * dist, kotlin.math.sin(ang) * dist + 40.dp.toPx() * b * b)
+                    val col = brand[i % brand.size].copy(alpha = (1f - b))
+                    if (i % 2 == 0) drawCircle(col, 4.dp.toPx(), p)
+                    else drawLine(col, p, p + Offset(kotlin.math.cos(ang + 1f) * 8.dp.toPx(), kotlin.math.sin(ang + 1f) * 8.dp.toPx()), 3.dp.toPx(), androidx.compose.ui.graphics.StrokeCap.Round)
+                }
             }
         }
         Column(
@@ -128,10 +152,12 @@ fun RuvoSplash(modifier: Modifier = Modifier, onSkip: () -> Unit = {}) {
         ) {
             RuvoLogo(
                 Modifier.graphicsLayer {
-                    val sc = 0.55f + 0.45f * tile.value
-                    scaleX = sc; scaleY = sc; alpha = tile.value.coerceIn(0f, 1f)
+                    val t = tile.value
+                    val sc = 0.3f + 0.7f * t
+                    scaleX = sc; scaleY = sc; alpha = t.coerceIn(0f, 1f)
+                    rotationZ = (1f - t) * -40f
                 },
-                size = 112.dp, draw = draw.value, dot = dot.value,
+                size = 112.dp, draw = draw.value, dot = if (drop.value > 2f) 0f else 1f, dotDrop = drop.value,
             )
             Spacer(Modifier.height(Space.lg))
             Row {
@@ -139,7 +165,13 @@ fun RuvoSplash(modifier: Modifier = Modifier, onSkip: () -> Unit = {}) {
                     val p = letters[i].value
                     Text(
                         ch.toString(),
-                        Modifier.graphicsLayer { alpha = p.coerceIn(0f, 1f); translationY = (1f - p) * 18.dp.toPx() },
+                        Modifier.graphicsLayer {
+                            alpha = p.coerceIn(0f, 1f)
+                            // The final dot falls in from above; the letters hop up from below.
+                            translationY = (1f - p) * (if (ch == '.') -46.dp.toPx() else 26.dp.toPx())
+                            val sc = 0.6f + 0.4f * p
+                            scaleX = sc; scaleY = sc
+                        },
                         style = Ruvo.type.display.copy(fontSize = Ruvo.type.display.fontSize * 1.25f),
                         color = if (ch == '.') LogoHaldi else LogoPaper,
                     )
