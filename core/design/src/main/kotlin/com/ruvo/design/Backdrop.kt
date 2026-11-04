@@ -21,6 +21,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.graphics.Canvas
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.ImageShader
+import androidx.compose.ui.graphics.Paint
+import androidx.compose.ui.graphics.ShaderBrush
+import androidx.compose.ui.graphics.TileMode
+import kotlin.random.Random
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -30,39 +38,37 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 /**
- * The glowing canvas behind every screen: an amber dawn glow near the top left and a lavender dusk glow
- * near the bottom right. They drift on slow, out-of-step loops (23 s and 31 s) so the screen feels alive
- * without anything asking for attention. Reduced motion keeps them still.
+ * The page behind every screen: warm paper (or ink-blue night) with a fine printed grain and a faint warmth in the
+ * top corner, like light falling on a desk. It is still on purpose: the content moves, the page does not.
+ * The grain is drawn once per size and cached.
  */
 @Composable
 fun AmbientBackdrop(modifier: Modifier = Modifier, content: @Composable BoxScope.() -> Unit = {}) {
     val c = Ruvo.colors
-    val reduced = Ruvo.reducedMotion
-    val drift = rememberInfiniteTransition(label = "backdrop")
-    val a by drift.animateFloat(0f, 1f, infiniteRepeatable(tween(23_000, easing = LinearEasing), RepeatMode.Restart), label = "a")
-    val b by drift.animateFloat(0f, 1f, infiniteRepeatable(tween(31_000, easing = LinearEasing), RepeatMode.Restart), label = "b")
-    Box(modifier.fillMaxSize().background(c.canvas)) {
-        Canvas(Modifier.fillMaxSize()) {
-            val ta = if (reduced) 0.1f else a
-            val tb = if (reduced) 0.6f else b
-            val warm = Offset(
-                size.width * (0.05f + 0.10f * cos(2 * PI * ta).toFloat()),
-                size.height * (0.10f + 0.05f * sin(2 * PI * ta).toFloat()),
-            )
-            val cool = Offset(
-                size.width * (0.95f + 0.08f * sin(2 * PI * tb).toFloat()),
-                size.height * (0.86f + 0.05f * cos(2 * PI * tb).toFloat()),
-            )
-            val r = size.width * 0.95f
-            drawRect(Brush.radialGradient(listOf(c.glowWarm, c.glowWarm.copy(alpha = 0f)), warm, r))
-            drawRect(Brush.radialGradient(listOf(c.glowCool, c.glowCool.copy(alpha = 0f)), cool, r * 1.1f))
-            val mid = Offset(size.width * (0.7f + 0.1f * cos(2 * PI * (ta + tb)).toFloat()), size.height * 0.42f)
-            drawRect(Brush.radialGradient(listOf(c.glowCool.copy(alpha = c.glowCool.alpha * 0.35f), Color.Transparent), mid, r * 0.6f))
-        }
+    Box(
+        modifier.fillMaxSize().background(c.canvas).drawWithCache {
+            // One 256 px tile of grain, drawn once and repeated as a pattern.
+            val tile = ImageBitmap(256, 256)
+            val pen = Canvas(tile)
+            val paint = Paint()
+            val random = Random(42)
+            val grain = if (c.isDark) Color.White else Color(0xFF5A4A30)
+            repeat(260) {
+                val a = random.nextFloat()
+                paint.color = grain.copy(alpha = 0.04f + a * 0.06f)
+                pen.drawCircle(Offset(random.nextFloat() * 256f, random.nextFloat() * 256f), 0.7f + a * 0.9f, paint)
+            }
+            val paperGrain = ShaderBrush(ImageShader(tile, TileMode.Repeated, TileMode.Repeated))
+            onDrawBehind {
+                drawRect(Brush.radialGradient(listOf(c.glowWarm, Color.Transparent), Offset(size.width * 0.1f, 0f), size.width * 1.1f))
+                drawRect(Brush.radialGradient(listOf(c.glowCool, Color.Transparent), Offset(size.width, size.height), size.width))
+                drawRect(paperGrain)
+            }
+        },
+    ) {
         content()
     }
 }
-
 /** Fades content out under the status bar so scrolled text never collides with the clock. */
 @Composable
 fun BoxScope.StatusBarFade() {

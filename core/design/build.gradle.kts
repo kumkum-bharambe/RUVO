@@ -32,14 +32,14 @@ dependencies {
 }
 
 // The brand typefaces (SIL Open Font License) are downloaded once on the build machine instead of being
-// committed. Outfit is the brand face; Anek Latin supplies the ₹ sign, which Outfit lacks.
+// committed. Fraunces sets numbers and headlines; Space Grotesk sets the interface. Both include the rupee sign.
 val brandFonts = mapOf(
-    "outfit.ttf" to ("Outfit" to "https://github.com/google/fonts/raw/main/ofl/outfit/Outfit%5Bwght%5D.ttf"),
-    "anek_latin.ttf" to ("Anek Latin" to "https://github.com/google/fonts/raw/main/ofl/aneklatin/AnekLatin%5Bwdth,wght%5D.ttf"),
+    "fraunces.ttf" to ("Fraunces" to "https://raw.githubusercontent.com/google/fonts/main/ofl/fraunces/Fraunces%5BSOFT,WONK,opsz,wght%5D.ttf"),
+    "space_grotesk.ttf" to ("Space Grotesk" to "https://raw.githubusercontent.com/google/fonts/main/ofl/spacegrotesk/SpaceGrotesk%5Bwght%5D.ttf"),
 )
 val fontDir = layout.projectDirectory.dir("src/main/res/font").asFile
 val fetchFonts by tasks.registering {
-    description = "Downloads the Outfit and Anek Latin variable fonts into res/font if they are missing."
+    description = "Downloads the Fraunces and Space Grotesk variable fonts into res/font if they are missing."
     outputs.files(brandFonts.keys.map { fontDir.resolve(it) })
     onlyIf { brandFonts.keys.any { !fontDir.resolve(it).exists() } }
     doLast {

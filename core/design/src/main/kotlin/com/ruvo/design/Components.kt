@@ -35,7 +35,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -47,9 +46,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.drawOutline
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
@@ -72,7 +76,7 @@ import kotlinx.coroutines.launch
 
 /**
  * Springs used across the app. Interruptible, so a second tap mid-motion still feels natural.
- * Mature motion: things settle rather than bounce, except where something is physically pulled.
+ * Mature motion: things settle rather than bounce, except where something is physically pressed or stamped.
  */
 object Motion {
     fun <T> soft() = spring<T>(dampingRatio = 0.82f, stiffness = Spring.StiffnessMediumLow)
@@ -80,9 +84,11 @@ object Motion {
     fun <T> bouncy() = spring<T>(dampingRatio = 0.55f, stiffness = Spring.StiffnessLow)
     /** Slow and calm, for entrances and large surfaces. */
     fun <T> gentle() = spring<T>(dampingRatio = 0.9f, stiffness = 140f)
+    /** A rubber stamp landing: fast, firm, one small rebound. */
+    fun <T> stamp() = spring<T>(dampingRatio = 0.5f, stiffness = 900f)
 
     /** Gap between items in a staggered entrance. */
-    const val STAGGER_MS = 55L
+    const val STAGGER_MS = 60L
 }
 
 /** Scales down slightly while pressed, springing back on release. */
@@ -90,35 +96,48 @@ object Motion {
 fun Modifier.pressable(interaction: MutableInteractionSource): Modifier {
     val pressed by interaction.collectIsPressedAsState()
     val reduced = Ruvo.reducedMotion
-    val scale by animateFloatAsState(if (pressed && !reduced) 0.975f else 1f, Motion.snappy(), label = "press")
+    val scale by animateFloatAsState(if (pressed && !reduced) 0.98f else 1f, Motion.snappy(), label = "press")
     return this.graphicsLayer { scaleX = scale; scaleY = scale }
 }
 
 /**
- * Staggered entrance: the element rises 18 dp and fades in, a beat after the one before it.
+ * A hard, offset shadow in one flat colour, like a misregistered print. Draw it before clipping.
+ */
+fun Modifier.hardShadow(shape: Shape, offset: Dp, color: Color): Modifier = drawBehind {
+    val o = offset.toPx()
+    if (o <= 0f) return@drawBehind
+    translate(o, o) { drawOutline(shape.createOutline(size, layoutDirection, this), color) }
+}
+
+/**
+ * Ink-wipe entrance: the element is uncovered left to right like a pen stroke, a beat after the one before it.
  * Runs once when the element first appears. Reduced motion shows it immediately.
  */
 fun Modifier.reveal(index: Int = 0): Modifier = composed {
     val reduced = Ruvo.reducedMotion
     val progress = remember { Animatable(if (reduced) 1f else 0f) }
-    val rise = with(LocalDensity.current) { 18.dp.toPx() }
+    val shift = with(LocalDensity.current) { 10.dp.toPx() }
     LaunchedEffect(Unit) {
         if (reduced) return@LaunchedEffect
         delay(index.coerceIn(0, 12) * Motion.STAGGER_MS)
         launch { progress.animateTo(1f, Motion.gentle()) }
     }
-    graphicsLayer {
-        val p = progress.value
-        alpha = p.coerceIn(0f, 1f)
-        translationY = (1f - p) * rise
-        val s = 0.985f + 0.015f * p
-        scaleX = s; scaleY = s
-    }
+    this
+        .graphicsLayer {
+            val p = progress.value
+            alpha = (p * 1.6f).coerceIn(0f, 1f)
+            translationX = (1f - p) * -shift
+        }
+        .drawWithContent {
+            val p = progress.value.coerceIn(0f, 1f)
+            if (p >= 0.999f) drawContent()
+            else clipRect(right = size.width * (0.15f + 0.85f * p) + 1f) { this@drawWithContent.drawContent() }
+        }
 }
 
 /**
- * Ruvo's card. By default it is frosted glass over the glowing canvas with a light top edge.
- * Pass [color] or [brush] for a filled card; pass `border = null` for no edge.
+ * Ruvo's card: flat paper on paper with a ruled edge. Pass [color] or [brush] for a printed panel, `border = null`
+ * for no edge, and [elevated] to stamp it onto the page with a hard ink shadow.
  */
 @Composable
 fun RuvoCard(
@@ -136,7 +155,7 @@ fun RuvoCard(
     val interaction = remember { MutableInteractionSource() }
     val shape = RoundedCornerShape(Radius.card)
     var m = modifier.pressable(interaction)
-    if (elevated) m = m.shadow(18.dp, shape, ambientColor = c.shadow, spotColor = c.shadow)
+    if (elevated) m = m.hardShadow(shape, Radius.stamp, c.shadow)
     m = m.clip(shape)
     m = when {
         brush != null -> m.background(brush)
@@ -145,8 +164,8 @@ fun RuvoCard(
     }
     when {
         border == null -> {}
-        border == Color.Unspecified && brush == null && color == Color.Unspecified ->
-            m = m.border(BorderStroke(1.dp, Brush.verticalGradient(listOf(c.glassEdge, c.glassEdge.copy(alpha = c.glassEdge.alpha * 0.25f)))), shape)
+        elevated -> m = m.border(BorderStroke(1.5.dp, c.shadow), shape)
+        border == Color.Unspecified && brush == null && color == Color.Unspecified -> m = m.border(BorderStroke(1.dp, c.glassEdge), shape)
         border == Color.Unspecified -> {}
         else -> m = m.border(BorderStroke(1.dp, border), shape)
     }
@@ -156,58 +175,59 @@ fun RuvoCard(
 
 @Composable
 fun Eyebrow(text: String, modifier: Modifier = Modifier, color: Color = Ruvo.colors.inkSoft) {
-    Text(text.uppercase(), modifier, style = Ruvo.type.eyebrow, color = color)
+    Text(text.uppercase(), modifier, style = Ruvo.type.eyebrow, color = color, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
 }
 
+/** A section heading in the serif voice, with a ledger rule running to the edge. */
 @Composable
 fun SectionTitle(text: String, modifier: Modifier = Modifier, action: String? = null, onAction: (() -> Unit)? = null) {
+    val c = Ruvo.colors
     Row(modifier.fillMaxWidth().padding(top = Space.xl, bottom = Space.sm), verticalAlignment = Alignment.CenterVertically) {
-        Text(text, Modifier.weight(1f).semantics { heading() }, style = Ruvo.type.title, color = Ruvo.colors.ink)
+        Text(text, Modifier.semantics { heading() }, style = Ruvo.type.title, color = c.ink)
+        Spacer(Modifier.width(Space.sm))
+        Box(Modifier.weight(1f).height(1.dp).background(c.glassEdge))
         if (action != null && onAction != null) {
             Text(
                 action,
                 Modifier.clip(RoundedCornerShape(Radius.chip)).clickable(role = Role.Button, onClick = onAction)
-                    .heightIn(min = 48.dp).padding(horizontal = Space.sm, vertical = Space.sm),
-                style = Ruvo.type.label, color = Ruvo.colors.inkSoft,
+                    .heightIn(min = 48.dp).padding(start = Space.sm, top = Space.sm, bottom = Space.sm),
+                style = Ruvo.type.label, color = c.inkSoft,
             )
         }
     }
 }
 
-/** The main call to action: an amber pill that glows a little, with navy text. */
+/** The main call to action: a haldi block stamped onto the page with a hard ink shadow. */
 @Composable
 fun PrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, icon: ImageVector? = null, enabled: Boolean = true) {
     val c = Ruvo.colors
-    if (enabled) {
-        PillButton(text, onClick, modifier, background = Color.Transparent, brush = c.amberBrush, content = c.onAccent, icon = icon, glow = c.fuelDeep)
-    } else {
-        PillButton(text, onClick, modifier, background = c.hairline, content = c.inkFaint, icon = icon, enabled = false)
-    }
+    if (enabled) PillButton(text, onClick, modifier, background = c.fuel, content = c.onAccent, border = c.shadow, icon = icon, stamped = true)
+    else PillButton(text, onClick, modifier, background = c.hairline, content = c.inkFaint, icon = icon, enabled = false)
 }
 
-/** A filled pill in a specific accent, for bucket-specific actions. */
+/** A filled block in a specific accent, for bucket-specific actions. */
 @Composable
 fun AccentButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, accent: Color = Ruvo.colors.fuel, icon: ImageVector? = null) {
-    PillButton(text, onClick, modifier, background = accent, content = Ruvo.colors.onAccent, icon = icon)
+    PillButton(text, onClick, modifier, background = accent, content = Ruvo.colors.onAccent, border = Ruvo.colors.shadow, icon = icon, stamped = true)
 }
 
-/** Navy pill (white in Night swim): a strong secondary action. */
+/** Ink block: a strong secondary action. */
 @Composable
 fun InkButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, icon: ImageVector? = null) {
     val c = Ruvo.colors
-    PillButton(text, onClick, modifier, background = c.ink, content = if (c.isDark) c.canvas else c.surface, icon = icon)
+    PillButton(text, onClick, modifier, background = c.ink, content = c.canvas, icon = icon)
 }
 
 @Composable
 fun GhostButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, icon: ImageVector? = null) {
     val c = Ruvo.colors
-    PillButton(text, onClick, modifier, background = Color.Transparent, content = c.ink, border = c.ink.copy(alpha = 0.85f), icon = icon)
+    PillButton(text, onClick, modifier, background = Color.Transparent, content = c.ink, border = c.ink, icon = icon)
 }
 
-/** Outlined pill in any colour, e.g. white on the navy hero. */
+/** Outlined block in any colour, e.g. paper on the ink ticket. */
 @Composable
 fun OutlineButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, color: Color = Ruvo.colors.onHero, icon: ImageVector? = null) {
-    PillButton(text, onClick, modifier, background = Color.Transparent, content = color, border = color.copy(alpha = 0.7f), icon = icon)
+    PillButton(text, onClick, modifier, background = Color.Transparent, content = color, border = color.copy(alpha = 0.8f), icon = icon)
 }
 
 @Composable
@@ -220,17 +240,19 @@ private fun PillButton(
     border: Color? = null,
     icon: ImageVector? = null,
     enabled: Boolean = true,
-    brush: Brush? = null,
-    glow: Color? = null,
+    stamped: Boolean = false,
 ) {
+    val c = Ruvo.colors
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val shape = RoundedCornerShape(Radius.chip)
-    val lift by animateDpAsState(if (pressed) 3.dp else 12.dp, Motion.snappy(), label = "lift")
-    var m = modifier.pressable(interaction).heightIn(min = 56.dp)
-    if (glow != null) m = m.shadow(lift, shape, ambientColor = glow, spotColor = glow)
+    // Stamped buttons sit on a hard shadow; pressing pushes the button down onto it.
+    val depth by animateDpAsState(if (stamped && !pressed) Radius.stamp else 0.dp, Motion.stamp(), label = "depth")
+    val push = if (stamped) Radius.stamp - depth else 0.dp
+    var m = modifier.padding(end = if (stamped) Radius.stamp else 0.dp, bottom = if (stamped) Radius.stamp else 0.dp)
+        .offset(x = push, y = push).heightIn(min = 54.dp)
+    if (stamped) m = m.hardShadow(shape, depth, c.shadow)
     m = m.clip(shape).background(background)
-    if (brush != null) m = m.background(brush)
     if (border != null) m = m.border(1.5.dp, border, shape)
     Row(
         m.clickable(interaction, indication = null, enabled = enabled, role = Role.Button, onClick = onClick)
@@ -246,81 +268,70 @@ private fun PillButton(
     }
 }
 
-/** Selectable chip used for categories, cadence, amounts. Selected is navy in Daybreak, amber in Night swim. */
+/** Selectable chip for categories, cadence and amounts. Selected chips are printed in ink. */
 @Composable
 fun Chip(text: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier, accent: Color = Ruvo.colors.ink) {
     val c = Ruvo.colors
     val shape = RoundedCornerShape(Radius.chip)
-    val fill = when {
-        !selected -> c.glass
-        accent == c.ink -> if (c.isDark) c.fuel else c.ink
-        else -> accent
-    }
-    val text_ = when {
+    val fill = if (selected) accent else c.surface
+    val ink = when {
         !selected -> c.ink
-        accent == c.ink && !c.isDark -> c.surface
+        accent == c.ink -> c.canvas
         else -> c.onAccent
     }
     Box(
         modifier.heightIn(min = 48.dp).clip(shape)
             .background(fill)
-            .border(1.dp, if (selected) fill else c.hairline, shape)
+            .border(1.dp, if (selected) accent else c.glassEdge, shape)
             .clickable(role = Role.RadioButton, onClick = onClick)
             .padding(horizontal = Space.md, vertical = Space.sm),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text, style = Ruvo.type.label, color = text_)
+        Text(text, style = Ruvo.type.label, color = ink)
     }
 }
 
-/** Small rounded label, e.g. "Sample", "On track". */
+/** Small printed label, e.g. "Sample", "On track". */
 @Composable
 fun Tag(text: String, modifier: Modifier = Modifier, color: Color = Ruvo.colors.ink.copy(alpha = 0.08f), content: Color = Ruvo.colors.ink) {
     Text(
         text,
-        modifier.clip(RoundedCornerShape(Radius.chip)).background(color).padding(horizontal = 10.dp, vertical = 4.dp),
+        modifier.clip(RoundedCornerShape(2.dp)).background(color).padding(horizontal = 8.dp, vertical = 3.dp),
         style = Ruvo.type.eyebrow, color = content,
     )
 }
 
-/** Round icon button with a 48 dp target. */
+/** Square icon button with a 48 dp target. */
 @Composable
-fun IconCircle(icon: ImageVector, description: String, onClick: () -> Unit, modifier: Modifier = Modifier, tint: Color = Ruvo.colors.ink, background: Color = Ruvo.colors.glass) {
+fun IconCircle(icon: ImageVector, description: String, onClick: () -> Unit, modifier: Modifier = Modifier, tint: Color = Ruvo.colors.ink, background: Color = Ruvo.colors.surface) {
+    val shape = RoundedCornerShape(Radius.card)
     Box(
-        modifier.size(48.dp).clip(CircleShape).background(background).border(1.dp, Ruvo.colors.glassEdge, CircleShape)
+        modifier.size(48.dp).clip(shape).background(background).border(1.dp, Ruvo.colors.glassEdge, shape)
             .clickable(role = Role.Button, onClickLabel = description, onClick = onClick)
             .semantics { contentDescription = description },
         contentAlignment = Alignment.Center,
     ) { Icon(icon, null, Modifier.size(22.dp), tint = tint) }
 }
 
-/**
- * A pill segmented control. The amber pill slides between options on a spring.
- */
+/** Ledger tabs: an ink-ruled box with an ink block that slides under the chosen option. */
 @Composable
 fun SegmentedControl(options: List<String>, selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
     val c = Ruvo.colors
     val shape = RoundedCornerShape(Radius.chip)
-    BoxWithConstraints(
-        modifier.fillMaxWidth().clip(shape).background(c.ink.copy(alpha = if (c.isDark) 0.1f else 0.07f)).padding(4.dp),
-    ) {
+    BoxWithConstraints(modifier.fillMaxWidth().clip(shape).border(1.5.dp, c.ink, shape).padding(3.dp)) {
         val w = maxWidth / options.size
         val x by animateDpAsState(w * selected, Motion.snappy(), label = "seg")
-        Box(
-            Modifier.offset(x = x).width(w).height(48.dp)
-                .shadow(8.dp, shape, ambientColor = c.fuelDeep, spotColor = c.fuelDeep)
-                .clip(shape).background(c.amberBrush),
-        )
+        Box(Modifier.offset(x = x).width(w).height(46.dp).clip(RoundedCornerShape(2.dp)).background(c.ink))
         Row(Modifier.fillMaxWidth()) {
             options.forEachIndexed { i, label ->
                 val on = i == selected
                 Box(
-                    Modifier.width(w).height(48.dp).clip(shape)
+                    Modifier.width(w).height(46.dp)
                         .semantics { this.selected = on }
                         .clickable(role = Role.Tab, onClickLabel = "Show $label") { onSelect(i) },
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(label, style = Ruvo.type.bodyStrong, color = if (on) c.onAccent else c.inkSoft, maxLines = 1)
+                    Text(label, style = Ruvo.type.label, color = if (on) c.canvas else c.inkSoft, maxLines = 1)
                 }
             }
         }
@@ -328,8 +339,8 @@ fun SegmentedControl(options: List<String>, selected: Int, onSelect: (Int) -> Un
 }
 
 /**
- * Digits that roll to their new value instead of swapping. Each digit sits in its own slot so
- * the number never jitters sideways, whatever the font's figures do.
+ * Digits that roll to their new value instead of swapping, like a departure board. Each digit sits in its own slot
+ * so the number never jitters sideways.
  */
 @Composable
 fun RollingNumber(
@@ -368,24 +379,25 @@ fun Amount(paise: Paise, modifier: Modifier = Modifier, style: TextStyle = Ruvo.
 }
 
 /**
- * The three bucket cards share one layout and one height. Each is filled with its bucket's colour and still
- * carries its name and icon, so colour is never the only cue.
+ * A ledger column for one bucket. All three share one layout and height: a printed colour band, a small icon
+ * block, the name and the amount set in the serif. Colour is never the only cue.
  */
 @Composable
 fun BucketCard(bucket: Bucket, amount: Paise, caption: String, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
     val c = Ruvo.colors
-    RuvoCard(
-        modifier.height(156.dp), brush = c.bucketBrush(bucket), border = null, elevated = !c.isDark,
-        onClick = onClick, onClickLabel = "Open ${bucketName(bucket)}", padding = PaddingValues(14.dp),
-    ) {
-        Box(Modifier.size(34.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.55f)), contentAlignment = Alignment.Center) {
-            Icon(RuvoIcons.forBucket(bucket), null, Modifier.size(19.dp), tint = c.onAccent)
+    val accent = c.bucket(bucket)
+    RuvoCard(modifier.height(148.dp), onClick = onClick, onClickLabel = "Open ${bucketName(bucket)}", padding = PaddingValues(0.dp)) {
+        Box(Modifier.fillMaxWidth().height(6.dp).background(accent))
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 12.dp)) {
+            Box(Modifier.size(30.dp).clip(RoundedCornerShape(Radius.inner)).background(accent), contentAlignment = Alignment.Center) {
+                Icon(RuvoIcons.forBucket(bucket), null, Modifier.size(18.dp), tint = c.onAccent)
+            }
+            Spacer(Modifier.height(Space.md))
+            Eyebrow(bucketName(bucket), color = c.bucketInk(bucket))
+            Spacer(Modifier.height(2.dp))
+            Amount(amount, style = Ruvo.type.title.copy(fontFeatureSettings = "lnum, tnum"))
+            Text(caption, style = Ruvo.type.caption, color = c.inkFaint, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        Spacer(Modifier.weight(1f))
-        Eyebrow(bucketName(bucket), color = c.onAccent.copy(alpha = 0.75f))
-        Spacer(Modifier.height(2.dp))
-        Amount(amount, style = Ruvo.type.amount, color = c.onAccent)
-        Text(caption, style = Ruvo.type.caption, color = c.onAccent.copy(alpha = 0.72f), maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -401,7 +413,7 @@ fun bucketMeaning(b: Bucket) = when (b) {
     Bucket.FUTURE -> "Protected for goals"
 }
 
-/** A row in a list: leading icon tile, two lines of text, trailing content. 64 dp tall. */
+/** A ledger row: leading tile, two lines of text, trailing content, a rule underneath. 64 dp tall. */
 @Composable
 fun ListRow(
     title: String,
@@ -411,104 +423,115 @@ fun ListRow(
     onClick: (() -> Unit)? = null,
     trailing: @Composable RowScope.() -> Unit = {},
 ) {
+    val c = Ruvo.colors
     var m = modifier.fillMaxWidth().heightIn(min = 64.dp)
-    if (onClick != null) m = m.clip(RoundedCornerShape(Radius.inner)).clickable(role = Role.Button, onClick = onClick)
-    Row(m.padding(vertical = Space.xs), verticalAlignment = Alignment.CenterVertically) {
-        leading()
-        Spacer(Modifier.width(Space.sm))
-        Column(Modifier.weight(1f)) {
-            Text(title, style = Ruvo.type.bodyStrong, color = Ruvo.colors.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(subtitle, style = Ruvo.type.caption, color = Ruvo.colors.inkFaint, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    if (onClick != null) m = m.clickable(role = Role.Button, onClick = onClick)
+    Column(m) {
+        Row(Modifier.fillMaxWidth().padding(vertical = Space.xs), verticalAlignment = Alignment.CenterVertically) {
+            leading()
+            Spacer(Modifier.width(Space.sm))
+            Column(Modifier.weight(1f)) {
+                Text(title, style = Ruvo.type.bodyStrong, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(subtitle, style = Ruvo.type.caption, color = c.inkFaint, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            Spacer(Modifier.width(Space.xs))
+            trailing()
         }
-        Spacer(Modifier.width(Space.xs))
-        trailing()
+        Box(Modifier.fillMaxWidth().padding(start = 56.dp).height(1.dp).background(c.hairline))
     }
 }
 
-/** Letter tile for merchants: first letter on a soft accent square. */
+/** Letter tile for merchants: the first letter, in the serif, on a tinted square. */
 @Composable
 fun MerchantTile(name: String, accent: Color, size: Dp = 44.dp) {
     val c = Ruvo.colors
-    Box(Modifier.size(size).clip(RoundedCornerShape(14.dp)).background(accent.copy(alpha = if (c.isDark) 0.22f else 0.2f)), contentAlignment = Alignment.Center) {
-        Text(name.firstOrNull { it.isLetterOrDigit() }?.uppercase() ?: "·", style = Ruvo.type.bodyStrong, color = if (c.isDark) accent else c.ink)
+    Box(Modifier.size(size).clip(RoundedCornerShape(Radius.inner)).background(accent.copy(alpha = if (c.isDark) 0.24f else 0.28f)), contentAlignment = Alignment.Center) {
+        Text(name.firstOrNull { it.isLetterOrDigit() }?.uppercase() ?: "·", style = Ruvo.type.title, color = c.ink)
     }
 }
 
-/** A rounded progress bar with an animated fill. */
+/** A flat progress bar with an animated fill. */
 @Composable
-fun FillBar(progress: Float, accent: Color, modifier: Modifier = Modifier, height: Dp = 10.dp, track: Color = Color.Unspecified) {
+fun FillBar(progress: Float, accent: Color, modifier: Modifier = Modifier, height: Dp = 8.dp, track: Color = Color.Unspecified) {
     val reduced = Ruvo.reducedMotion
     val c = Ruvo.colors
     val p by animateFloatAsState(progress.coerceIn(0f, 1f), if (reduced) spring(stiffness = Spring.StiffnessHigh) else Motion.gentle(), label = "fill")
-    val trackColor = if (track != Color.Unspecified) track else c.ink.copy(alpha = if (c.isDark) 0.14f else 0.08f)
-    Box(modifier.fillMaxWidth().height(height).clip(RoundedCornerShape(Radius.chip)).background(trackColor)) {
-        Box(Modifier.fillMaxWidth(p).height(height).clip(RoundedCornerShape(Radius.chip)).background(accent))
+    val trackColor = if (track != Color.Unspecified) track else c.ink.copy(alpha = if (c.isDark) 0.14f else 0.09f)
+    val shape = RoundedCornerShape(2.dp)
+    Box(modifier.fillMaxWidth().height(height).clip(shape).background(trackColor)) {
+        Box(Modifier.fillMaxWidth(p).height(height).clip(shape).background(accent))
     }
 }
 
 /** One segment of a [SplitBar]. */
 data class Segment(val fraction: Float, val color: Color)
 
-/** A single bar split into coloured segments that grow into place. */
+/** A single bar split into printed segments that slide into place. */
 @Composable
-fun SplitBar(segments: List<Segment>, modifier: Modifier = Modifier, height: Dp = 16.dp) {
+fun SplitBar(segments: List<Segment>, modifier: Modifier = Modifier, height: Dp = 14.dp) {
     val c = Ruvo.colors
     val reduced = Ruvo.reducedMotion
     val total = segments.sumOf { it.fraction.toDouble() }.toFloat().coerceAtLeast(1f)
     Row(
-        modifier.fillMaxWidth().height(height).clip(RoundedCornerShape(Radius.chip)).background(c.ink.copy(alpha = if (c.isDark) 0.14f else 0.08f)),
-        horizontalArrangement = Arrangement.spacedBy(3.dp),
+        modifier.fillMaxWidth().height(height).clip(RoundedCornerShape(2.dp)).background(c.ink.copy(alpha = if (c.isDark) 0.14f else 0.09f)),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         segments.filter { it.fraction > 0f }.forEachIndexed { i, s ->
             val grown = remember { Animatable(if (reduced) 1f else 0f) }
             LaunchedEffect(Unit) { delay(i * 90L); grown.animateTo(1f, Motion.gentle()) }
-            Box(Modifier.weight((s.fraction / total * grown.value).coerceAtLeast(0.0001f)).fillMaxHeight().clip(RoundedCornerShape(Radius.chip)).background(s.color))
+            Box(Modifier.weight((s.fraction / total * grown.value).coerceAtLeast(0.0001f)).fillMaxHeight().background(s.color))
         }
         val rest = 1f - segments.sumOf { it.fraction.toDouble() }.toFloat() / total
         if (rest > 0.001f) Spacer(Modifier.weight(rest))
     }
 }
 
-/** One pill in a [PillBars] chart. */
+/** One bar in a [PillBars] chart. */
 data class Pill(val label: String, val value: Float, val highlight: Boolean = false, val spoken: String = "")
 
 /**
- * Rounded pills that grow from the bottom one after another. The tallest is the biggest value.
- * Used for daily spending and month-by-month comparisons.
+ * Square-shouldered bars that rise from a baseline one after another, over a ruled baseline.
+ * The tallest is the biggest value. Used for daily spending and month-by-month comparisons.
  */
 @Composable
 fun PillBars(pills: List<Pill>, modifier: Modifier = Modifier, height: Dp = 120.dp, color: Color = Ruvo.colors.fuel, highlightColor: Color = Ruvo.colors.ink) {
     val c = Ruvo.colors
     val reduced = Ruvo.reducedMotion
     val max = pills.maxOfOrNull { it.value }?.coerceAtLeast(1f) ?: 1f
-    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.Bottom) {
-        pills.forEachIndexed { i, pill ->
-            val grow = remember { Animatable(if (reduced) 1f else 0f) }
-            LaunchedEffect(pill.value) { delay(i * 45L); grow.animateTo(1f, Motion.soft()) }
-            Column(
-                Modifier.weight(1f).semantics { contentDescription = pill.spoken.ifEmpty { "${pill.label}: ${pill.value.toInt()}" } },
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Box(Modifier.fillMaxWidth().height(height), contentAlignment = Alignment.BottomCenter) {
-                    Box(Modifier.fillMaxSize().clip(RoundedCornerShape(Radius.chip)).background(c.ink.copy(alpha = if (c.isDark) 0.08f else 0.05f)))
-                    val f = (pill.value / max).coerceIn(0.06f, 1f) * grow.value
+    Column(modifier.fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.Bottom) {
+            pills.forEachIndexed { i, pill ->
+                val grow = remember { Animatable(if (reduced) 1f else 0f) }
+                LaunchedEffect(pill.value) { delay(i * 45L); grow.animateTo(1f, Motion.soft()) }
+                Box(
+                    Modifier.weight(1f).height(height).semantics { contentDescription = pill.spoken.ifEmpty { "${pill.label}: ${pill.value.toInt()}" } },
+                    contentAlignment = Alignment.BottomCenter,
+                ) {
+                    val f = (pill.value / max).coerceIn(0.04f, 1f) * grow.value
                     Box(
-                        Modifier.fillMaxWidth().fillMaxHeight(f.coerceAtLeast(0.001f)).clip(RoundedCornerShape(Radius.chip))
+                        Modifier.fillMaxWidth().fillMaxHeight(f.coerceAtLeast(0.001f)).clip(RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp))
                             .background(if (pill.highlight) highlightColor else color),
                     )
                 }
-                Spacer(Modifier.height(6.dp))
-                Text(pill.label, style = Ruvo.type.caption, color = if (pill.highlight) c.ink else c.inkFaint, maxLines = 1)
+            }
+        }
+        Box(Modifier.fillMaxWidth().height(1.5.dp).background(c.ink))
+        if (pills.any { it.label.isNotEmpty() }) {
+            Spacer(Modifier.height(6.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                pills.forEach { pill ->
+                    Text(pill.label, Modifier.weight(1f), style = Ruvo.type.caption, color = if (pill.highlight) c.ink else c.inkFaint, maxLines = 1, textAlign = TextAlign.Center)
+                }
             }
         }
     }
 }
 
-/** Dot plus label, for chart legends. */
+/** Square swatch plus label, for chart legends. */
 @Composable
 fun LegendDot(color: Color, label: String, modifier: Modifier = Modifier) {
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(9.dp).clip(CircleShape).background(color))
+        Box(Modifier.size(10.dp).background(color))
         Spacer(Modifier.width(6.dp))
         Text(label, style = Ruvo.type.caption, color = Ruvo.colors.inkSoft)
     }

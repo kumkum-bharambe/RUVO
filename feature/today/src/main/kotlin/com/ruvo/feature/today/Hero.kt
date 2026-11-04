@@ -1,12 +1,7 @@
 package com.ruvo.feature.today
 
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -23,41 +18,54 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.PathOperation
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.ruvo.design.Eyebrow
+import com.ruvo.design.Haptics
 import com.ruvo.design.Motion
 import com.ruvo.design.Radius
 import com.ruvo.design.RollingNumber
 import com.ruvo.design.Ruvo
 import com.ruvo.design.RuvoIcons
 import com.ruvo.design.Space
+import com.ruvo.design.hardShadow
 import com.ruvo.engine.DayStrip
 import com.ruvo.engine.IndianFormat
 import com.ruvo.engine.Insights
 import com.ruvo.engine.RunwayResult
-import kotlin.math.PI
-import kotlin.math.sin
+import kotlinx.coroutines.delay
 
 /** "Next money in 19 days · 4 days spare", or the honest alternative. */
 fun runwaySubline(r: RunwayResult): String {
@@ -75,113 +83,167 @@ fun runwaySpoken(r: RunwayResult): String =
     if (r.unlimited) "Runway: no end at current spending." else "Runway ${IndianFormat.days(r.runwayDays)}. ${runwaySubline(r).replace("·", ".")}"
 
 /**
- * The hero: a deep navy card with the runway number set huge and tight in white. Its lower part is a slow
- * amber liquid whose level follows how comfortable the buffer is; it ripples faster and turns coral when money
- * is tight. A warm glow sits in the top corner, and a mood tag reads the month in three words.
+ * A ticket: small cut corners and two half-circle notches where the stub tears off, [stubHeight] from the bottom.
+ */
+class TicketShape(private val stubHeight: Dp, private val notch: Dp = 11.dp, private val corner: Dp = Radius.card) : Shape {
+    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
+        val r = with(density) { notch.toPx() }
+        val cr = with(density) { corner.toPx() }
+        val y = size.height - with(density) { stubHeight.toPx() }
+        val body = Path().apply { addRoundRect(RoundRect(0f, 0f, size.width, size.height, cr, cr)) }
+        val holes = Path().apply {
+            addOval(Rect(Offset(0f, y), r))
+            addOval(Rect(Offset(size.width, y), r))
+        }
+        return Outline.Generic(Path.combine(PathOperation.Difference, body, holes))
+    }
+}
+
+private val STUB = 64.dp
+
+/**
+ * The hero is a runway ticket. Printed in ink (paper in Night swim), it carries the runway number huge in the
+ * serif, a serial number, and a stub with the next money. A rubber stamp, "MAKES IT +4" or "3 DAYS SHORT", lands
+ * on it a moment after it appears, with a firm haptic.
  */
 @Composable
 fun RunwayHero(r: RunwayResult, onWhy: () -> Unit, modifier: Modifier = Modifier) {
     val c = Ruvo.colors
     val reduced = Ruvo.reducedMotion
-    val buffer = r.bufferDays
-    val next = r.daysToNextIncome
-    val tight = !r.makesIt || (buffer != null && buffer < 3)
-    val health = when {
-        r.unlimited -> 0.9f
-        next == null -> (r.runwayDays / 30f).coerceIn(0.15f, 0.9f)
-        next == 0 -> 0.8f
-        else -> (r.runwayDays.toFloat() / next).coerceIn(0.12f, 1.2f) * 0.65f
-    }
-    val level by animateFloatAsState(health, Motion.gentle(), label = "level")
-    val wave = rememberInfiniteTransition(label = "wave")
-    val phase by wave.animateFloat(
-        0f, (2 * PI).toFloat(),
-        infiniteRepeatable(tween(if (tight) 2600 else 5200, easing = LinearEasing), RepeatMode.Restart), label = "phase",
-    )
-    val glow by wave.animateFloat(0.75f, 1f, infiniteRepeatable(tween(3200), RepeatMode.Reverse), label = "glow")
-    val liquid = if (tight) c.warning else c.fuel
-    val shape = RoundedCornerShape(Radius.card + 6.dp)
+    val view = LocalView.current
+    val shape = TicketShape(STUB)
     val mood = Insights.mood(r)
+    val short = !r.makesIt
+    val stampInk = when {
+        short -> c.warning
+        (r.bufferDays ?: 99) < 3 -> c.fuelDeep
+        else -> c.futureDeep
+    }
+    val stampText = when {
+        r.unlimited -> "NO END\nIN SIGHT"
+        r.daysToNextIncome == null -> "${r.runwayDays} DAYS\nAT YOUR PACE"
+        short -> "${-(r.bufferDays ?: 0)} DAYS\nSHORT"
+        else -> "MAKES IT\n+${r.spareDays} DAYS"
+    }
+
+    // The stamp lands: big and faint, then firmly down at a slight angle.
+    val land = remember(stampText) { Animatable(if (reduced) 1f else 0f) }
+    LaunchedEffect(stampText) {
+        if (reduced) return@LaunchedEffect
+        delay(520)
+        land.animateTo(1f, Motion.stamp())
+        Haptics.medium(view)
+    }
 
     Box(
         modifier.fillMaxWidth()
-            .shadow(24.dp, shape, ambientColor = c.heroBottom, spotColor = c.heroBottom)
+            .hardShadow(shape, 6.dp, c.fuel)
             .clip(shape).background(c.heroBrush)
             .clickable(role = Role.Button, onClickLabel = "Why this many days", onClick = onWhy)
             .semantics { contentDescription = runwaySpoken(r) + ". " + mood.title },
     ) {
-        Canvas(Modifier.matchParentSize()) {
-            // Warm light in the top-right corner, breathing slowly.
-            val g = if (reduced) 0.85f else glow
-            drawRect(Brush.radialGradient(listOf(liquid.copy(alpha = 0.42f * g), Color.Transparent), Offset(size.width * 0.95f, 0f), size.width * 0.75f))
-            val top = size.height * (1f - level.coerceIn(0f, 1f) * 0.42f)
-            val amp = if (reduced) 0f else size.height * (if (tight) 0.035f else 0.02f)
-            fun surface(offset: Float, alpha: Float) {
-                val p = Path().apply {
-                    moveTo(0f, size.height)
-                    var x = 0f
-                    while (x <= size.width) {
-                        val y = top + amp * sin((x / size.width) * 2f * PI.toFloat() * 1.3f + phase + offset)
-                        lineTo(x, y); x += 6f
-                    }
-                    lineTo(size.width, size.height); close()
+        Column(Modifier.fillMaxWidth().clearAndSetSemantics { }) {
+            Column(Modifier.fillMaxWidth().padding(start = Space.xl, end = Space.xl, top = Space.lg, bottom = Space.md)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Eyebrow("Ruvo · Runway pass", color = c.onHero.copy(alpha = 0.6f))
+                    Spacer(Modifier.weight(1f))
+                    Text("No. ${r.runwayDays.toString().padStart(4, '0')}", style = Ruvo.type.caption, color = c.onHero.copy(alpha = 0.55f))
                 }
-                drawPath(p, Brush.verticalGradient(listOf(liquid.copy(alpha = alpha), liquid.copy(alpha = alpha * 0.3f)), startY = top, endY = size.height))
-            }
-            surface(1.4f, 0.22f)
-            surface(0f, 0.36f)
-        }
-        Column(Modifier.fillMaxWidth().padding(Space.xl).clearAndSetSemantics { }) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Eyebrow("Runway", color = c.onHero.copy(alpha = 0.7f))
-                Spacer(Modifier.weight(1f))
+                Spacer(Modifier.height(Space.xs))
+                Box(Modifier.fillMaxWidth()) {
+                    val heroStyle = if (r.runwayDays >= 100) Ruvo.type.hero.copy(fontSize = Ruvo.type.hero.fontSize * 0.76f) else Ruvo.type.hero
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        if (r.unlimited) Text("∞", style = heroStyle, color = c.onHero)
+                        else RollingNumber(r.runwayDays, heroStyle, c.onHero)
+                        Spacer(Modifier.width(Space.xs))
+                        Text(
+                            if (r.runwayDays == 1) "day" else "days", Modifier.padding(bottom = 18.dp),
+                            style = Ruvo.type.display.copy(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic), color = c.onHero,
+                            maxLines = 1, softWrap = false,
+                        )
+                    }
+                    Stamp(
+                        stampText, stampInk,
+                        Modifier.align(Alignment.TopEnd).padding(top = 6.dp).graphicsLayer {
+                            val p = land.value
+                            alpha = p.coerceIn(0f, 1f)
+                            val s = 1f + (1f - p) * 1.2f
+                            scaleX = s; scaleY = s
+                            rotationZ = -11f + (1f - p) * -10f
+                        },
+                    )
+                }
+                Text(
+                    "${IndianFormat.rupees(r.fuel.coerceAtLeast(0))} of Fuel at about ${IndianFormat.rupees(r.dailySpend)} a day",
+                    style = Ruvo.type.label, color = c.onHero.copy(alpha = 0.75f),
+                )
+                Spacer(Modifier.height(Space.sm))
                 Row(
-                    Modifier.clip(RoundedCornerShape(Radius.chip)).background(c.onHero.copy(alpha = 0.14f))
-                        .padding(horizontal = Space.sm, vertical = 6.dp),
+                    Modifier.clip(RoundedCornerShape(Radius.chip)).border(1.dp, c.onHero.copy(alpha = 0.35f), RoundedCornerShape(Radius.chip))
+                        .padding(horizontal = 10.dp, vertical = 5.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("Why ${if (r.unlimited) "no end" else IndianFormat.days(r.runwayDays)}?", style = Ruvo.type.label, color = c.onHero, maxLines = 1)
-                    Icon(RuvoIcons.Forward, null, Modifier.padding(start = 2.dp).width(14.dp), tint = c.onHero)
+                    Box(Modifier.size(7.dp).background(stampInk))
+                    Spacer(Modifier.width(6.dp))
+                    Text(mood.title, style = Ruvo.type.caption, color = c.onHero, maxLines = 1)
+                    Icon(RuvoIcons.Forward, null, Modifier.padding(start = 2.dp).size(12.dp), tint = c.onHero)
                 }
             }
-            Spacer(Modifier.height(Space.xs))
-            // Three-digit runways step the number down so "days" always fits on the same line.
-            val heroStyle = if (r.runwayDays >= 100) Ruvo.type.hero.copy(fontSize = Ruvo.type.hero.fontSize * 0.78f) else Ruvo.type.hero
-            Row(verticalAlignment = Alignment.Bottom) {
-                if (r.unlimited) {
-                    Text("∞", style = heroStyle, color = c.onHero)
-                } else {
-                    RollingNumber(r.runwayDays, heroStyle, c.onHero)
-                }
-                Spacer(Modifier.width(Space.xs))
-                Text(
-                    if (r.runwayDays == 1) "day" else "days", Modifier.padding(bottom = 16.dp),
-                    style = Ruvo.type.display, color = c.onHero, maxLines = 1, softWrap = false,
+            // Perforation where the stub tears off.
+            Canvas(Modifier.fillMaxWidth().height(1.dp).padding(horizontal = 16.dp)) {
+                drawLine(
+                    c.onHero.copy(alpha = 0.35f), Offset(0f, 0f), Offset(size.width, 0f), strokeWidth = 1.5.dp.toPx(),
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(7f, 7f)),
                 )
             }
-            Text(runwaySubline(r), style = Ruvo.type.bodyStrong, color = if (r.makesIt) c.onHero else c.sun)
-            Spacer(Modifier.height(Space.xxs))
-            Text("${IndianFormat.rupees(r.fuel.coerceAtLeast(0))} of Fuel at about ${IndianFormat.rupees(r.dailySpend)} a day", style = Ruvo.type.caption, color = c.onHero.copy(alpha = 0.7f))
-            Spacer(Modifier.height(Space.md))
             Row(
-                Modifier.clip(RoundedCornerShape(Radius.chip)).background(c.onHero.copy(alpha = 0.12f)).padding(horizontal = Space.sm, vertical = 6.dp),
+                Modifier.fillMaxWidth().height(STUB).padding(horizontal = Space.xl),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                val dot = when (mood.level) {
-                    Insights.MoodLevel.COMFORTABLE -> c.future
-                    Insights.MoodLevel.WATCH -> c.fuel
-                    Insights.MoodLevel.PLAN -> c.warning
+                Column(Modifier.weight(1f)) {
+                    val next = r.daysToNextIncome
+                    Eyebrow(
+                        when {
+                            next == null -> "Income"
+                            else -> "Next money" + (r.nextIncomeDate?.let { " · ${IndianFormat.date(it, r.today)}" } ?: "")
+                        },
+                        color = c.onHero.copy(alpha = 0.55f),
+                        modifier = Modifier.semantics { },
+                    )
+                    Text(
+                        when {
+                            r.unlimited -> "No end at this pace"
+                            r.incomeOverdue -> "Late"
+                            next == null -> "No fixed date"
+                            else -> "In ${IndianFormat.days(next)}"
+                        },
+                        style = Ruvo.type.bodyStrong, color = c.onHero, maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    )
                 }
-                Box(Modifier.size(8.dp).clip(CircleShape).background(dot))
-                Spacer(Modifier.width(6.dp))
-                Text(mood.title, style = Ruvo.type.label, color = c.onHero)
+                Text("Why?", style = Ruvo.type.label, color = c.onHero.copy(alpha = 0.7f))
+                Icon(RuvoIcons.Forward, null, Modifier.padding(start = 2.dp).size(14.dp), tint = c.onHero.copy(alpha = 0.7f))
             }
         }
     }
 }
+
+/** A rubber stamp: double-ruled box, two lines of spaced capitals, ink slightly uneven. */
+@Composable
+private fun Stamp(text: String, ink: Color, modifier: Modifier) {
+    Box(
+        modifier.border(2.dp, ink.copy(alpha = 0.9f), RoundedCornerShape(3.dp)).padding(3.dp)
+            .border(1.dp, ink.copy(alpha = 0.6f), RoundedCornerShape(2.dp)).padding(horizontal = 10.dp, vertical = 6.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text, style = Ruvo.type.eyebrow.copy(fontSize = Ruvo.type.eyebrow.fontSize * 1.15f, lineHeight = Ruvo.type.eyebrow.lineHeight * 1.2f), color = ink, textAlign = TextAlign.Center)
+    }
+}
+
 /**
- * The day strip: one liquid-filled pill per day to the next money. Covered days are full, the day money runs
- * out is part-filled, days after it are empty and outlined, and the income day glows.
+ * The day strip: one punched square per day to the next money. Covered days are printed in haldi, the day money runs
+ * out is part-filled, days after it are hatched in sindoor, and the income day carries a star. A fade at the edge
+ * says there is more.
  */
 @Composable
 fun DayStripRow(r: RunwayResult, modifier: Modifier = Modifier) {
@@ -192,13 +254,19 @@ fun DayStripRow(r: RunwayResult, modifier: Modifier = Modifier) {
         r.unlimited -> "Every day is covered"
         r.daysToNextIncome == null -> runsOut?.let { "At this pace your Fuel lasts until ${IndianFormat.date(it, r.today)}" } ?: ""
         r.makesIt -> "Every day to your next money is covered"
-        else -> runsOut?.let { "Fuel runs out around ${IndianFormat.date(it, r.today)}" } ?: ""
+        else -> runsOut?.let { "Fuel runs out around ${IndianFormat.date(it, r.today)} · swipe to see the gap" } ?: ""
     }
     Column(modifier.semantics { contentDescription = caption }) {
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp), contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = Space.gutter)) {
-            itemsIndexed(days, key = { _, d -> d.date.toEpochDay() }) { i, d ->
-                DayPill(d, DayStrip.fill(r, i))
+        Box {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(5.dp), contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = Space.gutter)) {
+                itemsIndexed(days, key = { _, d -> d.date.toEpochDay() }) { i, d ->
+                    DayPill(d, DayStrip.fill(r, i))
+                }
             }
+            Box(
+                Modifier.align(Alignment.CenterEnd).width(40.dp).height(88.dp)
+                    .background(Brush.horizontalGradient(listOf(c.canvas.copy(alpha = 0f), c.canvas))),
+            )
         }
         Text(caption, Modifier.padding(horizontal = Space.gutter, vertical = Space.xs), style = Ruvo.type.caption, color = c.inkSoft)
     }
@@ -210,46 +278,49 @@ private fun DayPill(d: DayStrip.Day, fill: Float) {
     val target = if (d.state == DayStrip.State.INCOME) 1f else fill
     val animated by animateFloatAsState(target, Motion.soft(), label = "fill")
     val accent = when (d.state) {
-        DayStrip.State.INCOME -> c.sun
+        DayStrip.State.INCOME -> c.future
         DayStrip.State.SHORT -> c.warning
         else -> c.fuel
     }
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clearAndSetSemantics { }) {
         Text(d.date.dayOfWeek.name.take(1), style = Ruvo.type.caption, color = if (d.isToday) c.ink else c.inkFaint)
         Spacer(Modifier.height(4.dp))
-        Canvas(Modifier.width(30.dp).height(72.dp)) {
-            val r = size.width / 2
-            val shapePath = Path().apply {
-                addRoundRect(androidx.compose.ui.geometry.RoundRect(0f, 0f, size.width, size.height, r, r))
-            }
-            drawPath(shapePath, c.hairline.copy(alpha = if (c.isDark) 0.6f else 0.9f))
+        Canvas(Modifier.width(28.dp).height(52.dp)) {
+            val corner = 3.dp.toPx()
+            val box = Path().apply { addRoundRect(RoundRect(0f, 0f, size.width, size.height, corner, corner)) }
+            drawPath(box, c.ink.copy(alpha = if (c.isDark) 0.1f else 0.06f))
             val h = size.height * animated
             if (h > 0f) {
-                clipPath(shapePath) {
-                    drawRect(
-                        Brush.verticalGradient(listOf(accent.copy(alpha = 0.75f), accent), startY = size.height - h, endY = size.height),
-                        topLeft = Offset(0f, size.height - h),
-                    )
+                clipPath(box) {
+                    drawRect(accent, topLeft = Offset(0f, size.height - h))
                 }
             }
             if (d.state == DayStrip.State.SHORT) {
-                drawPath(shapePath, accent.copy(alpha = 0.7f), style = Stroke(width = 2.dp.toPx()))
+                // Hatching: the days Fuel does not cover.
+                clipPath(box) {
+                    var x = -size.height
+                    while (x < size.width) {
+                        drawLine(accent.copy(alpha = 0.55f), Offset(x, size.height), Offset(x + size.height, 0f), strokeWidth = 1.5.dp.toPx())
+                        x += 6.dp.toPx()
+                    }
+                }
+                drawPath(box, accent.copy(alpha = 0.7f), style = Stroke(width = 1.5.dp.toPx()))
             }
-            if (d.isToday) {
-                drawPath(shapePath, c.ink, style = Stroke(width = 2.dp.toPx()))
-            }
+            if (d.isToday) drawPath(box, c.ink, style = Stroke(width = 2.dp.toPx()))
             if (d.state == DayStrip.State.INCOME) {
-                drawCircle(Color.White.copy(alpha = 0.85f), radius = r * 0.32f, center = Offset(size.width / 2, size.height * 0.3f))
+                // A four-point star on the income day.
+                val cx = size.width / 2; val cy = size.height * 0.38f; val s = size.width * 0.28f
+                val star = Path().apply {
+                    moveTo(cx, cy - s); quadraticTo(cx, cy, cx + s, cy); quadraticTo(cx, cy, cx, cy + s)
+                    quadraticTo(cx, cy, cx - s, cy); quadraticTo(cx, cy, cx, cy - s); close()
+                }
+                drawPath(star, Color.White.copy(alpha = 0.9f))
             }
         }
         Spacer(Modifier.height(4.dp))
         Text(
             d.date.dayOfMonth.toString(), style = Ruvo.type.caption, textAlign = TextAlign.Center,
-            color = when {
-                d.state == DayStrip.State.INCOME -> c.ink
-                d.isToday -> c.ink
-                else -> c.inkFaint
-            },
+            color = if (d.isToday || d.state == DayStrip.State.INCOME) c.ink else c.inkFaint,
         )
     }
 }

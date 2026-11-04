@@ -326,7 +326,7 @@ private fun Header(state: AppState, a: TodayActions) {
             Text("$hello, ${state.displayName}", style = Ruvo.type.headline, color = c.ink)
             if (state.isDemo) {
                 Text(
-                    "Sample student · tap to switch",
+                    "Sample student · switch",
                     Modifier.padding(top = 4.dp).clip(RoundedCornerShape(Radius.chip))
                         .background(c.fixed.copy(alpha = 0.14f))
                         .clickable(role = Role.Button, onClick = a.openPersonas)

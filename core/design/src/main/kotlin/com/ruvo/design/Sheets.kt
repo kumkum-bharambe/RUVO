@@ -55,7 +55,7 @@ fun RuvoSheet(
         scrimColor = c.scrim,
         shape = RoundedCornerShape(topStart = Radius.sheet, topEnd = Radius.sheet),
         dragHandle = {
-            Box(Modifier.padding(top = Space.sm).size(width = 40.dp, height = 5.dp).clip(RoundedCornerShape(Radius.chip)).background(c.hairline))
+            Box(Modifier.padding(top = Space.sm).size(width = 36.dp, height = 4.dp).background(c.ink.copy(alpha = 0.3f)))
         },
     ) {
         val scroll = rememberScrollState()

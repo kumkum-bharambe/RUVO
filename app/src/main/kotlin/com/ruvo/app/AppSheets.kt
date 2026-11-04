@@ -149,10 +149,10 @@ fun SettingsSheet(state: AppState, onDismiss: () -> Unit, onPersonas: () -> Unit
         Eyebrow("Mood")
         Spacer(Modifier.height(Space.xs))
         Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
-            MoodCard("Daybreak", "Soft light, amber dawn glow", Daybreak, s.theme == ThemeChoice.DAYBREAK.name, Modifier.weight(1f)) {
+            MoodCard("Daybreak", "Warm paper, ink and haldi", Daybreak, s.theme == ThemeChoice.DAYBREAK.name, Modifier.weight(1f)) {
                 scope.launch { repo.setTheme(ThemeChoice.DAYBREAK.name) }
             }
-            MoodCard("Night swim", "Deep navy, glowing liquid", NightSwim, s.theme == ThemeChoice.NIGHT_SWIM.name, Modifier.weight(1f)) {
+            MoodCard("Night swim", "Ink-blue night, paper ticket", NightSwim, s.theme == ThemeChoice.NIGHT_SWIM.name, Modifier.weight(1f)) {
                 scope.launch { repo.setTheme(ThemeChoice.NIGHT_SWIM.name) }
             }
         }
@@ -171,7 +171,7 @@ fun SettingsSheet(state: AppState, onDismiss: () -> Unit, onPersonas: () -> Unit
             Text("Showing sample student ${state.persona?.name}. None of it is real.", style = Ruvo.type.body, color = c.inkSoft)
             Spacer(Modifier.height(Space.xs))
             Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
-                GhostButton("Switch student", onPersonas, Modifier.weight(1f))
+                GhostButton("Switch", onPersonas, Modifier.weight(1f))
                 PrimaryButton("Use my own", { scope.launch { repo.deleteEverything() } }, Modifier.weight(1f))
             }
         } else {

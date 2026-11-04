@@ -21,9 +21,9 @@ Everything is organised around one number: **Runway**, in days.
 | Platform | Android only, Kotlin + Jetpack Compose, min SDK 26, no backend, no login |
 | Navigation | Four tabs (Today, Money, Goals, Guide) on a custom floating dock with a sliding amber pill; not a stock Material bar. Guide added 3 Nov 2026 at Kumkum's request |
 | Companion | The **Ruvo Orb**: a liquid sphere, no face. Fill = Fuel; ripples faster when money is tight; glows when a goal completes. Poke, drag, tilt. Tap = talk to Ruvo, pull down = quick-add. Replaces mascot, AI button and capture button |
-| Visual | Navy and amber, refined from the HTML prototype's final look (3 Nov 2026). Daybreak: soft cool canvas with drifting amber and lavender glows, navy ink, frosted glass cards. Night swim: deep navy. Buckets: Fuel amber, Future sky blue, Fixed lavender; filled gradient bucket cards of equal height, each with name and icon so colour is never the only cue. Navy hero cards, amber glowing pill buttons. Custom icons, no emoji. Indian number grouping (₹1,25,000), dates like "3 Nov" |
-| Motion | Mature and calm: springs that settle (`Motion.gentle/soft/snappy`), staggered `reveal()` entrances, drifting `AmbientBackdrop`, 3D page turns in the Guide reader. Every infinite loop uses an infinite transition or `withInfiniteAnimationFrameNanos` so UI tests can go idle. Reduced motion stills everything |
-| Typeface | Outfit (variable weight), like the HTML prototype. Outfit has no ₹, so on Android 10+ each weight falls back to Anek Latin for ₹ only (`Type.kt`). Both downloaded at build time by `core/design` |
+| Visual | "Ticket & Ledger" (4 Nov 2026, see `docs/DESIGN_REVIEW.md`): Indian print culture. Daybreak: warm paper with fine grain, ink type, ruled lines. Night swim: ink-blue night with paper type; the runway ticket turns to paper. Buckets: Fuel haldi (turmeric), Future peacock, Fixed neel (indigo); sindoor only for shortfalls and the stamp. Crisp 4-6 dp corners; only the Orb and avatars are round. Hero is a perforated runway ticket with a serial number, stub and rubber stamp. Ledger bucket columns of equal height, each with name and icon so colour is never the only cue. Flat ledger dock on the bottom edge. Custom icons, no emoji. Indian number grouping (₹1,25,000), dates like "3 Nov" |
+| Motion | Mature, physical: ink-wipe `reveal()` entrances, stamp-press buttons on a hard offset shadow (`hardShadow`, `Motion.stamp`), the runway stamp landing with a haptic, rolling digits, 3D page turns in the Guide reader. Springs only. The page itself is still. Every infinite loop uses an infinite transition or `withInfiniteAnimationFrameNanos` so UI tests can go idle. Reduced motion stills everything |
+| Typeface | Fraunces (variable serif with optical sizes) for numbers and headlines; Space Grotesk for the interface, with tabular figures. Both include ₹ natively. Downloaded at build time by `core/design` |
 | Voice | Written persona: mature, warm, insightful Indian woman's voice in English. Optional spoken replies via the phone's Indian English TTS |
 | AI | Scripted offline answers by default so the demo never fails. Optional live Claude API with the user's own key, sending only a summary (totals, runway), never raw transactions |
 | Data | On the phone only, encrypted (Room + SQLCipher). SMS read on-device; only known bank sender IDs; raw text never uploaded |
@@ -95,8 +95,8 @@ SmokeTest passes on the OnePlus. Fixes needed: a build-script import, six cross-
 now compiles and the app runs, but each milestone still needs its own on-device check and Kumkum's review.
 **Redesign (3 Nov 2026):** navy and amber design system, Outfit, Guide tab, and the HTML prototype's missing
 features (weekly review, insights, plan card, coming up, Money overview and history, goal insights, settings extras).
-Unit tests: `core/engine` 71, `core/sms` 11. Not yet checked on the phone: take screenshots of every screen in both
-themes and rerun the SmokeTest before Kumkum's review. Update this table as milestones pass.
+Unit tests: `core/engine` 71, `core/sms` 11. Checked on the phone in both themes; SmokeTest passes. Second redesign "Ticket & Ledger" (4 Nov 2026) replaced
+navy and amber, Outfit and glass with paper and ink, Fraunces and Space Grotesk, crisp corners and the runway ticket. Update this table as milestones pass.
 
 ### Decisions made while writing the code (tell Kumkum if any need changing)
 

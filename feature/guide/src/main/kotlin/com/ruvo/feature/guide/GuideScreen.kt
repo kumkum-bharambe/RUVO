@@ -152,7 +152,7 @@ private fun SlowSpark() {
     val reduced = Ruvo.reducedMotion
     val t = rememberInfiniteTransition(label = "spark")
     val r by t.animateFloat(0f, 360f, infiniteRepeatable(tween(24_000, easing = LinearEasing), RepeatMode.Restart), label = "r")
-    Box(Modifier.size(56.dp).clip(CircleShape).background(c.fuel.copy(alpha = 0.18f)), contentAlignment = Alignment.Center) {
+    Box(Modifier.size(56.dp).clip(RoundedCornerShape(Radius.card)).border(1.5.dp, c.fuel, RoundedCornerShape(Radius.card)), contentAlignment = Alignment.Center) {
         Icon(RuvoIcons.Spark, null, Modifier.size(30.dp).graphicsLayer { rotationZ = if (reduced) 0f else r }, tint = c.fuel)
     }
 }
@@ -160,15 +160,8 @@ private fun SlowSpark() {
 @Composable
 private fun NewThisWeek(book: Library.Book, read: Boolean, modifier: Modifier, onOpen: () -> Unit) {
     val c = Ruvo.colors
-    val reduced = Ruvo.reducedMotion
-    val t = rememberInfiniteTransition(label = "glow")
-    val breathe by t.animateFloat(10f, 26f, infiniteRepeatable(tween(2_600), RepeatMode.Reverse), label = "b")
-    val shape = RoundedCornerShape(Radius.card)
-    Box(
-        modifier.fillMaxWidth()
-            .shadow(if (reduced) 16.dp else breathe.dp, shape, ambientColor = c.fuelDeep, spotColor = c.fuelDeep),
-    ) {
-        RuvoCard(Modifier.fillMaxWidth(), brush = c.amberBrush, border = null, onClick = onOpen, onClickLabel = "Read ${book.title}", padding = PaddingValues(Space.md)) {
+    Box(modifier.fillMaxWidth()) {
+        RuvoCard(Modifier.fillMaxWidth(), brush = c.amberBrush, elevated = true, onClick = onOpen, onClickLabel = "Read ${book.title}", padding = PaddingValues(Space.md)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 BookCover(book, read, width = 64.dp, showLabel = false, modifier = Modifier.graphicsLayer { rotationZ = -5f })
                 Spacer(Modifier.width(Space.md))

@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.ruvo.design.Covers
 import com.ruvo.design.Ruvo
+import com.ruvo.design.hardShadow
 import com.ruvo.design.pressable
 import com.ruvo.engine.guide.Library
 
@@ -57,10 +58,10 @@ fun BookCover(
     val (bg, shape, accent) = Covers.palettes[h % Covers.palettes.size]
     val motif = (h / 7) % 6
     val height = width * 1.42f
-    val corners = RoundedCornerShape(topStart = 6.dp, bottomStart = 6.dp, topEnd = 18.dp, bottomEnd = 18.dp)
+    val corners = RoundedCornerShape(topStart = 2.dp, bottomStart = 2.dp, topEnd = 6.dp, bottomEnd = 6.dp)
     val interaction = remember { MutableInteractionSource() }
     var m = modifier.size(width, height).pressable(interaction)
-        .shadow(14.dp, corners, ambientColor = Ruvo.colors.shadow, spotColor = Ruvo.colors.shadow)
+        .hardShadow(corners, 4.dp, Ruvo.colors.ink.copy(alpha = 0.85f))
         .clip(corners)
     if (onClick != null) {
         m = m.clickable(interaction, indication = null, role = Role.Button, onClickLabel = "Open ${book.title}", onClick = onClick)
@@ -75,13 +76,13 @@ fun BookCover(
         }
         if (width >= 100.dp) Text(
             if (read) "Read" else "${book.pages.size} pages",
-            Modifier.align(Alignment.TopEnd).padding(8.dp).clip(RoundedCornerShape(99.dp)).background(Covers.labelInk).padding(horizontal = 8.dp, vertical = 3.dp),
+            Modifier.align(Alignment.TopEnd).padding(8.dp).clip(RoundedCornerShape(2.dp)).background(Covers.labelInk).padding(horizontal = 8.dp, vertical = 3.dp),
             style = Ruvo.type.eyebrow, color = Covers.label,
         )
         if (showLabel) {
             Column(
                 Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(start = 12.dp, end = 8.dp, bottom = 8.dp)
-                    .clip(RoundedCornerShape(12.dp)).background(Covers.label).padding(horizontal = 10.dp, vertical = 8.dp),
+                    .clip(RoundedCornerShape(2.dp)).background(Covers.label).padding(horizontal = 10.dp, vertical = 8.dp),
             ) {
                 Text(book.title, style = Ruvo.type.label, color = Covers.labelInk, maxLines = 3, overflow = TextOverflow.Ellipsis)
                 Text(if (read) "Finished" else "${book.minutes} min read", style = Ruvo.type.caption, color = Covers.labelInk.copy(alpha = 0.6f))
