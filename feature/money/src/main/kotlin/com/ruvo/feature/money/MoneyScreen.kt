@@ -134,7 +134,7 @@ fun MoneyScreen(openTxn: (String) -> Unit, openAdd: () -> Unit = {}) {
         item { BalanceCard(state, Modifier.padding(horizontal = Space.gutter).reveal(0)) { balanceSheet = true } }
         item {
             SegmentedControl(
-                MoneyTab.entries.map { if (it == MoneyTab.OWED && state.owedToYou > 0) "Owed · ${IndianFormat.compact(state.owedToYou)}" else it.label },
+                MoneyTab.entries.map { it.label },
                 tab.ordinal, { tab = MoneyTab.entries[it] },
                 Modifier.padding(horizontal = Space.gutter, vertical = Space.md).reveal(1),
             )
@@ -317,7 +317,7 @@ private fun WhereItWent(state: AppState, modifier: Modifier, onCategory: (String
     val cats = remember(state.input.transactions, state.today) { Insights.byCategory(state.input.transactions, state.today, 30) }
     if (cats.isEmpty()) return
     val top = cats.first().second.toFloat().coerceAtLeast(1f)
-    val palette = listOf(c.fuel, c.future, c.fixed, c.heroTop, c.sun, c.inkFaint)
+    val palette = listOf(c.fuel, c.future, c.fixed, c.ink.copy(alpha = 0.55f), c.sun, c.inkFaint)
     RuvoCard(Modifier.padding(horizontal = Space.gutter).fillMaxWidth().then(modifier)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -398,10 +398,8 @@ private fun History(state: AppState, onEdit: (java.time.YearMonth) -> Unit, onVi
                     sel.month.month.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.ENGLISH) + " " + sel.month.year,
                     Modifier.weight(1f), style = Ruvo.type.title, color = c.ink,
                 )
-                Text(
-                    (if (sel.leftOver >= 0) "Left " else "Over by ") + IndianFormat.rupees(kotlin.math.abs(sel.leftOver)),
-                    style = Ruvo.type.caption, color = if (sel.leftOver < 0) c.warning else c.inkSoft,
-                )
+                // The left-over figure is in the row below, so the header only flags an overspend.
+                if (sel.leftOver < 0) Text("Over by " + IndianFormat.rupees(-sel.leftOver), style = Ruvo.type.caption, color = c.warning)
             }
             Spacer(Modifier.height(Space.xs))
             Row {
@@ -604,9 +602,9 @@ private fun Owed(state: AppState) {
             return@Column
         }
         RuvoCard(brush = c.bucketBrush(Bucket.FUTURE), border = null) {
-            Eyebrow("Owed to you", color = c.ink)
-            Amount(state.owedToYou, style = Ruvo.type.display)
-            Text("Ruvo never moves money. Friends pay you with a UPI link.", style = Ruvo.type.caption, color = c.inkSoft)
+            Eyebrow("Owed to you", color = c.onAccent.copy(alpha = 0.75f))
+            Amount(state.owedToYou, style = Ruvo.type.display, color = c.onAccent)
+            Text("Ruvo never moves money. Friends pay you with a UPI link.", style = Ruvo.type.caption, color = c.onAccent.copy(alpha = 0.75f))
         }
         SectionTitle("Waiting")
         state.owed.forEach { o ->

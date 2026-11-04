@@ -195,7 +195,9 @@ fun TodayContent(state: AppState, a: TodayActions) {
         }
         // An occasional perk card: one a day, rotating, with its saving in days.
         item {
-            val perk = Perks.all[(state.today.dayOfYear) % Perks.all.size]
+            // Only listings that are current and recently checked; never one that has ended or gone stale.
+            val current = Perks.listed(state.today).filter { Perks.status(it, state.today).state.let { s -> s == Perks.State.ACTIVE || s == Perks.State.ENDING } }
+            val perk = current.getOrNull(state.today.dayOfYear % current.size.coerceAtLeast(1)) ?: return@item
             val days = Perks.daysSaved(perk, r.dailySpend)
             if (days > 0) {
                 RuvoCard(Modifier.padding(horizontal = Space.gutter).padding(top = Space.sm).reveal(11), brush = c.bucketBrush(Bucket.FIXED), border = null, onClick = a.openGuide, onClickLabel = "See the marketplace") {
@@ -314,14 +316,25 @@ private fun DailySpendingCard(state: AppState, modifier: Modifier) {
 
 @Composable
 private fun ReviewTile(title: String, sub: String, icon: androidx.compose.ui.graphics.vector.ImageVector, modifier: Modifier, open: () -> Unit) {
+    ActionRow(title, sub, icon, modifier, open)
+}
+
+/** The one shape every "open something" row on Home uses: a quiet icon, a title and line, and an arrow. */
+@Composable
+private fun ActionRow(title: String, sub: String, icon: androidx.compose.ui.graphics.vector.ImageVector, modifier: Modifier, open: () -> Unit) {
     val c = Ruvo.colors
-    RuvoCard(modifier, onClick = open, onClickLabel = "Open $title", padding = PaddingValues(Space.md)) {
-        Box(Modifier.size(36.dp).clip(CircleShape).background(c.future.copy(alpha = 0.2f)), contentAlignment = Alignment.Center) {
-            Icon(icon, null, Modifier.size(20.dp), tint = c.futureInk)
+    RuvoCard(modifier, onClick = open, onClickLabel = "Open $title") {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(40.dp).clip(CircleShape).background(c.ink.copy(alpha = if (c.isDark) 0.1f else 0.06f)), contentAlignment = Alignment.Center) {
+                Icon(icon, null, Modifier.size(20.dp), tint = c.ink)
+            }
+            Spacer(Modifier.width(Space.sm))
+            Column(Modifier.weight(1f)) {
+                Text(title, style = Ruvo.type.bodyStrong, color = c.ink)
+                Text(sub, style = Ruvo.type.caption, color = c.inkSoft)
+            }
+            Icon(RuvoIcons.Forward, null, Modifier.size(18.dp), tint = c.inkSoft)
         }
-        Spacer(Modifier.height(Space.sm))
-        Text(title, style = Ruvo.type.bodyStrong, color = c.ink)
-        Text(sub, style = Ruvo.type.caption, color = c.inkFaint)
     }
 }
 @Composable
@@ -380,19 +393,7 @@ private fun SortCard(count: Int, open: () -> Unit, modifier: Modifier = Modifier
 @Composable
 private fun BuyCard(open: () -> Unit, modifier: Modifier = Modifier) {
     val c = Ruvo.colors
-    RuvoCard(Modifier.padding(horizontal = Space.gutter).padding(top = Space.sm).then(modifier), onClick = open, onClickLabel = "Open Before you buy") {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(36.dp).clip(CircleShape).background(c.warning.copy(alpha = 0.16f)), contentAlignment = Alignment.Center) {
-                Icon(RuvoIcons.Cart, null, Modifier.size(20.dp), tint = c.warning)
-            }
-            Spacer(Modifier.width(Space.sm))
-            Column(Modifier.weight(1f)) {
-                Text("Before you buy", style = Ruvo.type.bodyStrong, color = c.ink)
-                Text("Type a price, see what it costs in days", style = Ruvo.type.caption, color = c.inkSoft)
-            }
-            Icon(RuvoIcons.Forward, null, tint = c.inkSoft)
-        }
-    }
+    ActionRow("Before you buy", "Type a price, see what it costs in days", RuvoIcons.Cart, Modifier.padding(horizontal = Space.gutter).padding(top = Space.sm).then(modifier), open)
 }
 
 @Composable

@@ -113,8 +113,9 @@ fun RunwayHero(r: RunwayResult, onWhy: () -> Unit, modifier: Modifier = Modifier
     ) {
         Canvas(Modifier.matchParentSize()) {
             val g = if (reduced) 0.9f else glow
-            drawRect(Brush.radialGradient(listOf(c.fuel.copy(alpha = 0.5f * g), Color.Transparent), Offset(size.width, 0f), size.width * 0.95f))
-            drawRect(Brush.radialGradient(listOf(c.fixed.copy(alpha = 0.38f), Color.Transparent), Offset(0f, size.height), size.width * 0.85f))
+            // On black a strong amber glow turns muddy, so Night swim keeps it faint and lets the violet lead.
+            drawRect(Brush.radialGradient(listOf(c.fuel.copy(alpha = (if (c.isDark) 0.14f else 0.5f) * g), Color.Transparent), Offset(size.width, 0f), size.width * 0.95f))
+            drawRect(Brush.radialGradient(listOf(c.fixed.copy(alpha = if (c.isDark) 0.3f else 0.38f), Color.Transparent), Offset(0f, size.height), size.width * 0.85f))
             if (!reduced) {
                 val x = size.width * sheen
                 drawRect(Brush.linearGradient(listOf(Color.Transparent, Color.White.copy(alpha = if (c.isDark) 0.06f else 0.22f), Color.Transparent), Offset(x - size.width * 0.3f, 0f), Offset(x + size.width * 0.3f, size.height)))

@@ -191,7 +191,7 @@ fun SignInScreen(settings: UserSettings) {
         }
     }
 
-    val first = settings.accountName.substringBefore(' ').ifBlank { "there" }
+    val first = settings.accountName.trim().substringBefore(' ').replaceFirstChar { it.uppercase() }.ifBlank { "there" }
     AuthFrame(onBack = null) {
         Title("Welcome back, $first", "+91 ${Mobile.masked(settings.accountPhone)}")
         Spacer(Modifier.height(Space.xl))

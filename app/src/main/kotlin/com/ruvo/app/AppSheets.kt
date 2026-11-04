@@ -204,7 +204,7 @@ fun SettingsSheet(state: AppState, onDismiss: () -> Unit, onPersonas: () -> Unit
         }
         scanned?.let { Text("Found $it new payments in the last 90 days. They are waiting in your weekly sort.", style = Ruvo.type.caption, color = c.fuel) }
         Toggle("Demo SMS", "Accept test messages from any sender, for emulator demos", s.demoSms) { on -> scope.launch { repo.setDemoSms(on) } }
-        Toggle("Spoken replies", "Ruvo reads answers aloud in Indian English", s.spokenReplies) { on -> scope.launch { repo.setSpokenReplies(on) } }
+        Toggle("Spoken replies", "Ruvo reads answers aloud in your chat language", s.spokenReplies) { on -> scope.launch { repo.setSpokenReplies(on) } }
 
         SectionTitle("Notifications")
         Text("Calm and occasional. Each one can be switched off.", style = Ruvo.type.caption, color = c.inkSoft)
@@ -213,7 +213,7 @@ fun SettingsSheet(state: AppState, onDismiss: () -> Unit, onPersonas: () -> Unit
         Toggle("Goal moments", "When a goal is reached or falls behind", s.notifyGoals) { on -> scope.launch { repo.setNotifications(goals = on) } }
 
         SectionTitle("Money view")
-        Toggle("Hide my balance", "Shows •••• on Money until you tap to reveal", s.hideBalance) { on -> scope.launch { repo.setHideBalance(on) } }
+        Toggle("Hide my balance", "Shows •••• on Money instead of the amount", s.hideBalance) { on -> scope.launch { repo.setHideBalance(on) } }
 
         SectionTitle("Splits")
         RuvoField(vpa, { vpa = it }, "Your UPI ID, for payment links")
@@ -222,7 +222,7 @@ fun SettingsSheet(state: AppState, onDismiss: () -> Unit, onPersonas: () -> Unit
 
         SectionTitle("Privacy")
         Text(
-            "Everything stays on this phone, in an encrypted database. Ruvo has no account, no ads and no analytics. " +
+            "Everything stays on this phone, in an encrypted database. Your account and PIN live here too; there is no server, no ads and no analytics. " +
                 "SMS are read here and never uploaded. Live answers, if you add your own key, send only totals and your runway, " +
                 "never transactions or messages. Ruvo explains your own numbers; it does not give investment, tax or legal advice.",
             style = Ruvo.type.body, color = c.inkSoft,

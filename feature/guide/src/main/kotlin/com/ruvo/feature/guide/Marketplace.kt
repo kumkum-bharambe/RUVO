@@ -65,7 +65,7 @@ fun MarketplaceSheet(onDismiss: () -> Unit) {
     var open by rememberSaveable { mutableStateOf<String?>(null) }
     val listed = Perks.listed(today)
     val shown = listed.filter { kind == "All" || it.kind == kind }
-    val live = listed.filter { Perks.status(it, today).state != Perks.State.EXPIRED }
+    val live = listed.filter { Perks.status(it, today).state.let { s -> s == Perks.State.ACTIVE || s == Perks.State.ENDING } }
     val monthDays = live.sumOf { Perks.daysSaved(it, daily) }
 
     RuvoSheet("Marketplace", onDismiss, eyebrow = "Student savings and opportunities") {

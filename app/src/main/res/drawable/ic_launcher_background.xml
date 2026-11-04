@@ -1,8 +1,8 @@
-<!-- Night blue warming to violet, as on the in-app tile. -->
+<!-- White fading to a faint lavender, as on the in-app tile. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android" xmlns:aapt="http://schemas.android.com/aapt" android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
     <path android:pathData="M0,0h108v108h-108z">
         <aapt:attr name="android:fillColor">
-            <gradient android:type="linear" android:startX="0" android:startY="0" android:endX="108" android:endY="108" android:startColor="#2E2680" android:endColor="#141B4D"/>
+            <gradient android:type="linear" android:startX="0" android:startY="0" android:endX="108" android:endY="108" android:startColor="#FFFFFF" android:endColor="#ECE6FF"/>
         </aapt:attr>
     </path>
 </vector>

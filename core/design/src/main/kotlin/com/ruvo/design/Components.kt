@@ -384,7 +384,7 @@ fun SegmentedControl(options: List<String>, selected: Int, onSelect: (Int) -> Un
                         .clickable(role = Role.Tab, onClickLabel = "Show $label") { onSelect(i) },
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(label, style = Ruvo.type.bodyStrong, color = if (on) c.onAccent else c.inkSoft, maxLines = 1)
+                    Text(label, style = Ruvo.type.label.copy(fontWeight = androidx.compose.ui.text.font.FontWeight(600)), color = if (on) c.onAccent else c.inkSoft, maxLines = 1, softWrap = false)
                 }
             }
         }
@@ -654,7 +654,8 @@ fun PillBars(
             val fill = when {
                 onSelect == null -> if (pill.highlight) highlightColor else color
                 chosen -> color
-                else -> color.copy(alpha = 0.4f)
+                // Only the chosen day carries colour; the rest stay a quiet grey so they never look muddy.
+                else -> c.ink.copy(alpha = if (c.isDark) 0.2f else 0.14f)
             }
             val press by animateFloatAsState(if (chosen) 1f else 0.97f, Motion.snappy(), label = "pill$i")
             var col = Modifier.weight(1f).semantics(mergeDescendants = true) { contentDescription = pill.spoken.ifEmpty { "${pill.label}: ${pill.value.toInt()}" } }

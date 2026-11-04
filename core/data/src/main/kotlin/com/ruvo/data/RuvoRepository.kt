@@ -65,7 +65,8 @@ data class AppState(
 ) {
     val owedToYou: Paise get() = owed.sumOf { it.amount }
     val isDemo: Boolean get() = settings.demoPersona != null
-    val displayName: String get() = persona?.name ?: settings.name.ifBlank { "there" }
+    /** The name to greet with, capitalised however it was typed ("kumkum" shows as "Kumkum"). */
+    val displayName: String get() = persona?.name ?: settings.name.trim().split(" ").filter { it.isNotEmpty() }.joinToString(" ") { w -> w.replaceFirstChar { it.uppercase() } }.ifBlank { "there" }
 
     companion object {
         fun empty(today: LocalDate): AppState {

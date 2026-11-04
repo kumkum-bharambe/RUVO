@@ -187,12 +187,28 @@ private fun DrawScope.laptop(sky: Sky, s: Float, t: Float) {
         Brush.linearGradient(listOf(Color(0xFF1B2A6B), Color(0xFF4A9BEA)), Offset(left, top), Offset(left + sw, top + sh)),
         Offset(left + inset, top + inset), Size(sw - inset * 2, sh - inset * 2), CornerRadius(s * 0.015f),
     )
-    // Three rising bars on the screen: Ruvo's own mark.
-    val bw = sw * 0.07f
-    listOf(0.35f to Color.White, 0.55f to Color(0xFFFDB913), 0.8f to Color(0xFF8CC8FF)).forEachIndexed { i, (frac, col) ->
-        val bh = sh * 0.5f * frac
-        drawRoundRect(col, Offset(cx - bw * 2f + i * bw * 1.5f, top + sh * 0.75f - bh), Size(bw, bh), CornerRadius(bw / 2))
-    }
+    // Ruvo's own mark on the screen: the R with a rupee inside it, in white and lavender.
+    val m = sh * 0.6f
+    val ox = cx - m * 0.51f
+    val oy = top + (sh - m) / 2f
+    fun q(x: Float, y: Float) = Offset(ox + x / 100f * m, oy + y / 100f * m)
+    val k = m / 100f
+    drawPath(Path().apply {
+        moveTo(q(16f, 14f).x, q(16f, 14f).y); lineTo(q(58f, 14f).x, q(58f, 14f).y)
+        cubicTo(q(72f, 14f).x, q(72f, 14f).y, q(82f, 24f).x, q(82f, 24f).y, q(82f, 36f).x, q(82f, 36f).y)
+        cubicTo(q(82f, 48f).x, q(82f, 48f).y, q(72f, 58f).x, q(72f, 58f).y, q(58f, 58f).x, q(58f, 58f).y)
+        lineTo(q(40f, 58f).x, q(40f, 58f).y); lineTo(q(40f, 46f).x, q(40f, 46f).y); lineTo(q(58f, 46f).x, q(58f, 46f).y)
+        cubicTo(q(64f, 46f).x, q(64f, 46f).y, q(69f, 42f).x, q(69f, 42f).y, q(69f, 36f).x, q(69f, 36f).y)
+        cubicTo(q(69f, 30f).x, q(69f, 30f).y, q(64f, 26f).x, q(64f, 26f).y, q(58f, 26f).x, q(58f, 26f).y)
+        lineTo(q(16f, 26f).x, q(16f, 26f).y); close()
+        moveTo(q(46f, 54f).x, q(46f, 54f).y); lineTo(q(60f, 54f).x, q(60f, 54f).y); lineTo(q(86f, 88f).x, q(86f, 88f).y); lineTo(q(72f, 88f).x, q(72f, 88f).y); close()
+    }, Color.White)
+    val lav = Color(0xFFC9B8FF)
+    drawRect(lav, q(16f, 31f), Size(20 * k, 7 * k))
+    drawRect(lav, q(16f, 43f), Size(20 * k, 7 * k))
+    drawPath(Path().apply {
+        moveTo(q(20f, 54f).x, q(20f, 54f).y); lineTo(q(33f, 54f).x, q(33f, 54f).y); lineTo(q(57f, 88f).x, q(57f, 88f).y); lineTo(q(44f, 88f).x, q(44f, 88f).y); close()
+    }, lav)
     drawPath(Path().apply {
         moveTo(cx - s * 0.4f, desk); lineTo(cx + s * 0.4f, desk); lineTo(cx + s * 0.35f, desk - s * 0.035f); lineTo(cx - s * 0.35f, desk - s * 0.035f); close()
     }, Color(0xFFC9CED8))
