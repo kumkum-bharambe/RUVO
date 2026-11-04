@@ -21,6 +21,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.material3.Icon
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.size
@@ -490,13 +493,24 @@ private fun Buckets(state: AppState) {
                 if (b == Bucket.FIXED) {
                     Spacer(Modifier.height(Space.sm))
                     val scope = rememberCoroutineScope()
+                    // null = closed, "" = adding a new one, otherwise the id being edited.
+                    var editing by remember { mutableStateOf<String?>(null) }
+                    if (state.commitments.isEmpty()) {
+                        Text("Nothing planned yet. Add rent, a phone plan or fees so Ruvo keeps them aside.", style = Ruvo.type.caption, color = c.inkSoft)
+                    }
                     state.commitments.forEach { cm ->
                         val due = r.reservedCommitments.firstOrNull { it.id == cm.id }
-                        Row(Modifier.fillMaxWidth().padding(vertical = Space.xxs), verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            Modifier.fillMaxWidth().heightIn(min = 56.dp).clip(RoundedCornerShape(Radius.inner))
+                                .clickable(role = Role.Button, onClickLabel = "Edit ${cm.name}") { editing = cm.id }
+                                .padding(vertical = Space.xxs),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
                             Column(Modifier.weight(1f)) {
                                 Text(cm.name, style = Ruvo.type.bodyStrong, color = c.ink)
                                 Text(
-                                    if (due != null) "Due ${due.dueDate?.let { IndianFormat.date(it, state.today) }}" else "Paid for this cycle",
+                                    (if (due != null) "Due ${due.dueDate?.let { IndianFormat.date(it, state.today) }}" else "Paid for this cycle") +
+                                        (cm.dueDayOfMonth?.takeIf { cm.recurring }?.let { " · monthly on day $it" } ?: ""),
                                     style = Ruvo.type.caption, color = c.inkFaint,
                                 )
                             }
@@ -505,7 +519,73 @@ private fun Buckets(state: AppState) {
                                 Spacer(Modifier.width(Space.xs))
                                 Chip("Paid", false, { scope.launch { RuvoGraph.repository.payCommitment(cm) } })
                             }
+                            Spacer(Modifier.width(Space.xxs))
+                            Icon(RuvoIcons.Forward, null, Modifier.size(16.dp), tint = c.inkFaint)
                         }
+                    }
+                    Spacer(Modifier.height(Space.xs))
+                    GhostButton("Add a fixed cost", { editing = "" }, Modifier.fillMaxWidth(), icon = RuvoIcons.Plus)
+                    editing?.let { id ->
+                        CommitmentSheet(state.commitments.firstOrNull { it.id == id }, onDismiss = { editing = null })
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Adds or edits one Fixed cost: its name, amount and the day of the month it falls due. Saving is only possible
+ * with a name, an amount above zero and a day from 1 to 31. Removing asks once before it happens.
+ */
+@Composable
+private fun CommitmentSheet(cm: com.ruvo.engine.Commitment?, onDismiss: () -> Unit) {
+    val c = Ruvo.colors
+    val scope = rememberCoroutineScope()
+    val repo = RuvoGraph.repository
+    var name by remember { mutableStateOf(cm?.name ?: "") }
+    var amount by remember { mutableStateOf(cm?.amount?.let { (it / 100).toString() } ?: "") }
+    var day by remember { mutableStateOf((cm?.dueDayOfMonth ?: 1).toString()) }
+    var removing by remember { mutableStateOf(false) }
+    val paise = parseRupees(amount) ?: 0
+    val dueDay = day.toIntOrNull()
+    val monthly = cm == null || cm.recurring
+    val dayOk = !monthly || dueDay in 1..31
+    RuvoSheet(if (cm == null) "Add a fixed cost" else "Edit ${cm.name}", onDismiss, eyebrow = "Fixed") {
+        Text("Ruvo keeps this aside before it counts your runway.", style = Ruvo.type.caption, color = c.inkSoft)
+        Spacer(Modifier.height(Space.sm))
+        RuvoField(name, { name = it }, "Name, like Rent or Phone plan")
+        Spacer(Modifier.height(Space.sm))
+        RuvoField(amount, { amount = it }, "Amount", number = true, prefix = "₹ ")
+        if (monthly) {
+            Spacer(Modifier.height(Space.sm))
+            RuvoField(day, { v -> day = v.filter { it.isDigit() }.take(2) }, "Day of the month it's due", number = true)
+            if (!dayOk) Text("Use a day from 1 to 31.", Modifier.padding(top = Space.xxs), style = Ruvo.type.caption, color = c.warning)
+        }
+        Spacer(Modifier.height(Space.md))
+        PrimaryButton(
+            if (cm == null) "Add" else "Save changes", {
+                scope.launch {
+                    if (cm == null) repo.addCommitment(name.trim(), paise, dueDay ?: 1)
+                    else repo.updateCommitment(cm, name, paise, dueDay)
+                }
+                onDismiss()
+            }, Modifier.fillMaxWidth(), enabled = name.isNotBlank() && paise > 0 && dayOk,
+        )
+        if (cm != null) {
+            Spacer(Modifier.height(Space.sm))
+            if (!removing) {
+                androidx.compose.material3.TextButton({ removing = true }, Modifier.fillMaxWidth()) {
+                    Text("Remove this fixed cost", style = Ruvo.type.label, color = c.warning)
+                }
+            } else {
+                RuvoCard(Modifier.fillMaxWidth(), color = c.warning.copy(alpha = 0.1f), border = c.warning.copy(alpha = 0.5f)) {
+                    Text("Remove ${cm.name}?", style = Ruvo.type.title, color = c.ink)
+                    Text("Ruvo stops keeping ${IndianFormat.rupees(cm.amount)} aside for it, so your Fuel and runway grow.", style = Ruvo.type.body, color = c.inkSoft)
+                    Spacer(Modifier.height(Space.sm))
+                    Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
+                        GhostButton("Keep it", { removing = false }, Modifier.weight(1f))
+                        com.ruvo.design.AccentButton("Remove", { scope.launch { repo.removeCommitment(cm.id) }; onDismiss() }, Modifier.weight(1f), accent = c.warning)
                     }
                 }
             }

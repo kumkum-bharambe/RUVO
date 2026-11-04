@@ -36,6 +36,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -81,7 +82,7 @@ import com.ruvo.feature.today.WeeklyReviewSheet
 import com.ruvo.feature.today.WhySheet
 import kotlinx.coroutines.launch
 
-enum class Tab(val label: String) { TODAY("Today"), MONEY("Money"), GOALS("Goals"), GUIDE("Guide") }
+enum class Tab(val label: String) { TODAY("Home"), MONEY("Money"), GOALS("Goals"), GUIDE("Guide") }
 
 /** Which sheet or overlay is open. Only one at a time, so the screen never stacks dialogs. */
 sealed interface Overlay {
@@ -104,17 +105,25 @@ sealed interface Overlay {
 
 @Composable
 fun RuvoRoot(state: AppState, request: LaunchRequest?, consumed: () -> Unit) {
-    // A calm splash on every cold start: at least a beat long, and until the data is ready.
-    var splashDone by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { kotlinx.coroutines.delay(1100); splashDone = true }
+    // The opening plays on every cold start, until it finishes or is tapped, and until the data is ready.
+    val reduced = Ruvo.reducedMotion
+    var splashDone by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(Unit) { kotlinx.coroutines.delay(if (reduced) 500 else 2_600); splashDone = true }
     val showApp = state.ready && splashDone
+    val unlocked by com.ruvo.data.Session.unlocked.collectAsStateWithLifecycle()
     Box(Modifier.fillMaxSize()) {
         if (showApp) {
-            if (!state.settings.onboarded) OnboardingFlow(onDone = {}) else MainShell(state, request, consumed)
+            // Sign in first, then the first-run setup, then the app.
+            when {
+                !unlocked && !state.settings.hasAccount -> com.ruvo.feature.onboarding.CreateAccountScreen(suggestedName = state.settings.name)
+                !unlocked -> com.ruvo.feature.onboarding.SignInScreen(state.settings)
+                !state.settings.onboarded -> OnboardingFlow(onDone = {})
+                else -> MainShell(state, request, consumed)
+            }
         }
         // The splash sits on top and fades away over the app.
         AnimatedVisibility(!showApp, enter = fadeIn(), exit = fadeOut(Motion.gentle())) {
-            com.ruvo.design.RuvoSplash()
+            com.ruvo.design.RuvoSplash(onSkip = { splashDone = true })
         }
     }
 }

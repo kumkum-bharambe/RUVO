@@ -91,7 +91,7 @@ private fun DrawScope.drawSun(sky: Sky, s: Float, t: Float, complete: Boolean) {
     val c = Offset(size.width * 0.2f, size.height * 0.26f)
     val r = s * 0.1f
     if (sky.night) {
-        drawCircle(Color(0xFFFFF1B8).copy(alpha = 0.18f), r * 2.2f, c)
+        drawCircle(Brush.radialGradient(listOf(Color(0x40FFF1B8), Color(0x00FFF1B8)), c, r * 2.4f), r * 2.4f, c)
         drawCircle(Color(0xFFFFF1B8), r, c)
         drawCircle(sky.top, r * 0.86f, c + Offset(r * 0.45f, -r * 0.3f))
         listOf(0.42f to 0.12f, 0.62f to 0.22f, 0.86f to 0.1f, 0.52f to 0.34f, 0.94f to 0.3f).forEachIndexed { i, (x, y) ->

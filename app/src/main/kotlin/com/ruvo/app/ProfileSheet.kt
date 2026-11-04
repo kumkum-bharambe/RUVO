@@ -72,6 +72,7 @@ fun ProfileSheet(
     val c = Ruvo.colors
     val scope = rememberCoroutineScope()
     var editing by remember { mutableStateOf(false) }
+    var changingPin by remember { mutableStateOf(false) }
     var name by remember { mutableStateOf(state.settings.name) }
     val who = state.persona?.let { "${it.name}, ${it.age} · ${it.livesIn}" }
         ?: when (state.settings.cadence) {
@@ -163,7 +164,18 @@ fun ProfileSheet(
             Shortcut(RuvoIcons.Calendar, "Your week", "Seven days, gently reviewed") { onDismiss(); onWeekly() }
             Shortcut(RuvoIcons.Bookmark, "Saved ideas", if (ideas == 0) "Save ideas while you read" else "$ideas saved from the Guide") { onDismiss(); onGuide() }
             Shortcut(RuvoIcons.User, if (state.isDemo) "Switch sample student" else "Try a sample student", "Five made-up students to explore") { onDismiss(); onPersonas() }
-            Shortcut(RuvoIcons.Shield, "Private by design", "Everything stays on this phone, encrypted", onClick = null)
+            Shortcut(RuvoIcons.Lock, "Change PIN", "The 4-digit PIN you open Ruvo with") { changingPin = true }
+            Shortcut(RuvoIcons.Shield, "Private by design", "Your account and data stay on this phone, encrypted", onClick = null)
+        }
+
+        Spacer(Modifier.height(Space.md))
+        GhostButton("Sign out", { onDismiss(); RuvoGraph.repository.signOut() }, Modifier.fillMaxWidth())
+        if (state.settings.accountPhone.isNotEmpty()) {
+            Text(
+                "Signed in as ${state.settings.accountName} · +91 ${com.ruvo.data.Mobile.masked(state.settings.accountPhone)}",
+                Modifier.fillMaxWidth().padding(top = Space.xs), style = Ruvo.type.caption, color = c.inkFaint,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            )
         }
 
         Spacer(Modifier.height(Space.lg))
@@ -173,6 +185,7 @@ fun ProfileSheet(
             Text("Ruvo 1.0", style = Ruvo.type.caption, color = c.inkFaint)
         }
     }
+    if (changingPin) com.ruvo.feature.onboarding.ChangePinSheet { changingPin = false }
 }
 
 @Composable

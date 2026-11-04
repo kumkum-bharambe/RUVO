@@ -16,6 +16,9 @@ class SmokeTest {
     @get:Rule val rule = createAndroidComposeRule<MainActivity>()
 
     @Test fun sampleStudentShowsRunway() {
+        // The test runs in the app's own process, so it signs in by opening the in-memory session directly.
+        // The phone's saved account and PIN are left as they are.
+        com.ruvo.data.Session.unlock()
         rule.waitUntil(10_000) { rule.onAllNodesWithText("Explore with a sample student").fetchSemanticsNodes().isNotEmpty() || rule.onAllNodes(hasContentDescription("Runway", substring = true)).fetchSemanticsNodes().isNotEmpty() }
         if (rule.onAllNodesWithText("Explore with a sample student").fetchSemanticsNodes().isNotEmpty()) {
             rule.onNodeWithText("Explore with a sample student").performClick()

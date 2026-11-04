@@ -8,6 +8,8 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.runtime.setValue
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -75,6 +77,7 @@ fun GuideScreen(a: GuideActions) {
     val read = state.settings.readBooks
     val total = Library.all.size
     val done = Library.all.count { it.id in read }
+    var readingOpen by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
 
     val scroll = rememberScrollState()
     Column(
@@ -85,7 +88,7 @@ fun GuideScreen(a: GuideActions) {
             Spacer(Modifier.height(Space.xs))
 
             // Hero: what the Guide is, and how far you have read.
-            RuvoCard(Modifier.fillMaxWidth().reveal(1), brush = c.heroBrush, border = null, elevated = true, padding = PaddingValues(Space.xl)) {
+            RuvoCard(Modifier.fillMaxWidth().reveal(1), brush = c.heroBrush, border = null, elevated = true, padding = PaddingValues(Space.lg)) {
                 Row(verticalAlignment = Alignment.Top) {
                     Text(
                         "Understand your money. One small idea at a time.",
@@ -96,19 +99,33 @@ fun GuideScreen(a: GuideActions) {
                     GuideMark()
                 }
                 Spacer(Modifier.height(Space.lg))
+                // One spine per book: tall amber ones are read, short outlines are still to read.
+                ReadingShelf(read)
+                Spacer(Modifier.height(Space.sm))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("$done of $total read", style = Ruvo.type.label, color = c.onHero.copy(alpha = 0.75f), modifier = Modifier.weight(1f))
-                    Text("No streaks, no pressure", style = Ruvo.type.caption, color = c.onHero.copy(alpha = 0.55f))
+                    Column(Modifier.weight(1f)) {
+                        Text("$done read · ${total - done} to go", style = Ruvo.type.bodyStrong, color = c.onHero)
+                        Text("No streaks, no pressure", style = Ruvo.type.caption, color = c.onHero.copy(alpha = 0.6f))
+                    }
+                    Text(
+                        "See the list",
+                        Modifier.clip(RoundedCornerShape(Radius.chip)).background(c.onHero.copy(alpha = 0.14f))
+                            .clickable(role = androidx.compose.ui.semantics.Role.Button, onClickLabel = "See which books you have read") { readingOpen = true }
+                            .padding(horizontal = Space.md, vertical = Space.sm),
+                        style = Ruvo.type.label, color = c.onHero,
+                    )
                 }
-                Spacer(Modifier.height(Space.xs))
-                FillBar(done / total.toFloat(), c.fuel, track = c.onHero.copy(alpha = 0.16f))
             }
+
+            // The same Marketplace tile as in Profile, kept near the top so it is easy to find.
+            Spacer(Modifier.height(Space.md))
+            com.ruvo.design.BigTile("Marketplace", MARKETPLACE_LINE, RuvoIcons.Store, Modifier.reveal(2), onClick = a.openMarketplace)
 
             // New this week: the first unread fresh book, highlighted with a slow glow.
             val fresh = Library.shelf(Library.Shelf.NEW)
             val next = fresh.firstOrNull { it.id !in read } ?: fresh.first()
             Spacer(Modifier.height(Space.md))
-            NewThisWeek(next, next.id in read, Modifier.reveal(2)) { a.openBook(next.id) }
+            NewThisWeek(next, next.id in read, Modifier.reveal(3)) { a.openBook(next.id) }
         }
 
         // Picked from what actually happened this month.
@@ -137,16 +154,13 @@ fun GuideScreen(a: GuideActions) {
                 }
             }
 
-            // The same tile as in Profile, opening the same Marketplace.
-            Spacer(Modifier.height(Space.lg))
-            com.ruvo.design.BigTile("Marketplace", MARKETPLACE_LINE, RuvoIcons.Store, onClick = a.openMarketplace)
-
             Spacer(Modifier.height(Space.lg))
             PrimaryButton("Before you buy", a.openBuy, Modifier.fillMaxWidth(), icon = RuvoIcons.Cart)
             Spacer(Modifier.height(Space.sm))
             GhostButton("Ask Ruvo a question", { a.openChat(null) }, Modifier.fillMaxWidth(), icon = RuvoIcons.Message)
         }
     }
+    if (readingOpen) ReadingSheet(read, onOpen = a.openBook, onDismiss = { readingOpen = false })
 }
 
 /** The Guide's mark: an open book with a soft halo that breathes very slowly. */

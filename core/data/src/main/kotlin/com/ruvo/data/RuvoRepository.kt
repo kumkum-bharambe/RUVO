@@ -285,6 +285,16 @@ class RuvoRepository(
 
     suspend fun removeCommitment(id: String) = dao.deleteCommitment(id)
 
+    /** Edits a commitment's name, amount and, for monthly ones, the day it falls due. Payment history is kept. */
+    suspend fun updateCommitment(c: Commitment, name: String, amount: Paise, dueDay: Int?) {
+        dao.upsertCommitment(
+            CommitmentEntity(
+                c.id, name.trim(), amount, if (c.recurring) dueDay else c.dueDayOfMonth,
+                c.dueDate?.toEpochDay(), c.recurring, c.lastPaidOn?.toEpochDay(),
+            ),
+        )
+    }
+
     /** Records paying a commitment: a Fixed-bucket spend, and the commitment is marked paid. */
     suspend fun payCommitment(c: Commitment) {
         val today = todayFlow.value
@@ -414,11 +424,58 @@ class RuvoRepository(
         }
     }
 
-    /** Settings → Delete everything. */
+    /** Settings → Delete everything. Also removes the account, so the next start asks to create one. */
     suspend fun deleteEverything() {
         dao.clearAll()
         settingsStore.update { UserSettings(onboarded = false, demoPersona = "aarav", theme = it.theme) }
+        Session.lock()
     }
+
+    // --- Account (on this phone only) ---
+
+    /** Creates the account and signs in. The name also becomes what Ruvo calls you. */
+    suspend fun createAccount(name: String, phone: String, pin: String) {
+        require(Pins.isValid(pin) && Mobile.isValid(phone) && name.isNotBlank())
+        val hash = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { Pins.hash(pin) }
+        settingsStore.update {
+            it.copy(accountName = name.trim(), name = it.name.ifBlank { name.trim() }, accountPhone = Mobile.normalise(phone), pinHash = hash, pinFails = 0, pinPausedUntil = 0)
+        }
+        Session.unlock()
+    }
+
+    /** Checks a PIN. Five wrong in a row pause tries for 30 seconds; a right one clears the count. */
+    suspend fun signIn(pin: String, nowMillis: Long = System.currentTimeMillis()): SignIn {
+        val s = settingsStore.current()
+        if (s.pinPausedUntil > nowMillis) return SignIn.Paused(s.pinPausedUntil)
+        val ok = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { Pins.matches(pin, s.pinHash) }
+        if (ok) {
+            settingsStore.update { it.copy(pinFails = 0, pinPausedUntil = 0) }
+            Session.unlock()
+            return SignIn.Ok
+        }
+        val fails = s.pinFails + 1
+        return if (fails >= MAX_PIN_TRIES) {
+            val until = nowMillis + PIN_PAUSE_MILLIS
+            settingsStore.update { it.copy(pinFails = 0, pinPausedUntil = until) }
+            SignIn.Paused(until)
+        } else {
+            settingsStore.update { it.copy(pinFails = fails) }
+            SignIn.Wrong(MAX_PIN_TRIES - fails)
+        }
+    }
+
+    /** Changes the PIN after checking the current one. Returns false if the current PIN is wrong. */
+    suspend fun changePin(current: String, next: String): Boolean {
+        require(Pins.isValid(next))
+        val s = settingsStore.current()
+        val ok = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { Pins.matches(current, s.pinHash) }
+        if (!ok) return false
+        val hash = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { Pins.hash(next) }
+        settingsStore.update { it.copy(pinHash = hash, pinFails = 0, pinPausedUntil = 0) }
+        return true
+    }
+
+    fun signOut() = Session.lock()
 
     suspend fun recordSnapshot() {
         val s = state.value
@@ -427,6 +484,11 @@ class RuvoRepository(
     }
 
     private fun newId() = UUID.randomUUID().toString()
+
+    private companion object {
+        const val MAX_PIN_TRIES = 5
+        const val PIN_PAUSE_MILLIS = 30_000L
+    }
 }
 
 // --- Mapping between stored rows and engine models ---

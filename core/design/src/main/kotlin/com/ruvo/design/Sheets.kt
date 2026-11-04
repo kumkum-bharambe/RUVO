@@ -93,16 +93,29 @@ fun RuvoField(
     modifier: Modifier = Modifier,
     number: Boolean = false,
     prefix: String? = null,
+    /** A mobile number: digits only, at most 10, with the phone keypad. */
+    phone: Boolean = false,
+    error: String? = null,
 ) {
     val c = Ruvo.colors
     OutlinedTextField(
         value = value,
-        onValueChange = { v -> onValueChange(if (number) v.filter { it.isDigit() || it == '.' }.take(9) else v) },
+        onValueChange = { v ->
+            onValueChange(
+                when {
+                    phone -> v.filter { it.isDigit() }.take(10)
+                    number -> v.filter { it.isDigit() || it == '.' }.take(9)
+                    else -> v
+                },
+            )
+        },
+        isError = error != null,
+        supportingText = error?.let { e -> { Text(e, style = Ruvo.type.caption, color = c.warning) } },
         label = { Text(label, style = Ruvo.type.label) },
         prefix = if (prefix != null) { { Text(prefix, style = Ruvo.type.bodyStrong, color = c.ink) } } else null,
         singleLine = true,
         textStyle = if (number) Ruvo.type.title else Ruvo.type.body,
-        keyboardOptions = KeyboardOptions(keyboardType = if (number) KeyboardType.Number else KeyboardType.Text),
+        keyboardOptions = KeyboardOptions(keyboardType = when { phone -> KeyboardType.Phone; number -> KeyboardType.Number; else -> KeyboardType.Text }),
         shape = RoundedCornerShape(Radius.inner),
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = c.ink, unfocusedBorderColor = c.hairline, focusedLabelColor = c.ink,

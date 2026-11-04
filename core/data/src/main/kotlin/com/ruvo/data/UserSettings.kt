@@ -58,7 +58,16 @@ data class UserSettings(
     val monthEdits: Set<String> = emptySet(),
     /** Chat language for dictation and spoken replies, as a BCP-47 tag such as "en-IN" or "hi-IN". */
     val chatLanguage: String = "en-IN",
+    /** The on-phone account: who signed up, their mobile number, and a salted hash of their PIN (never the PIN). */
+    val accountName: String = "",
+    val accountPhone: String = "",
+    val pinHash: String = "",
+    /** Wrong PINs in a row, and when tries may start again after five. */
+    val pinFails: Int = 0,
+    val pinPausedUntil: Long = 0,
 ) {
+    val hasAccount: Boolean get() = pinHash.isNotEmpty()
+
     fun monthEditMap(): Map<java.time.YearMonth, Pair<Long, Long>> = monthEdits.mapNotNull { e ->
         val p = e.split(":")
         runCatching { java.time.YearMonth.parse(p[0]) to (p[1].toLong() to p[2].toLong()) }.getOrNull()
@@ -95,6 +104,11 @@ class SettingsStore(private val context: Context) {
         val nGoals = booleanPreferencesKey("notify_goals")
         val edits = stringSetPreferencesKey("month_edits")
         val lang = stringPreferencesKey("chat_language")
+        val accName = stringPreferencesKey("account_name")
+        val accPhone = stringPreferencesKey("account_phone")
+        val pin = stringPreferencesKey("pin_hash")
+        val pinFails = intPreferencesKey("pin_fails")
+        val pinPaused = longPreferencesKey("pin_paused_until")
     }
 
     val settings: Flow<UserSettings> = context.store.data.map { readFrom(it) }
@@ -129,6 +143,11 @@ class SettingsStore(private val context: Context) {
             p[K.nGoals] = s.notifyGoals
             p[K.edits] = s.monthEdits
             p[K.lang] = s.chatLanguage
+            p[K.accName] = s.accountName
+            p[K.accPhone] = s.accountPhone
+            p[K.pin] = s.pinHash
+            p[K.pinFails] = s.pinFails
+            p[K.pinPaused] = s.pinPausedUntil
         }
     }
 
@@ -158,5 +177,10 @@ class SettingsStore(private val context: Context) {
         notifyGoals = p[K.nGoals] ?: true,
         monthEdits = p[K.edits] ?: emptySet(),
         chatLanguage = p[K.lang] ?: "en-IN",
+        accountName = p[K.accName] ?: "",
+        accountPhone = p[K.accPhone] ?: "",
+        pinHash = p[K.pin] ?: "",
+        pinFails = p[K.pinFails] ?: 0,
+        pinPausedUntil = p[K.pinPaused] ?: 0,
     )
 }

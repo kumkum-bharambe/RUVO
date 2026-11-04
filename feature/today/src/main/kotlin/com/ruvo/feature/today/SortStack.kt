@@ -105,7 +105,7 @@ fun SortStackScreen(onClose: () -> Unit, onShare: (String) -> Unit) {
                     style = Ruvo.type.body, color = c.inkSoft, textAlign = TextAlign.Center,
                 )
                 Spacer(Modifier.height(Space.xl))
-                PrimaryButton("Back to Today", onClose)
+                PrimaryButton("Back to Home", onClose)
             }
             return@Column
         }

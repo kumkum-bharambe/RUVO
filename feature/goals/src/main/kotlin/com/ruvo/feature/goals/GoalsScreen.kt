@@ -86,7 +86,6 @@ import androidx.compose.ui.draw.clip
 import com.ruvo.design.parseRupees
 import com.ruvo.engine.Goal
 import com.ruvo.engine.IndianFormat
-import com.ruvo.engine.guide.Perks
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import kotlin.math.PI
@@ -159,14 +158,6 @@ fun GoalsScreen(startNewGoal: Boolean = false, onNewGoalShown: () -> Unit = {}, 
             }
         }
         if (state.goals.isNotEmpty()) item { GoalInsights(state, Modifier.padding(horizontal = Space.gutter).padding(top = Space.md).reveal(3)) }
-        item { SectionTitle("Perks", Modifier.padding(horizontal = Space.gutter)) }
-        item {
-            Text("Ways to save and earn. Sample offers with made-up brands; no ads, no tracking.", Modifier.padding(horizontal = Space.gutter), style = Ruvo.type.caption, color = c.inkFaint)
-            Spacer(Modifier.height(Space.sm))
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(Space.sm), contentPadding = PaddingValues(horizontal = Space.gutter)) {
-                items(Perks.all, key = { it.id }) { p -> PerkCard(p, state.runway.dailySpend) }
-            }
-        }
         item {
             RuvoCard(Modifier.padding(horizontal = Space.gutter).padding(top = Space.xl), brush = c.heroBrush, border = null, elevated = true, onClick = { review = true }, onClickLabel = "Open monthly review") {
                 Eyebrow("Monthly review", color = c.onHero.copy(alpha = 0.7f))
@@ -262,24 +253,6 @@ private fun NewGoalCard(modifier: Modifier, onClick: () -> Unit) {
         Spacer(Modifier.height(Space.xs))
         Text("New goal", style = Ruvo.type.bodyStrong, color = c.ink)
         Text("A trip, a laptop, a cushion", style = Ruvo.type.caption, color = c.inkFaint)
-    }
-}
-
-@Composable
-private fun PerkCard(p: Perks.Perk, daily: Long) {
-    val c = Ruvo.colors
-    val days = Perks.daysSaved(p, daily)
-    RuvoCard(Modifier.width(220.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(RuvoIcons.Perk, null, Modifier.size(18.dp), tint = c.fuelInk)
-            Spacer(Modifier.width(Space.xxs))
-            Eyebrow("${p.kind} · sample")
-        }
-        Spacer(Modifier.height(Space.xs))
-        Text(p.brand, style = Ruvo.type.title, color = c.ink)
-        Text(p.offer, style = Ruvo.type.caption, color = c.inkSoft, maxLines = 3)
-        Spacer(Modifier.height(Space.xs))
-        Text(if (days > 0) "Saves you ${IndianFormat.days(days)} a month" else "Adds to your income", style = Ruvo.type.label, color = c.ink)
     }
 }
 

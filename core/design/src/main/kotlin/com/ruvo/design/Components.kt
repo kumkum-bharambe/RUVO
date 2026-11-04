@@ -186,9 +186,8 @@ fun RuvoCard(
 
 @Composable
 fun Eyebrow(text: String, modifier: Modifier = Modifier, color: Color = Ruvo.colors.inkSoft) {
-    // Sentence case: "Daily spending", not "DAILY SPENDING".
-    val calm = text.lowercase().replaceFirstChar { it.uppercase() }.replace("ruvo", "Ruvo").replace(" upi", " UPI")
-    Text(calm, modifier, style = Ruvo.type.eyebrow, color = color, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
+    // Sentence case as written: "Daily spending", not "DAILY SPENDING". Names and months keep their capitals.
+    Text(text, modifier, style = Ruvo.type.eyebrow, color = color, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
 }
 
 @Composable

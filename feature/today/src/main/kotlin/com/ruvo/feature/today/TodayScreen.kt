@@ -152,7 +152,6 @@ fun TodayContent(state: AppState, a: TodayActions) {
             item { InsightCard(change, onWhy = { a.openChat("Where did most of my money go?") }, onHide = { insightHidden = true }, modifier = Modifier.reveal(4)) }
         }
         item { DailySpendingCard(state, Modifier.reveal(5)) }
-        item { PlanCard(state, Modifier.reveal(6), a.openMoney) }
         val upcoming = comingUp(state)
         if (upcoming.isNotEmpty()) {
             item { SectionTitle("Coming up", Modifier.padding(horizontal = Space.gutter), action = "See all", onAction = a.openMoney) }
@@ -309,46 +308,6 @@ private fun DailySpendingCard(state: AppState, modifier: Modifier) {
                 }
             }
         }
-    }
-}
-/** This month's plan: what arrives, split into Fixed, goals and Fuel, with a daily amount. */
-@Composable
-private fun PlanCard(state: AppState, modifier: Modifier, open: () -> Unit) {
-    val c = Ruvo.colors
-    val income = state.input.income.expectedAmount
-    if (income <= 0) return
-    val fixed = state.commitments.filter { it.recurring }.sumOf { it.amount }
-    val goals = state.goals.sumOf { it.monthlyContribution }
-    val free = (income - fixed - goals).coerceAtLeast(0)
-    val perDay = free / state.input.income.cycleDays.coerceAtLeast(1)
-    RuvoCard(Modifier.padding(horizontal = Space.gutter).padding(top = Space.sm).then(modifier), onClick = open, onClickLabel = "See your money plan") {
-        Eyebrow("This month's plan")
-        Row(verticalAlignment = Alignment.Bottom) {
-            Amount(income, style = Ruvo.type.display, countUp = true)
-            Spacer(Modifier.width(Space.xs))
-            Text("comes in", Modifier.padding(bottom = 6.dp), style = Ruvo.type.caption, color = c.inkSoft)
-        }
-        Spacer(Modifier.height(Space.sm))
-        val sum = income.toFloat().coerceAtLeast(1f)
-        SplitBar(listOf(Segment(fixed / sum, c.fixed), Segment(goals / sum, c.future), Segment(free / sum, c.fuel)))
-        Spacer(Modifier.height(Space.sm))
-        PlanRow(c.fixed, "Fixed", "Rent, travel and bills", fixed)
-        PlanRow(c.future, "Saved for goals", "Added to goals each month", goals)
-        PlanRow(c.fuel, "Yours to spend", "About ${IndianFormat.rupees(perDay)} a day", free)
-    }
-}
-
-@Composable
-private fun PlanRow(dot: androidx.compose.ui.graphics.Color, title: String, sub: String, amount: Long) {
-    val c = Ruvo.colors
-    Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(10.dp).clip(CircleShape).background(dot))
-        Spacer(Modifier.width(Space.sm))
-        Column(Modifier.weight(1f)) {
-            Text(title, style = Ruvo.type.bodyStrong, color = c.ink)
-            Text(sub, style = Ruvo.type.caption, color = c.inkFaint)
-        }
-        Amount(amount)
     }
 }
 
