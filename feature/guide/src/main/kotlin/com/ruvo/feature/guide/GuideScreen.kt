@@ -165,7 +165,7 @@ fun GuideScreen(a: GuideActions) {
 private fun NewThisWeek(book: Library.Book, read: Boolean, modifier: Modifier, onOpen: () -> Unit) {
     val c = Ruvo.colors
     Box(modifier.fillMaxWidth()) {
-        RuvoCard(Modifier.fillMaxWidth(), brush = c.amberBrush, elevated = true, onClick = onOpen, onClickLabel = "Read ${book.title}", padding = PaddingValues(Space.md)) {
+        RuvoCard(Modifier.fillMaxWidth(), brush = c.softAmberBrush, elevated = true, onClick = onOpen, onClickLabel = "Read ${book.title}", padding = PaddingValues(Space.md)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 BookCover(book, read, width = 64.dp, showLabel = false, modifier = Modifier.graphicsLayer { rotationZ = -5f })
                 Spacer(Modifier.width(Space.md))

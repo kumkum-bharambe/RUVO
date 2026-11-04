@@ -84,6 +84,8 @@ data class RuvoColors(
 
     val heroBrush: Brush get() = Brush.linearGradient(listOf(heroTop, heroBottom))
     val amberBrush: Brush get() = Brush.linearGradient(listOf(sun, fuelDeep))
+    /** A lighter amber for whole cards; buttons and the dock keep the full [amberBrush]. */
+    val softAmberBrush: Brush get() = Brush.linearGradient(listOf(sun.lighten(0.55f), fuel.lighten(0.2f)))
 }
 
 /** Mixes a colour toward white. */
@@ -126,9 +128,10 @@ val Daybreak = RuvoColors(
     warning = Color(0xFFD93A63),
     sun = Butter,
     onAccent = Navy,
-    heroTop = Color(0xFF2E2680),
-    heroBottom = Navy,
-    onHero = Color(0xFFFFFFFF),
+    // Feature cards glow like the runway card: soft lavender into warm peach, with dark ink on top.
+    heroTop = Color(0xFFE4DAFF),
+    heroBottom = Color(0xFFFFE3C7),
+    onHero = Navy,
     glowWarm = Color(0x80FFC23D),
     glowCool = Color(0x998B6CFF),
     orbCore = Color(0xFFFFF1B8),
@@ -162,8 +165,8 @@ val NightSwim = RuvoColors(
     warning = Color(0xFFFF6B8B),
     sun = Butter,
     onAccent = Navy,
-    heroTop = Color(0xFF241D66),
-    heroBottom = Color(0xFF10153D),
+    heroTop = Color(0xFF2B2167),
+    heroBottom = Color(0xFF3A1D44),
     onHero = Color(0xFFFFFFFF),
     // Only a breath of colour at the corners, so glass has something to catch; the canvas stays black.
     glowWarm = Color(0x1FFF8A45),

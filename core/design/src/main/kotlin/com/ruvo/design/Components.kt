@@ -172,7 +172,28 @@ fun RuvoCard(
     if (elevated) m = m.shadow(18.dp, shape, ambientColor = c.shadow, spotColor = c.shadow)
     m = m.clip(shape)
     m = when {
-        brush != null -> m.background(brush)
+        // Gradient cards glow like the bucket boxes: two soft lights drift inside, light sweeps across now
+        // and then, and a glassy white edge catches the top. Reduced motion keeps the lights still.
+        brush != null -> {
+            val reduced = Ruvo.reducedMotion
+            val loop = rememberInfiniteTransition(label = "cardGlow")
+            val t by loop.animateFloat(0f, 1f, infiniteRepeatable(tween(11_000, easing = LinearEasing)), label = "drift")
+            val sweep by loop.animateFloat(-0.6f, 2.4f, infiniteRepeatable(tween(8_000, easing = LinearEasing)), label = "sweep")
+            m.background(brush).drawWithContent {
+                val a = (if (reduced) 0.2f else t) * 2f * PI.toFloat()
+                val r = size.maxDimension * 0.5f
+                val one = Offset(size.width * (0.85f + 0.08f * cos(a)), size.height * (0.15f + 0.12f * sin(a)))
+                val two = Offset(size.width * (0.12f + 0.08f * sin(a)), size.height * (0.9f + 0.08f * cos(a)))
+                drawCircle(Brush.radialGradient(listOf(Color.White.copy(alpha = if (c.isDark) 0.12f else 0.5f), Color.Transparent), one, r), r, one)
+                drawCircle(Brush.radialGradient(listOf(c.fixed.copy(alpha = 0.22f), Color.Transparent), two, r), r, two)
+                drawRect(Brush.verticalGradient(listOf(Color.White.copy(alpha = if (c.isDark) 0.08f else 0.3f), Color.Transparent), endY = size.height * 0.4f))
+                if (!reduced) {
+                    val x = size.width * sweep
+                    drawRect(Brush.linearGradient(listOf(Color.Transparent, Color.White.copy(alpha = if (c.isDark) 0.06f else 0.22f), Color.Transparent), Offset(x - size.width * 0.3f, 0f), Offset(x + size.width * 0.3f, size.height)))
+                }
+                drawContent()
+            }.border(1.dp, Brush.verticalGradient(listOf(Color.White.copy(alpha = if (c.isDark) 0.25f else 0.9f), Color.White.copy(alpha = 0.05f))), shape)
+        }
         color != Color.Unspecified -> m.background(color)
         // Frosted glass: brighter at the top where light falls, with a thin highlight along the top edge.
         else -> m.background(Brush.verticalGradient(listOf(c.glass.copy(alpha = (c.glass.alpha * 1.45f).coerceAtMost(1f)), c.glass)))
@@ -683,9 +704,9 @@ fun LegendDot(color: Color, label: String, modifier: Modifier = Modifier) {
 @Composable
 fun BigTile(title: String, line: String, icon: ImageVector, modifier: Modifier = Modifier, amber: Boolean = true, onClick: () -> Unit) {
     val c = Ruvo.colors
-    val fg = if (amber) c.onAccent else c.canvas
+    val fg = if (amber) c.onAccent else c.onHero
     RuvoCard(
-        modifier.fillMaxWidth(), brush = if (amber) c.amberBrush else null, color = if (amber) Color.Unspecified else c.ink,
+        modifier.fillMaxWidth(), brush = if (amber) c.softAmberBrush else c.heroBrush,
         border = null, elevated = true, onClick = onClick, onClickLabel = "Open $title", padding = PaddingValues(Space.md),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {

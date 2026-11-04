@@ -94,7 +94,7 @@ fun ProfileSheet(
                 Column(Modifier.weight(1f)) {
                     Text(if (state.displayName == "there") "You" else state.displayName, style = Ruvo.type.headline, color = c.onHero)
                     Text(who, style = Ruvo.type.caption, color = c.onHero.copy(alpha = 0.72f))
-                    if (state.isDemo) Text("Sample student, none of this is real", style = Ruvo.type.caption, color = c.fuel)
+                    if (state.isDemo) Text("Sample student, none of this is real", style = Ruvo.type.caption, color = if (c.isDark) c.fuel else c.fixedInk)
                 }
                 if (!state.isDemo) {
                     androidx.compose.material3.TextButton({ editing = !editing }) {
@@ -120,7 +120,7 @@ fun ProfileSheet(
         Spacer(Modifier.height(Space.md))
         val from = state.today.withDayOfMonth(1)
         val flow = Insights.flow(state.activity.map { it.txn }, from, state.today)
-        RuvoCard(Modifier.fillMaxWidth().reveal(1)) {
+        RuvoCard(Modifier.fillMaxWidth().reveal(1), brush = c.bucketBrush(com.ruvo.engine.Bucket.FIXED), border = null, elevated = !c.isDark) {
             Eyebrow("${state.today.month.name.lowercase().replaceFirstChar { it.uppercase() }} so far")
             Spacer(Modifier.height(Space.xs))
             Row {

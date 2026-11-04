@@ -28,7 +28,7 @@ Everything is organised around one number: **Runway**, in days.
 | AI | Scripted offline answers by default so the demo never fails. Optional live Claude API with the user's own key, sending only a summary (totals, runway), never raw transactions |
 | Data | On the phone only, encrypted (Room + SQLCipher). SMS read on-device; only known bank sender IDs; raw text never uploaded |
 | Demo | Five sample personas and sample bank SMS on by default. Real SMS behind a switch in Settings |
-| Perks | Marketplace sheet (tile in Guide and Profile), shelf inside Goals, plus an occasional card on Today. Made-up brands only, each perk shows its saving in days |
+| Perks | Marketplace sheet (tile in Guide and Profile), after Ruvo 7: every listing shows its category, status (Active, Ends in N days, Needs a re-check, Ended), source, last check, end date and time left, with How to get it on tap; shelf inside Goals, plus an occasional card on Today. Made-up brands only, each perk shows its saving in days |
 | Guide | 24 five-minute books on six shelves (`core/engine/guide/Library.kt`), seven pages each: idea, situation, why, reflect, try it, a check, apply in Ruvo. No streaks, no named investments. The eight Today lessons are books with the same ids |
 | Never | Hold money, show ads, sell data, shame spending, recommend specific investments, block a purchase |
 | Old design | The HTML prototype ("Ruvo — Student money companion") is now the style reference (3 Nov 2026): follow its look and features, but do not copy it screen for screen. Its mascot and phone/OTP login stay out; the Orb stays and there is no login |

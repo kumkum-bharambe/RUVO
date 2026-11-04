@@ -370,19 +370,90 @@ object Lessons {
     }
 }
 
-/** Perks shelf: curated, clearly labelled, made-up brands. Each shows its saving in days. */
+/**
+ * The Marketplace: curated, clearly labelled listings from made-up brands. Every listing says who published it,
+ * when Ruvo last checked it and when it ends, as in Ruvo 7, so nobody mistakes a stale offer for a live one.
+ * Each also shows its saving in days. These are sample listings, not real offers.
+ */
 object Perks {
-    data class Perk(val id: String, val brand: String, val offer: String, val monthlySaving: Paise, val kind: String)
+    data class Perk(
+        val id: String,
+        val brand: String,
+        val offer: String,
+        val monthlySaving: Paise,
+        /** Save, Earn, Learn or Student offers. */
+        val kind: String,
+        /** Who published it, and what kind of publisher that is. */
+        val source: String = "",
+        val sourceType: String = "",
+        /** When Ruvo last checked the listing, and when the offer ends (null if it has no end). */
+        val checked: LocalDate = LocalDate.of(2026, 10, 20),
+        val ends: LocalDate? = null,
+        /** The one step to take it up. */
+        val how: String = "",
+    )
 
     val all = listOf(
-        Perk("p1", "Kettle Club", "₹40 off chai and a snack, weekdays before 11 am", 80_000, "Save"),
-        Perk("p2", "LoopRide", "Student monthly pass for metro feeder buses", 1_20_000, "Save"),
-        Perk("p3", "Chalk & Co.", "15% off stationery and printing with a college ID", 45_000, "Save"),
-        Perk("p4", "Thali Tribe", "Mess-style lunch plan, 20 meals", 1_50_000, "Save"),
-        Perk("p5", "Pixelpass", "Free student plan for design tools", 99_900, "Learn"),
-        Perk("p6", "GigNest", "Paid weekend projects for beginner designers", 0, "Earn"),
+        Perk(
+            "p1", "Kettle Club", "₹40 off chai and a snack, weekdays before 11 am", 80_000, "Save",
+            "Kettle Club counter notice", "Partner listing", LocalDate.of(2026, 10, 28), LocalDate.of(2026, 12, 31),
+            "Show your college ID at the counter before 11 am.",
+        ),
+        Perk(
+            "p2", "LoopRide", "Student monthly pass for metro feeder buses", 1_20_000, "Save",
+            "LoopRide website", "Transport operator", LocalDate.of(2026, 10, 15), LocalDate.of(2027, 3, 31),
+            "Apply at a LoopRide counter with your college ID and a photo.",
+        ),
+        Perk(
+            "p3", "Chalk & Co.", "15% off stationery and printing with a college ID", 45_000, "Student offers",
+            "Chalk & Co. store", "Partner listing", LocalDate.of(2026, 10, 30), LocalDate.of(2026, 11, 14),
+            "Show your college ID at the billing counter.",
+        ),
+        Perk(
+            "p4", "Thali Tribe", "Mess-style lunch plan, 20 meals", 1_50_000, "Save",
+            "Thali Tribe menu card", "Partner listing", LocalDate.of(2026, 9, 18), LocalDate.of(2027, 1, 31),
+            "Buy the 20-meal card at the counter; it lasts a month.",
+        ),
+        Perk(
+            "p5", "Pixelpass", "Free student plan for design tools", 99_900, "Learn",
+            "Pixelpass student page", "Company website", LocalDate.of(2026, 10, 25), null,
+            "Sign up with your college email address.",
+        ),
+        Perk(
+            "p6", "GigNest", "Paid weekend projects for beginner designers", 0, "Earn",
+            "GigNest job board", "Partner listing", LocalDate.of(2026, 10, 2), LocalDate.of(2026, 10, 31),
+            "Make a profile and apply to one project at a time.",
+        ),
     )
 
     /** "Saves you 2 days" at the current daily spend. */
     fun daysSaved(p: Perk, dailySpend: Paise): Int = if (dailySpend <= 0) 0 else (p.monthlySaving / dailySpend).toInt()
+
+    /** In list order: what is current first, then ending soon, then needing a re-check, then over. */
+    enum class State { ACTIVE, ENDING, RECHECK, EXPIRED }
+
+    data class Status(val state: State, val daysLeft: Int?, val checkedDaysAgo: Int, val timeLeft: Float)
+
+    /** Over once the end date has passed; ending within 14 days; needing a re-check if checked over 30 days ago. */
+    fun status(p: Perk, today: LocalDate): Status {
+        val ago = java.time.temporal.ChronoUnit.DAYS.between(p.checked, today).toInt()
+        val left = p.ends?.let { java.time.temporal.ChronoUnit.DAYS.between(today, it).toInt() }
+        val total = p.ends?.let { java.time.temporal.ChronoUnit.DAYS.between(p.checked, it).toInt() }?.coerceAtLeast(1)
+        val timeLeft = when {
+            left == null || total == null -> 1f
+            left < 0 -> 0f
+            else -> (left.toFloat() / total).coerceIn(0f, 1f)
+        }
+        val state = when {
+            left != null && left < 0 -> State.EXPIRED
+            ago > 30 -> State.RECHECK
+            left != null && left <= 14 -> State.ENDING
+            else -> State.ACTIVE
+        }
+        return Status(state, left, ago, timeLeft)
+    }
+
+    /** All listings, current ones first, each group soonest-ending first. */
+    fun listed(today: LocalDate): List<Perk> =
+        all.sortedWith(compareBy<Perk>({ status(it, today).state.ordinal }, { status(it, today).daysLeft ?: Int.MAX_VALUE }))
 }

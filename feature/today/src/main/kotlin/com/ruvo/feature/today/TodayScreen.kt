@@ -362,10 +362,10 @@ private fun Header(state: AppState, a: TodayActions) {
 @Composable
 private fun SortCard(count: Int, open: () -> Unit, modifier: Modifier = Modifier) {
     val c = Ruvo.colors
-    RuvoCard(Modifier.padding(horizontal = Space.gutter).padding(top = Space.sm).then(modifier), brush = c.amberBrush, border = null, elevated = true, onClick = open, onClickLabel = "Start the weekly sort") {
+    RuvoCard(Modifier.padding(horizontal = Space.gutter).padding(top = Space.sm).then(modifier), brush = c.softAmberBrush, border = null, elevated = true, onClick = open, onClickLabel = "Start the weekly sort") {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(44.dp).clip(CircleShape).background(c.heroBottom), contentAlignment = Alignment.Center) {
-                Text(count.toString(), style = Ruvo.type.title, color = c.onHero)
+            Box(Modifier.size(44.dp).clip(CircleShape).background(c.ink), contentAlignment = Alignment.Center) {
+                Text(count.toString(), style = Ruvo.type.title, color = if (c.isDark) c.canvas else c.surface)
             }
             Spacer(Modifier.width(Space.sm))
             Column(Modifier.weight(1f)) {

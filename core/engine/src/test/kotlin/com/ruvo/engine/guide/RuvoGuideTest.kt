@@ -103,4 +103,40 @@ class RuvoGuideTest {
         assertEquals(4, Perks.daysSaved(Perks.all[0], rupees(200)))
         assertEquals(0, Perks.daysSaved(Perks.all[5], rupees(200)))
     }
+
+    private fun listing(checked: LocalDate, ends: LocalDate?) =
+        Perks.all[0].copy(checked = checked, ends = ends)
+
+    @Test fun `listing status says whether it is current, ending, stale or over`() {
+        val today = LocalDate.of(2026, 11, 4)
+        assertEquals(Perks.State.ACTIVE, Perks.status(listing(today.minusDays(3), today.plusDays(60)), today).state)
+        assertEquals(Perks.State.ACTIVE, Perks.status(listing(today.minusDays(3), null), today).state)
+
+        val ending = Perks.status(listing(today.minusDays(3), today.plusDays(9)), today)
+        assertEquals(Perks.State.ENDING, ending.state)
+        assertEquals(9, ending.daysLeft)
+
+        // Checked more than 30 days ago: shown, but flagged so nobody relies on it.
+        assertEquals(Perks.State.RECHECK, Perks.status(listing(today.minusDays(31), today.plusDays(60)), today).state)
+        assertEquals(Perks.State.ACTIVE, Perks.status(listing(today.minusDays(30), today.plusDays(60)), today).state)
+
+        // Ended trumps everything else.
+        val over = Perks.status(listing(today.minusDays(40), today.minusDays(1)), today)
+        assertEquals(Perks.State.EXPIRED, over.state)
+        assertEquals(40, over.checkedDaysAgo)
+    }
+
+    @Test fun `time left runs from the last check to the end date`() {
+        val today = LocalDate.of(2026, 11, 4)
+        assertEquals(0.5f, Perks.status(listing(today.minusDays(10), today.plusDays(10)), today).timeLeft, 0.001f)
+        assertEquals(0f, Perks.status(listing(today.minusDays(10), today.minusDays(1)), today).timeLeft, 0.001f)
+        assertEquals(1f, Perks.status(listing(today.minusDays(10), null), today).timeLeft, 0.001f)
+    }
+
+    @Test fun `listings put current offers first and ended ones last`() {
+        val today = LocalDate.of(2026, 11, 4)
+        val order = Perks.listed(today).map { Perks.status(it, today).state }
+        assertEquals(order.sortedBy { it.ordinal }, order)
+        assertEquals(Perks.all.size, Perks.listed(today).size)
+    }
 }

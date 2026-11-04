@@ -478,7 +478,7 @@ fun MonthlyReviewSheet(state: AppState, onDismiss: () -> Unit, onWeekly: () -> U
         Spacer(Modifier.height(Space.sm))
         Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
             RuvoCard(Modifier.weight(1f).reveal(2), brush = c.bucketBrush(com.ruvo.engine.Bucket.FUTURE), border = null) { Eyebrow("Saved", color = c.onAccent.copy(alpha = 0.7f)); Amount(state.runway.futureProtected, style = Ruvo.type.title, color = c.onAccent) }
-            RuvoCard(Modifier.weight(1f).reveal(3), brush = c.amberBrush, border = null) { Eyebrow("Still free", color = c.onAccent.copy(alpha = 0.7f)); Amount(state.runway.fuel.coerceAtLeast(0), style = Ruvo.type.title, color = c.onAccent) }
+            RuvoCard(Modifier.weight(1f).reveal(3), brush = c.softAmberBrush, border = null) { Eyebrow("Still free", color = c.onAccent.copy(alpha = 0.7f)); Amount(state.runway.fuel.coerceAtLeast(0), style = Ruvo.type.title, color = c.onAccent) }
         }
         Spacer(Modifier.height(Space.lg))
         Text("What can you do next?", style = Ruvo.type.title, color = c.ink)
