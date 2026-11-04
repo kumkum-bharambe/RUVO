@@ -80,6 +80,7 @@ fun ChatSheet(onDismiss: () -> Unit, firstQuestion: String? = null) {
     var input by remember { mutableStateOf("") }
     var thinking by remember { mutableStateOf(false) }
     var picking by remember { mutableStateOf(false) }
+    var speechTrouble by remember { mutableStateOf(false) }
     val lang = state.settings.chatLanguage
     val langName = LANGUAGES.firstOrNull { it.first == lang }?.second ?: ("English" to "English")
     // Answers can only be in another language when live answers are on; scripted answers are English.
@@ -89,7 +90,7 @@ fun ChatSheet(onDismiss: () -> Unit, firstQuestion: String? = null) {
         if (!heard.isNullOrBlank()) input = heard
     }
     val canDictate = remember { SpeechRecognizer.isRecognitionAvailable(context) }
-    val foxMood = OrbMood.from(state.runway, false).fox()
+    val petMood = OrbMood.from(state.runway, false).pet()
 
     fun ask(q: String) {
         if (q.isBlank()) return
@@ -104,7 +105,7 @@ fun ChatSheet(onDismiss: () -> Unit, firstQuestion: String? = null) {
             val spokenIn = if (live != null) answerLang else "en-IN"
             bubbles += Bubble(false, text, scripted.suggestions, spokenIn)
             thinking = false
-            if (state.settings.spokenReplies) speech.speak(text, spokenIn)
+            if (state.settings.spokenReplies && !speech.speak(text, spokenIn, "b${bubbles.lastIndex}")) speechTrouble = true
         }
     }
     LaunchedEffect(firstQuestion) { firstQuestion?.let { ask(it) } }
@@ -125,8 +126,22 @@ fun ChatSheet(onDismiss: () -> Unit, firstQuestion: String? = null) {
             Spacer(Modifier.weight(1f))
             IconCircle(
                 RuvoIcons.Speaker, if (state.settings.spokenReplies) "Turn off spoken replies" else "Turn on spoken replies",
-                { scope.launch { RuvoGraph.repository.setSpokenReplies(!state.settings.spokenReplies) } },
+                {
+                    val on = !state.settings.spokenReplies
+                    scope.launch { RuvoGraph.repository.setSpokenReplies(on) }
+                    // Turning it on reads the latest answer straight away, so you hear that it works.
+                    if (on) {
+                        val last = bubbles.indexOfLast { !it.fromUser }
+                        if (last >= 0 && !speech.speak(bubbles[last].text, bubbles[last].language, "b$last")) speechTrouble = true
+                    } else speech.stop()
+                },
                 tint = if (state.settings.spokenReplies) c.onAccent else c.inkFaint, background = if (state.settings.spokenReplies) c.fuel else c.glass,
+            )
+        }
+        androidx.compose.animation.AnimatedVisibility(speechTrouble || speech.status == RuvoSpeech.Status.UNAVAILABLE) {
+            Text(
+                "This phone has no voice for reading aloud yet. Turn one on in phone Settings, Accessibility, Text-to-speech, then try again.",
+                Modifier.padding(top = Space.xs).semantics { liveRegion = LiveRegionMode.Polite }, style = Ruvo.type.caption, color = c.warning,
             )
         }
         androidx.compose.animation.AnimatedVisibility(picking) {
@@ -172,7 +187,7 @@ fun ChatSheet(onDismiss: () -> Unit, firstQuestion: String? = null) {
                 } else {
                     // Ruvo's answer: glass bubble beside a small amber orb.
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-                        FoxPet(foxMood, Modifier.size(38.dp))
+                        RuvoPet(petMood, Modifier.size(38.dp))
                         Spacer(Modifier.size(10.dp))
                         Column(
                             Modifier.weight(1f).clip(RoundedCornerShape(topStart = 6.dp, topEnd = 22.dp, bottomStart = 22.dp, bottomEnd = 22.dp))
@@ -181,16 +196,18 @@ fun ChatSheet(onDismiss: () -> Unit, firstQuestion: String? = null) {
                                 .semantics { liveRegion = LiveRegionMode.Polite },
                         ) {
                             Text(b.text, style = Ruvo.type.body.copy(fontWeight = androidx.compose.ui.text.font.FontWeight(500)), color = c.ink)
-                            if (i > 0) {
+                            run {
                                 Spacer(Modifier.height(Space.xs))
                                 Row(
-                                    Modifier.clip(RoundedCornerShape(Radius.chip)).clickable(role = Role.Button, onClickLabel = "Read this answer aloud") { speech.speak(b.text, b.language) }
+                                    Modifier.clip(RoundedCornerShape(Radius.chip)).clickable(role = Role.Button, onClickLabel = if (speech.speakingId == "b$i") "Stop reading" else "Read this answer aloud") {
+                                        if (!speech.toggle(b.text, b.language, "b$i")) speechTrouble = true
+                                    }
                                         .padding(vertical = 4.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
                                     androidx.compose.material3.Icon(RuvoIcons.Speaker, null, Modifier.size(16.dp), tint = c.inkSoft)
                                     Spacer(Modifier.size(6.dp))
-                                    Text("Listen", style = Ruvo.type.label, color = c.inkSoft)
+                                    Text(if (speech.speakingId == "b$i") "Stop" else "Listen", style = Ruvo.type.label, color = c.inkSoft)
                                 }
                             }
                         }
@@ -204,7 +221,7 @@ fun ChatSheet(onDismiss: () -> Unit, firstQuestion: String? = null) {
             }
             if (thinking) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    FoxPet(FoxMood.THINKING, Modifier.size(38.dp))
+                    RuvoPet(PetMood.THINKING, Modifier.size(38.dp))
                     Spacer(Modifier.size(10.dp))
                     Text("Ruvo is thinking", style = Ruvo.type.caption, color = c.inkFaint)
                 }

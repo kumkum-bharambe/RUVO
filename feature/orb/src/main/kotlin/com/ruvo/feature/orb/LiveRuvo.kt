@@ -1,7 +1,14 @@
 package com.ruvo.feature.orb
 
 import android.content.Context
+import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import com.ruvo.engine.IndianFormat
 import com.ruvo.engine.guide.RuvoGuide
 import kotlinx.coroutines.Dispatchers
@@ -86,41 +93,85 @@ object LiveRuvo {
     }
 }
 
-/** Optional spoken replies with the phone's Indian English voice. Off by default. */
+/**
+ * Spoken replies with the phone's own text-to-speech, Indian English by default. Asking to speak before the
+ * engine has started queues the request instead of dropping it. [speakingId] says which answer is being read
+ * so its button can offer Stop, and [status] says when the phone has no usable voice, so the screen can say so.
+ */
 class RuvoSpeech(context: Context) {
-    private var ready = false
-    private val tts: TextToSpeech = TextToSpeech(context.applicationContext) { status ->
-        ready = status == TextToSpeech.SUCCESS
-        if (ready) configure()
+    enum class Status { STARTING, READY, UNAVAILABLE }
+
+    var status by mutableStateOf(Status.STARTING)
+        private set
+    var speakingId by mutableStateOf<String?>(null)
+        private set
+
+    private val main = Handler(Looper.getMainLooper())
+    private var pending: Triple<String, String, String>? = null
+    private var current: Locale? = null
+
+    private val tts: TextToSpeech = TextToSpeech(context.applicationContext) { result ->
+        main.post {
+            if (result != TextToSpeech.SUCCESS) { status = Status.UNAVAILABLE; pending = null; return@post }
+            if (useLanguage("en-IN") == null) { status = Status.UNAVAILABLE; pending = null; return@post }
+            tts.setSpeechRate(0.96f)
+            tts.setPitch(1.02f)
+            status = Status.READY
+            pending?.let { (text, lang, id) -> pending = null; speak(text, lang, id) }
+        }
     }
 
-    private fun configure() {
-        val india = Locale("en", "IN")
-        tts.language = india
-        // Prefer an installed Indian English voice that works offline.
-        tts.voices?.filter { it.locale.country == "IN" && it.locale.language == "en" && !it.isNetworkConnectionRequired }
-            ?.minByOrNull { it.latency }
-            ?.let { tts.voice = it }
-        tts.setSpeechRate(0.96f)
-        tts.setPitch(1.02f)
+    init {
+        tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+            override fun onStart(id: String?) { main.post { speakingId = id } }
+            override fun onDone(id: String?) { main.post { if (speakingId == id) speakingId = null } }
+            @Deprecated("Deprecated in Java")
+            override fun onError(id: String?) { main.post { if (speakingId == id) speakingId = null } }
+            override fun onStop(id: String?, interrupted: Boolean) { main.post { if (speakingId == id) speakingId = null } }
+        })
     }
 
-    fun speak(text: String) {
-        if (ready) tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "ruvo")
+    /** Switches to [tag] if the phone has it, else Indian English, else any English. Returns the locale used. */
+    private fun useLanguage(tag: String): Locale? {
+        val wanted = listOf(Locale.forLanguageTag(tag), Locale("en", "IN"), Locale.UK, Locale.US)
+        for (l in wanted) {
+            if (l == current) return l
+            if (tts.isLanguageAvailable(l) < TextToSpeech.LANG_AVAILABLE) continue
+            if (tts.setLanguage(l) < TextToSpeech.LANG_AVAILABLE) continue
+            // Prefer an installed voice for that language that works offline.
+            tts.voices?.filter { it.locale.language == l.language && it.locale.country == l.country && !it.isNetworkConnectionRequired }
+                ?.minByOrNull { it.latency }?.let { tts.voice = it }
+            current = l
+            return l
+        }
+        return null
     }
 
-    /** Speaks in another Indian language when the answer is in it; falls back to Indian English. */
-    fun speak(text: String, languageTag: String) {
-        if (!ready) return
-        val locale = Locale.forLanguageTag(languageTag)
-        if (tts.isLanguageAvailable(locale) >= TextToSpeech.LANG_AVAILABLE) tts.language = locale else configure()
-        tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "ruvo")
-        if (!languageTag.startsWith("en")) configure()
+    /** Reads [text] aloud. Returns false only when the phone cannot speak at all. */
+    fun speak(text: String, languageTag: String = "en-IN", id: String = text.hashCode().toString()): Boolean {
+        when (status) {
+            Status.UNAVAILABLE -> return false
+            Status.STARTING -> { pending = Triple(text, languageTag, id); return true }
+            Status.READY -> Unit
+        }
+        useLanguage(languageTag) ?: return false
+        // Read the rupee sign and bullets the way a person would.
+        val spoken = text.replace("₹", "rupees ").replace("·", ",")
+        return tts.speak(spoken, TextToSpeech.QUEUE_FLUSH, Bundle(), id) == TextToSpeech.SUCCESS
     }
+
+    /** Listen / Stop on one answer. */
+    fun toggle(text: String, languageTag: String, id: String): Boolean =
+        if (speakingId == id) { stop(); true } else speak(text, languageTag, id)
 
     fun stop() {
-        if (ready) tts.stop()
+        pending = null
+        if (status == Status.READY) tts.stop()
+        speakingId = null
     }
 
-    fun shutdown() = tts.shutdown()
+    fun shutdown() {
+        main.removeCallbacksAndMessages(null)
+        tts.shutdown()
+    }
 }

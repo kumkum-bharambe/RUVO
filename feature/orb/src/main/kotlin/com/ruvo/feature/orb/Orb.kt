@@ -167,15 +167,15 @@ fun RuvoOrb(
                 }
             },
     ) {
-        // Ruvo 7's fox is the companion now. A tap makes it hop before the chat opens; a goal reached makes it glow.
+        // Ruvo's fuzzy pet is the companion. A tap makes it hop before the chat opens; a goal reached makes it glow.
         val hopY = with(density) { -22.dp.toPx() }
         if (mood.glow) {
             Canvas(Modifier.fillMaxSize().graphicsLayer { scaleX = 1.5f; scaleY = 1.5f }) {
                 drawCircle(Brush.radialGradient(listOf(Color(0xFFFFD54F).copy(alpha = 0.55f * halo), Color.Transparent)))
             }
         }
-        FoxPet(
-            mood.fox(),
+        RuvoPet(
+            mood.pet(),
             Modifier.fillMaxSize().graphicsLayer {
                 val p = hop.value
                 translationY = hopY * sin(PI.toFloat() * p)

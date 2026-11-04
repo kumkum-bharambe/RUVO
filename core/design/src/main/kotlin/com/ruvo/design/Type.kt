@@ -79,18 +79,18 @@ fun ruvoType(context: Context?): RuvoType {
     val w700 = outfitFamily(context, 700)
     val w800 = outfitFamily(context, 800)
     return RuvoType(
-        // One step smaller than before: the runway number stays the one loud thing on screen.
-        hero = TextStyle(fontFamily = w800, fontWeight = FontWeight(800), fontSize = 96.sp, lineHeight = 90.sp, letterSpacing = (-0.055).em, fontFeatureSettings = TABULAR),
-        display = TextStyle(fontFamily = w700, fontWeight = FontWeight(700), fontSize = 32.sp, lineHeight = 36.sp, letterSpacing = (-0.03).em, fontFeatureSettings = TABULAR),
-        headline = TextStyle(fontFamily = w700, fontWeight = FontWeight(700), fontSize = 24.sp, lineHeight = 28.sp, letterSpacing = (-0.02).em),
-        title = TextStyle(fontFamily = w600, fontWeight = FontWeight(600), fontSize = 17.sp, lineHeight = 22.sp, letterSpacing = (-0.01).em),
-        body = TextStyle(fontFamily = w400, fontWeight = FontWeight(400), fontSize = 15.sp, lineHeight = 22.sp),
-        bodyStrong = TextStyle(fontFamily = w600, fontWeight = FontWeight(600), fontSize = 15.sp, lineHeight = 22.sp),
-        label = TextStyle(fontFamily = w500, fontWeight = FontWeight(500), fontSize = 13.sp, lineHeight = 17.sp),
+        // Two steps smaller than Ruvo 7: the runway number stays the one loud thing on screen.
+        hero = TextStyle(fontFamily = w800, fontWeight = FontWeight(800), fontSize = 84.sp, lineHeight = 80.sp, letterSpacing = (-0.055).em, fontFeatureSettings = TABULAR),
+        display = TextStyle(fontFamily = w700, fontWeight = FontWeight(700), fontSize = 28.sp, lineHeight = 32.sp, letterSpacing = (-0.03).em, fontFeatureSettings = TABULAR),
+        headline = TextStyle(fontFamily = w700, fontWeight = FontWeight(700), fontSize = 21.sp, lineHeight = 26.sp, letterSpacing = (-0.02).em),
+        title = TextStyle(fontFamily = w600, fontWeight = FontWeight(600), fontSize = 16.sp, lineHeight = 21.sp, letterSpacing = (-0.01).em),
+        body = TextStyle(fontFamily = w400, fontWeight = FontWeight(400), fontSize = 14.sp, lineHeight = 20.sp),
+        bodyStrong = TextStyle(fontFamily = w600, fontWeight = FontWeight(600), fontSize = 14.sp, lineHeight = 20.sp),
+        label = TextStyle(fontFamily = w500, fontWeight = FontWeight(500), fontSize = 12.5.sp, lineHeight = 16.sp),
         // Labels are sentence case and quiet, not spaced capitals.
         eyebrow = TextStyle(fontFamily = w500, fontWeight = FontWeight(500), fontSize = 12.sp, lineHeight = 16.sp, letterSpacing = 0.01.em),
         caption = TextStyle(fontFamily = w400, fontWeight = FontWeight(400), fontSize = 12.sp, lineHeight = 17.sp),
-        amount = TextStyle(fontFamily = w600, fontWeight = FontWeight(600), fontSize = 15.sp, lineHeight = 20.sp, fontFeatureSettings = TABULAR),
+        amount = TextStyle(fontFamily = w600, fontWeight = FontWeight(600), fontSize = 14.sp, lineHeight = 19.sp, fontFeatureSettings = TABULAR),
     )
 }
 

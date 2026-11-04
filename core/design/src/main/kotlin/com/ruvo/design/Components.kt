@@ -258,14 +258,14 @@ private fun PillButton(
     val pressed by interaction.collectIsPressedAsState()
     val shape = RoundedCornerShape(Radius.chip)
     val lift by animateDpAsState(if (pressed) 3.dp else 12.dp, Motion.snappy(), label = "lift")
-    var m = modifier.pressable(interaction).heightIn(min = 56.dp)
+    var m = modifier.pressable(interaction).heightIn(min = 50.dp)
     if (glow != null) m = m.shadow(lift, shape, ambientColor = glow, spotColor = glow)
     m = m.clip(shape).background(background)
     if (brush != null) m = m.background(brush)
     if (border != null) m = m.border(1.5.dp, border, shape)
     Row(
         m.clickable(interaction, indication = null, enabled = enabled, role = Role.Button, onClick = onClick)
-            .padding(horizontal = Space.lg, vertical = Space.md),
+            .padding(horizontal = Space.lg, vertical = Space.sm),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -488,7 +488,7 @@ fun StatusChips(items: List<StatusItem>, modifier: Modifier = Modifier) {
 fun BucketCard(bucket: Bucket, amount: Paise, caption: String, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
     val c = Ruvo.colors
     RuvoCard(
-        modifier.height(124.dp), brush = c.bucketBrush(bucket), border = null, elevated = !c.isDark,
+        modifier.height(108.dp), brush = c.bucketBrush(bucket), border = null, elevated = !c.isDark,
         onClick = onClick, onClickLabel = "Open ${bucketName(bucket)}", padding = PaddingValues(14.dp),
     ) {
         // Name first, then the number: the word carries the meaning, so no icon is needed.

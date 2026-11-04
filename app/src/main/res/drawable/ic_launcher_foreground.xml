@@ -1,6 +1,6 @@
-<!-- The Ruvo mark: three rising bars, white, amber and blue, on a navy tile. No coin, no rupee sign. -->
+<!-- The Ruvo mark: a lowercase r whose shoulder lifts off like a runway, then a sun-yellow dot ("ruvo."). -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
-    <path android:fillColor="#FFFFFF" android:pathData="M41,54h0a4.5,4.5 0,0 1,4.5 4.5v7a4.5,4.5 0,0 1,-4.5 4.5h0a4.5,4.5 0,0 1,-4.5 -4.5v-7a4.5,4.5 0,0 1,4.5 -4.5z"/>
-    <path android:fillColor="#FDB913" android:pathData="M54,46h0a4.5,4.5 0,0 1,4.5 4.5v15a4.5,4.5 0,0 1,-4.5 4.5h0a4.5,4.5 0,0 1,-4.5 -4.5v-15a4.5,4.5 0,0 1,4.5 -4.5z"/>
-    <path android:fillColor="#4A9BEA" android:pathData="M67,38h0a4.5,4.5 0,0 1,4.5 4.5v23a4.5,4.5 0,0 1,-4.5 4.5h0a4.5,4.5 0,0 1,-4.5 -4.5v-23a4.5,4.5 0,0 1,4.5 -4.5z"/>
+    <path android:strokeColor="#FFFFFF" android:strokeWidth="7.3" android:strokeLineCap="round" android:pathData="M44.8,68.5L44.8,56.6"/>
+    <path android:strokeColor="#FF8A45" android:strokeWidth="7.3" android:strokeLineCap="round" android:pathData="M44.8,56.6C44.8,46.1 52,41.5 61.3,41.8"/>
+    <path android:fillColor="#FFC23D" android:pathData="M70.2,41.5m-4.75,0a4.75,4.75 0,1 1,9.5 0a4.75,4.75 0,1 1,-9.5 0"/>
 </vector>

@@ -8,13 +8,12 @@ import androidx.compose.ui.unit.dp
 import com.ruvo.engine.Bucket
 
 /**
- * Ruvo's two moods, drawn from the navy-and-amber language of the first Ruvo prototype and refined.
- * Daybreak (light): a soft, cool canvas lit by an amber dawn glow and a lavender dusk glow; navy ink; white glass.
- * Night swim (dark): deep navy water where the same accents glow from inside.
+ * Ruvo's two moods in one palette: sunny yellow, warm orange, violet purple and a deep night blue, with white
+ * and black. Daybreak (light) sits on a soft lavender canvas with white cards; Night swim (dark) is true black.
  *
  * The three buckets keep one colour each in both moods:
- *   Fuel (yours to spend) = amber, Future (protected) = sky blue, Fixed (already planned) = lavender.
- * Every colour in the app comes from here.
+ *   Fuel (yours to spend) = yellow, Future (protected for goals) = orange, Fixed (already planned) = purple.
+ * Shortfalls use a rose that is never confused with the orange. Every colour in the app comes from here.
  */
 @Immutable
 data class RuvoColors(
@@ -94,44 +93,48 @@ fun Color.lighten(amount: Float) = Color(
     alpha,
 )
 
-private val Navy = Color(0xFF0F1B3D)
-private val Amber = Color(0xFFFDB913)
-private val AmberDeep = Color(0xFFF5A50B)
-private val Butter = Color(0xFFFFD54F)
+private val Navy = Color(0xFF141B4D)
+private val Amber = Color(0xFFFFC23D)
+private val AmberDeep = Color(0xFFFFA51F)
+private val Butter = Color(0xFFFFDB6E)
+private val Violet = Color(0xFF8B6CFF)
+private val VioletDeep = Color(0xFF6A4BF0)
+private val Tangerine = Color(0xFFFF8A45)
+private val TangerineDeep = Color(0xFFF2651F)
 
 val Daybreak = RuvoColors(
     isDark = false,
-    canvas = Color(0xFFF2F2F7),
+    canvas = Color(0xFFEFECF8),
     surface = Color(0xFFFFFFFF),
     raised = Color(0xFFFFFFFF),
-    glass = Color(0xA6FFFFFF),
-    glassEdge = Color(0xD9FFFFFF),
+    glass = Color(0xCCFFFFFF),
+    glassEdge = Color(0xFFFFFFFF),
     ink = Navy,
-    inkSoft = Color(0xFF545C78),
-    inkFaint = Color(0xFF80869C),
-    hairline = Color(0xFFE2E4EE),
-    fixed = Color(0xFFB79CF2),
-    fixedDeep = Color(0xFF9A7BEA),
+    inkSoft = Color(0xFF555A7E),
+    inkFaint = Color(0xFF82859F),
+    hairline = Color(0xFFE1DDEF),
+    fixed = Violet,
+    fixedDeep = VioletDeep,
     fuel = Amber,
     fuelDeep = AmberDeep,
-    future = Color(0xFF4A9BEA),
-    futureDeep = Color(0xFF3A86D4),
-    fixedInk = Color(0xFF6C4CCF),
-    fuelInk = Color(0xFF9A6500),
-    futureInk = Color(0xFF1F67B8),
-    warning = Color(0xFFE2581A),
+    future = Tangerine,
+    futureDeep = TangerineDeep,
+    fixedInk = Color(0xFF5A3BDB),
+    fuelInk = Color(0xFF8F5B00),
+    futureInk = Color(0xFFB7450B),
+    warning = Color(0xFFD93A63),
     sun = Butter,
     onAccent = Navy,
-    heroTop = Color(0xFF1F2E70),
+    heroTop = Color(0xFF2E2680),
     heroBottom = Navy,
     onHero = Color(0xFFFFFFFF),
-    glowWarm = Color(0x73FFC48C),
-    glowCool = Color(0x73B79CF2),
+    glowWarm = Color(0x66FFC23D),
+    glowCool = Color(0x808B6CFF),
     orbCore = Color(0xFFFFF1B8),
     orbGlow = Amber,
     orbDeep = Color(0xFFD9860A),
-    scrim = Color(0x730F1B3D),
-    shadow = Color(0x380F1B3D),
+    scrim = Color(0x73141B4D),
+    shadow = Color(0x33141B4D),
 )
 
 val NightSwim = RuvoColors(
@@ -146,20 +149,20 @@ val NightSwim = RuvoColors(
     inkSoft = Color(0xFFA9A9B2),
     inkFaint = Color(0xFF6E6E78),
     hairline = Color(0xFF232328),
-    fixed = Color(0xFFC3AAF7),
-    fixedDeep = Color(0xFF9C7DEB),
+    fixed = Color(0xFFA08BFF),
+    fixedDeep = Violet,
     fuel = Amber,
     fuelDeep = AmberDeep,
-    future = Color(0xFF62AEF2),
-    futureDeep = Color(0xFF3C86D6),
-    fixedInk = Color(0xFFC9B3FA),
-    fuelInk = Color(0xFFFFCB45),
-    futureInk = Color(0xFF7CBDF6),
-    warning = Color(0xFFFF8F57),
+    future = Tangerine,
+    futureDeep = TangerineDeep,
+    fixedInk = Color(0xFFB5A4FF),
+    fuelInk = Color(0xFFFFCE5C),
+    futureInk = Color(0xFFFFA46E),
+    warning = Color(0xFFFF6B8B),
     sun = Butter,
     onAccent = Navy,
-    heroTop = Color(0xFF1C2A66),
-    heroBottom = Color(0xFF0F1838),
+    heroTop = Color(0xFF241D66),
+    heroBottom = Color(0xFF10153D),
     onHero = Color(0xFFFFFFFF),
     glowWarm = Color(0x00000000),
     glowCool = Color(0x00000000),
@@ -180,14 +183,14 @@ object Space {
     val xl = 28.dp
     val xxl = 40.dp
     /** Side gutter on every screen. */
-    val gutter = 20.dp
+    val gutter = 16.dp
     /** Space kept clear at the bottom for the floating dock and the Orb above it. */
     val dockClearance = 196.dp
 }
 
 object Radius {
-    val card = 22.dp
-    val inner = 16.dp
+    val card = 20.dp
+    val inner = 14.dp
     val chip = 999.dp
     val sheet = 30.dp
 }
