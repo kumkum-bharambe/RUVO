@@ -34,13 +34,19 @@ object OnDeviceTranslate {
         addOnCanceledListener { cont.resume(null) }
     }
 
+    /** Waits for a task and says only whether it worked (a download succeeds with no value, so null is not failure). */
+    private suspend fun Task<*>.succeeded(): Boolean = suspendCancellableCoroutine { cont ->
+        addOnSuccessListener { cont.resume(true) }
+        addOnFailureListener { cont.resume(false) }
+        addOnCanceledListener { cont.resume(false) }
+    }
+
     /** Makes sure the language is on the phone, downloading it once if needed. True when ready. */
     suspend fun prepare(tag: String): Boolean {
         val code = codes[tag] ?: return false
         val conditions = DownloadConditions.Builder().build()
-        val a = translator(TranslateLanguage.ENGLISH, code).downloadModelIfNeeded(conditions).awaitOrNull()
-        val b = translator(code, TranslateLanguage.ENGLISH).downloadModelIfNeeded(conditions).awaitOrNull()
-        return a != null && b != null
+        return translator(TranslateLanguage.ENGLISH, code).downloadModelIfNeeded(conditions).succeeded() &&
+            translator(code, TranslateLanguage.ENGLISH).downloadModelIfNeeded(conditions).succeeded()
     }
 
     /** English text into [tag]'s language, or null if that isn't possible right now. */
