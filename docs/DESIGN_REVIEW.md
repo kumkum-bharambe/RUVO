@@ -41,8 +41,9 @@ Both include the ₹ sign natively.
 **Palette.** Named after things every Indian student knows.
 - Paper `#F4EEE3`, Ink `#1C1A17`.
 - Haldi (turmeric) for **Fuel**: yours to spend.
-- Peacock for **Future**: protected.
-- Neel (indigo) for **Fixed**: already planned.
+- Neela (blue) for **Future**: protected.
+- Jamun (violet) for **Fixed**: already planned.
+- No greens: amber and blue, as decided in the first prototype.
 - Sindoor (vermilion) only for shortfalls and the stamp. Never for blame.
 - Night swim becomes ink-blue night with paper-coloured type, and the hero ticket turns to paper.
 

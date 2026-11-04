@@ -379,16 +379,16 @@ fun Amount(paise: Paise, modifier: Modifier = Modifier, style: TextStyle = Ruvo.
 }
 
 /**
- * A ledger column for one bucket. All three share one layout and height: a printed colour band, a small icon
- * block, the name and the amount set in the serif. Colour is never the only cue.
+ * A ledger column for one bucket. All three share one layout and height: a small coloured icon block, the name
+ * and the amount set in the serif. Colour is never the only cue.
  */
 @Composable
 fun BucketCard(bucket: Bucket, amount: Paise, caption: String, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
     val c = Ruvo.colors
     val accent = c.bucket(bucket)
+    // Plain cards, no coloured edge: the coloured icon block and the name carry the meaning.
     RuvoCard(modifier.height(148.dp), onClick = onClick, onClickLabel = "Open ${bucketName(bucket)}", padding = PaddingValues(0.dp)) {
-        Box(Modifier.fillMaxWidth().height(6.dp).background(accent))
-        Column(Modifier.padding(horizontal = 12.dp, vertical = 12.dp)) {
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 14.dp)) {
             Box(Modifier.size(30.dp).clip(RoundedCornerShape(Radius.inner)).background(accent), contentAlignment = Alignment.Center) {
                 Icon(RuvoIcons.forBucket(bucket), null, Modifier.size(18.dp), tint = c.onAccent)
             }

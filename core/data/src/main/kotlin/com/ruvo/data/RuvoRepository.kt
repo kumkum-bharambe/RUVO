@@ -307,6 +307,17 @@ class RuvoRepository(
         it.copy(notifyCapture = capture ?: it.notifyCapture, notifyWeekly = weekly ?: it.notifyWeekly, notifyGoals = goals ?: it.notifyGoals)
     }
 
+    /** History: "this month I really received X and spent Y". Shown in History only. */
+    suspend fun setMonthTotals(month: java.time.YearMonth, received: Paise, spent: Paise) = settingsStore.update { s ->
+        s.copy(monthEdits = s.monthEdits.filterNot { it.startsWith("$month:") }.toSet() + "$month:$received:$spent")
+    }
+
+    suspend fun clearMonthTotals(month: java.time.YearMonth) = settingsStore.update { s ->
+        s.copy(monthEdits = s.monthEdits.filterNot { it.startsWith("$month:") }.toSet())
+    }
+
+    suspend fun setChatLanguage(tag: String) = settingsStore.update { it.copy(chatLanguage = tag) }
+
     // --- Guide and reviews ---
 
     suspend fun markBookRead(id: String) = settingsStore.update { it.copy(readBooks = it.readBooks + id) }

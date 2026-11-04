@@ -60,6 +60,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ruvo.data.AppState
 import com.ruvo.data.RuvoGraph
+import com.ruvo.design.AccentButton
 import com.ruvo.design.Amount
 import com.ruvo.design.Chip
 import com.ruvo.design.Eyebrow
@@ -343,6 +344,7 @@ private fun GoalSheet(id: String, state: AppState, onDismiss: () -> Unit) {
     val tilt by rememberTilt()
     var custom by remember { mutableStateOf("") }
     var releasing by remember { mutableStateOf(false) }
+    var removing by remember { mutableStateOf(false) }
     val fuel = state.runway.fuel.coerceAtLeast(0)
     val daily = state.runway.dailySpend
 
@@ -382,6 +384,27 @@ private fun GoalSheet(id: String, state: AppState, onDismiss: () -> Unit) {
             Text("You have ${IndianFormat.rupees(fuel)} of Fuel.", Modifier.padding(top = Space.xs), style = Ruvo.type.caption, color = c.inkFaint)
             Spacer(Modifier.height(Space.md))
             GhostButton("I need some of this money", { releasing = true }, Modifier.fillMaxWidth())
+            Spacer(Modifier.height(Space.sm))
+            // Removing a goal is always visible, with one confirmation that says where the money goes.
+            if (!removing) {
+                androidx.compose.material3.TextButton({ removing = true }, Modifier.fillMaxWidth()) {
+                    Text("Remove this goal", style = Ruvo.type.label, color = c.warning)
+                }
+            } else {
+                RuvoCard(Modifier.fillMaxWidth(), color = c.warning.copy(alpha = 0.1f), border = c.warning.copy(alpha = 0.5f)) {
+                    Text("Remove ${g.name}?", style = Ruvo.type.title, color = c.ink)
+                    Text(
+                        if (g.protectedAmount > 0) "Its ${IndianFormat.rupees(g.protectedAmount)} goes back to Fuel, so your runway grows. You can make a new goal any time."
+                        else "Nothing is protected in it yet. You can make a new goal any time.",
+                        style = Ruvo.type.body, color = c.inkSoft,
+                    )
+                    Spacer(Modifier.height(Space.sm))
+                    Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
+                        GhostButton("Keep it", { removing = false }, Modifier.weight(1f))
+                        AccentButton("Remove", { scope.launch { RuvoGraph.repository.deleteGoal(g.id) }; onDismiss() }, Modifier.weight(1f), accent = c.warning)
+                    }
+                }
+            }
         } else {
             val take = (parseRupees(custom) ?: 0).coerceAtMost(g.protectedAmount)
             Text("It is your money and your call. Moving it back to Fuel adds to your runway and moves the goal back.", style = Ruvo.type.body, color = c.ink)
@@ -395,8 +418,6 @@ private fun GoalSheet(id: String, state: AppState, onDismiss: () -> Unit) {
                 GhostButton("Keep it protected", { releasing = false; custom = "" }, Modifier.weight(1f))
                 PrimaryButton("Move to Fuel", { scope.launch { RuvoGraph.repository.release(g.id, take) }; releasing = false; custom = "" }, Modifier.weight(1f), enabled = take > 0)
             }
-            Spacer(Modifier.height(Space.md))
-            GhostButton("Delete this goal", { scope.launch { RuvoGraph.repository.deleteGoal(g.id) }; onDismiss() }, Modifier.fillMaxWidth())
         }
     }
 }
@@ -412,7 +433,7 @@ fun NewGoalSheet(onDismiss: () -> Unit) {
     val scope = rememberCoroutineScope()
     val tilt by rememberTilt()
     val c = Ruvo.colors
-    RuvoSheet("What are you saving for?", onDismiss, eyebrow = "New goal") {
+    RuvoSheet("Do you want to save for a goal?", onDismiss, eyebrow = "New goal") {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.xs), verticalArrangement = Arrangement.spacedBy(Space.xs)) {
             listOf("Trip with friends", "Laptop", "Emergency cushion", "Course fees", "Phone").forEach { s -> Chip(s, name == s, { name = s }) }
         }

@@ -54,7 +54,16 @@ data class UserSettings(
     val notifyCapture: Boolean = true,
     val notifyWeekly: Boolean = true,
     val notifyGoals: Boolean = true,
+    /** History corrections, as "2026-09:receivedPaise:spentPaise". Display only; never move the runway. */
+    val monthEdits: Set<String> = emptySet(),
+    /** Chat language for dictation and spoken replies, as a BCP-47 tag such as "en-IN" or "hi-IN". */
+    val chatLanguage: String = "en-IN",
 ) {
+    fun monthEditMap(): Map<java.time.YearMonth, Pair<Long, Long>> = monthEdits.mapNotNull { e ->
+        val p = e.split(":")
+        runCatching { java.time.YearMonth.parse(p[0]) to (p[1].toLong() to p[2].toLong()) }.getOrNull()
+    }.toMap()
+
     fun reviewOf(txnId: String): String? = purchaseReviews.firstOrNull { it.startsWith("$txnId:") }?.substringAfter(":")
 }
 
@@ -84,6 +93,8 @@ class SettingsStore(private val context: Context) {
         val nCapture = booleanPreferencesKey("notify_capture")
         val nWeekly = booleanPreferencesKey("notify_weekly")
         val nGoals = booleanPreferencesKey("notify_goals")
+        val edits = stringSetPreferencesKey("month_edits")
+        val lang = stringPreferencesKey("chat_language")
     }
 
     val settings: Flow<UserSettings> = context.store.data.map { readFrom(it) }
@@ -116,6 +127,8 @@ class SettingsStore(private val context: Context) {
             p[K.nCapture] = s.notifyCapture
             p[K.nWeekly] = s.notifyWeekly
             p[K.nGoals] = s.notifyGoals
+            p[K.edits] = s.monthEdits
+            p[K.lang] = s.chatLanguage
         }
     }
 
@@ -143,5 +156,7 @@ class SettingsStore(private val context: Context) {
         notifyCapture = p[K.nCapture] ?: true,
         notifyWeekly = p[K.nWeekly] ?: true,
         notifyGoals = p[K.nGoals] ?: true,
+        monthEdits = p[K.edits] ?: emptySet(),
+        chatLanguage = p[K.lang] ?: "en-IN",
     )
 }

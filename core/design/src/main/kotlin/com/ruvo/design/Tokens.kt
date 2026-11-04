@@ -13,7 +13,8 @@ import com.ruvo.engine.Bucket
  * Night swim (dark): ink-blue night with paper-coloured type; the runway ticket turns to paper.
  *
  * Colours are named after things every Indian student knows:
- *   Haldi (turmeric) = Fuel, yours to spend. Peacock = Future, protected. Neel (indigo) = Fixed, already planned.
+ *   Haldi (turmeric) = Fuel, yours to spend. Neela (blue) = Future, protected. Jamun (violet) = Fixed, already planned.
+ *   No greens: Kumkum asked for amber and blue in the first prototype.
  *   Sindoor (vermilion) = shortfalls and the stamp, never blame.
  * Every colour in the app comes from here.
  */@Immutable
@@ -110,15 +111,15 @@ val Daybreak = RuvoColors(
     inkSoft = Color(0xFF5F594F),
     inkFaint = Color(0xFF8C857A),
     hairline = Color(0xFFE3D9C9),
-    fixed = Color(0xFF8E99E2),
-    fixedDeep = Color(0xFF6E7BD2),
+    fixed = Color(0xFFAB8FDD),
+    fixedDeep = Color(0xFF8C6CCB),
     fuel = Color(0xFFF0B232),
     fuelDeep = Color(0xFFDC9819),
-    future = Color(0xFF4FAA9E),
-    futureDeep = Color(0xFF358D82),
-    fixedInk = Color(0xFF3A47A6),
+    future = Color(0xFF4A8EDB),
+    futureDeep = Color(0xFF2C6DB8),
+    fixedInk = Color(0xFF6342A8),
     fuelInk = Color(0xFF8A5A00),
-    futureInk = Color(0xFF0F6B62),
+    futureInk = Color(0xFF1E5AA3),
     warning = Color(0xFFD5432A),
     sun = Color(0xFFF7CB4D),
     onAccent = Ink,
@@ -126,7 +127,7 @@ val Daybreak = RuvoColors(
     heroBottom = Ink,
     onHero = Paper,
     glowWarm = Color(0x24F0B232),
-    glowCool = Color(0x1A8E99E2),
+    glowCool = Color(0x1AAB8FDD),
     orbCore = Color(0xFFFFF3C4),
     orbGlow = Color(0xFFF0B232),
     orbDeep = Color(0xFFB9770F),
@@ -145,15 +146,15 @@ val NightSwim = RuvoColors(
     inkSoft = Color(0xFFB3AC9F),
     inkFaint = Color(0xFF7D786C),
     hairline = Color(0xFF2A2E3D),
-    fixed = Color(0xFF9DA7F2),
-    fixedDeep = Color(0xFF7884E2),
+    fixed = Color(0xFFC2ABF5),
+    fixedDeep = Color(0xFF9F84E6),
     fuel = Color(0xFFF5B84A),
     fuelDeep = Color(0xFFE09A22),
-    future = Color(0xFF5CC3B5),
-    futureDeep = Color(0xFF389C8F),
-    fixedInk = Color(0xFFB1BAF7),
+    future = Color(0xFF64A6F2),
+    futureDeep = Color(0xFF3B82D3),
+    fixedInk = Color(0xFFCDBBF8),
     fuelInk = Color(0xFFF7C668),
-    futureInk = Color(0xFF74D3C6),
+    futureInk = Color(0xFF8ABDF6),
     warning = Color(0xFFFF6E50),
     sun = Color(0xFFF9D46A),
     onAccent = Color(0xFF14130F),
@@ -161,7 +162,7 @@ val NightSwim = RuvoColors(
     heroBottom = Color(0xFFE9DFCD),
     onHero = Ink,
     glowWarm = Color(0x1FF5B84A),
-    glowCool = Color(0x269DA7F2),
+    glowCool = Color(0x26C2ABF5),
     orbCore = Color(0xFFFFF3C4),
     orbGlow = Color(0xFFF5B84A),
     orbDeep = Color(0xFFB0700C),
@@ -203,22 +204,23 @@ object Covers {
     private val Ink = Color(0xFF1C1A17)
     private val Paper = Color(0xFFF4EEE3)
     private val Haldi = Color(0xFFF0B232)
-    private val Peacock = Color(0xFF2F8C81)
+    private val Neela = Color(0xFF2C6DB8)
     private val Neel = Color(0xFF3A47A6)
     private val Sindoor = Color(0xFFD5432A)
     private val Rose = Color(0xFFF2B8A8)
-    private val Mint = Color(0xFFBFE3D9)
+    private val Ice = Color(0xFFCFE3F7)
+    private val Jamun = Color(0xFF6342A8)
 
     val palettes: List<Triple<Color, Color, Color>> = listOf(
         Triple(Haldi, Ink, Paper),
         Triple(Ink, Haldi, Sindoor),
-        Triple(Peacock, Paper, Haldi),
+        Triple(Neela, Paper, Haldi),
         Triple(Neel, Paper, Haldi),
         Triple(Sindoor, Paper, Ink),
         Triple(Paper, Ink, Sindoor),
-        Triple(Ink, Paper, Peacock),
-        Triple(Mint, Ink, Sindoor),
-        Triple(Rose, Neel, Ink),
+        Triple(Ink, Paper, Neela),
+        Triple(Ice, Ink, Sindoor),
+        Triple(Rose, Jamun, Ink),
     )
     val label: Color = Paper
     val labelInk: Color = Ink

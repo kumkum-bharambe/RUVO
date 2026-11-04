@@ -68,15 +68,20 @@ class GuideActions(
 )
 
 @Composable
-fun GuideScreen(a: GuideActions) {
+fun GuideScreen(a: GuideActions, showMarketplace: Boolean = false, onMarketplaceShown: () -> Unit = {}) {
     val state by RuvoGraph.repository.state.collectAsStateWithLifecycle()
     val c = Ruvo.colors
     val read = state.settings.readBooks
     val total = Library.all.size
     val done = Library.all.count { it.id in read }
 
+    val scroll = rememberScrollState()
+    // Opened from the profile's Marketplace tile: glide down to the marketplace.
+    androidx.compose.runtime.LaunchedEffect(showMarketplace, scroll.maxValue) {
+        if (showMarketplace && scroll.maxValue > 0) { scroll.animateScrollTo(scroll.maxValue); onMarketplaceShown() }
+    }
     Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).statusBarsPadding().padding(top = Space.md, bottom = Space.dockClearance),
+        Modifier.fillMaxSize().verticalScroll(scroll).statusBarsPadding().padding(top = Space.md, bottom = Space.dockClearance),
     ) {
         Column(Modifier.padding(horizontal = Space.gutter)) {
             Eyebrow("Guide", Modifier.reveal(0))

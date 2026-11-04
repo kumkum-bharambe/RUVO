@@ -80,7 +80,22 @@ data class TodayActions(
     val openMonthly: () -> Unit = {},
     val openChat: (String?) -> Unit = {},
     val openGuide: () -> Unit = {},
+    val openAdd: () -> Unit = {},
+    val openProfile: () -> Unit = openSettings,
 )
+
+/** Your profile: a round initial, the one place besides the Orb that is round, because it is a person. */
+@Composable
+fun Avatar(name: String, onClick: () -> Unit, size: androidx.compose.ui.unit.Dp = 48.dp) {
+    val c = Ruvo.colors
+    Box(
+        Modifier.size(size).clip(CircleShape).background(c.ink)
+            .clickable(role = Role.Button, onClickLabel = "Open your profile", onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(name.firstOrNull { it.isLetter() }?.uppercase() ?: "R", style = Ruvo.type.title, color = c.canvas)
+    }
+}
 
 @Composable
 fun TodayScreen(actions: TodayActions) {
@@ -335,9 +350,10 @@ private fun Header(state: AppState, a: TodayActions) {
                 )
             }
         }
-        if (state.isDemo) IconCircle(RuvoIcons.Spark, "Switch sample student", a.openPersonas)
+        // Adding by hand is always one tap away, not hidden behind the Orb gesture.
+        IconCircle(RuvoIcons.Plus, "Add a payment", a.openAdd, tint = c.onAccent, background = c.fuel)
         Spacer(Modifier.width(Space.xs))
-        IconCircle(RuvoIcons.Settings, "Settings", a.openSettings)
+        Avatar(state.displayName, a.openProfile)
     }
 }
 

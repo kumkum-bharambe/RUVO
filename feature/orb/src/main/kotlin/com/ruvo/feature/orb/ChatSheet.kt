@@ -1,6 +1,13 @@
 package com.ruvo.feature.orb
 
+import android.content.Intent
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -46,7 +53,13 @@ import com.ruvo.design.Space
 import com.ruvo.engine.guide.RuvoGuide
 import kotlinx.coroutines.launch
 
-private data class Bubble(val fromUser: Boolean, val text: String, val suggestions: List<String> = emptyList())
+private data class Bubble(val fromUser: Boolean, val text: String, val suggestions: List<String> = emptyList(), val language: String = "en-IN")
+
+/** Languages for dictation and, with live answers, for replies. Shown in their own script. */
+private val LANGUAGES = listOf(
+    "en-IN" to ("English" to "English"), "hi-IN" to ("हिन्दी" to "Hindi"), "mr-IN" to ("मराठी" to "Marathi"),
+    "ta-IN" to ("தமிழ்" to "Tamil"), "te-IN" to ("తెలుగు" to "Telugu"), "bn-IN" to ("বাংলা" to "Bengali"), "gu-IN" to ("ગુજરાતી" to "Gujarati"),
+)
 
 /** Talking to Ruvo. Scripted answers by default; live answers when a key is set; spoken replies optional. */
 @OptIn(ExperimentalLayoutApi::class)
@@ -64,6 +77,16 @@ fun ChatSheet(onDismiss: () -> Unit, firstQuestion: String? = null) {
     }
     var input by remember { mutableStateOf("") }
     var thinking by remember { mutableStateOf(false) }
+    var picking by remember { mutableStateOf(false) }
+    val lang = state.settings.chatLanguage
+    val langName = LANGUAGES.firstOrNull { it.first == lang }?.second ?: ("English" to "English")
+    // Answers can only be in another language when live answers are on; scripted answers are English.
+    val answerLang = if (LiveRuvo.enabled) lang else "en-IN"
+    val dictate = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val heard = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
+        if (!heard.isNullOrBlank()) input = heard
+    }
+    val canDictate = remember { SpeechRecognizer.isRecognitionAvailable(context) }
 
     fun ask(q: String) {
         if (q.isBlank()) return
@@ -72,11 +95,13 @@ fun ChatSheet(onDismiss: () -> Unit, firstQuestion: String? = null) {
         thinking = true
         scope.launch {
             val scripted = RuvoGuide.answer(q, ctx)
-            val live = LiveRuvo.answer(q, ctx, bubbles.dropLast(1).map { it.fromUser to it.text })
+            val asked = if (answerLang.startsWith("en")) q else "$q\n\n(Reply in ${langName.second}, simply and warmly.)"
+            val live = LiveRuvo.answer(asked, ctx, bubbles.dropLast(1).map { it.fromUser to it.text })
             val text = live ?: scripted.text
-            bubbles += Bubble(false, text, scripted.suggestions)
+            val spokenIn = if (live != null) answerLang else "en-IN"
+            bubbles += Bubble(false, text, scripted.suggestions, spokenIn)
             thinking = false
-            if (state.settings.spokenReplies) speech.speak(text)
+            if (state.settings.spokenReplies) speech.speak(text, spokenIn)
         }
     }
     LaunchedEffect(firstQuestion) { firstQuestion?.let { ask(it) } }
@@ -95,6 +120,13 @@ fun ChatSheet(onDismiss: () -> Unit, firstQuestion: String? = null) {
                         Text(b.text, style = Ruvo.type.body, color = if (b.fromUser) c.canvas else c.ink)
                     }
                 }
+                if (!b.fromUser && i > 0) {
+                    Text(
+                        "Listen", Modifier.clip(RoundedCornerShape(Radius.chip)).clickable(role = Role.Button, onClickLabel = "Read this answer aloud") { speech.speak(b.text, b.language) }
+                            .padding(horizontal = Space.xs, vertical = 4.dp),
+                        style = Ruvo.type.label, color = c.inkSoft,
+                    )
+                }
                 if (!b.fromUser && i == bubbles.lastIndex && b.suggestions.isNotEmpty()) {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.xs), verticalArrangement = Arrangement.spacedBy(Space.xs)) {
                         b.suggestions.forEach { s -> Chip(s, false, { ask(s) }) }
@@ -104,8 +136,40 @@ fun ChatSheet(onDismiss: () -> Unit, firstQuestion: String? = null) {
             if (thinking) Text("Ruvo is thinking", style = Ruvo.type.caption, color = c.inkFaint)
         }
         Spacer(Modifier.height(Space.md))
+        // Language: changes dictation, and replies too when live answers are on.
+        Chip("Language · ${langName.first}", picking, { picking = !picking })
+        if (picking) {
+            Spacer(Modifier.height(Space.xs))
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.xs), verticalArrangement = Arrangement.spacedBy(Space.xs)) {
+                LANGUAGES.forEach { (tag, names) ->
+                    Chip(names.first, lang == tag, { scope.launch { RuvoGraph.repository.setChatLanguage(tag) }; picking = false })
+                }
+            }
+        }
+        if (!lang.startsWith("en") && !LiveRuvo.enabled) {
+            Text(
+                "You can speak in ${langName.second}. Offline answers stay in English; with live answers on, Ruvo replies in ${langName.second}.",
+                Modifier.padding(top = Space.xs), style = Ruvo.type.caption, color = c.inkFaint,
+            )
+        }
+        Spacer(Modifier.height(Space.sm))
         Row(Modifier.fillMaxWidth().imePadding(), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.weight(1f)) { RuvoField(input, { input = it }, "Ask about your money") }
+            Box(Modifier.weight(1f)) { RuvoField(input, { input = it }, if (lang.startsWith("en")) "Ask about your money" else "Ask in ${langName.second}") }
+            Spacer(Modifier.size(Space.xs))
+            IconCircle(
+                RuvoIcons.Mic, if (canDictate) "Speak your question" else "Speech input is not available on this phone",
+                {
+                    if (canDictate) runCatching {
+                        dictate.launch(
+                            Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+                                .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                                .putExtra(RecognizerIntent.EXTRA_LANGUAGE, lang)
+                                .putExtra(RecognizerIntent.EXTRA_PROMPT, "Ask Ruvo"),
+                        )
+                    }
+                },
+                tint = if (canDictate) c.ink else c.inkFaint,
+            )
             Spacer(Modifier.size(Space.xs))
             IconCircle(RuvoIcons.Send, "Send", { ask(input) }, background = c.fuel, tint = c.onAccent)
         }

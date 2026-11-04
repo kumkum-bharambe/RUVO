@@ -4,6 +4,13 @@
     <!-- Only for optional live AI answers with the user's own key. Nothing else uses the network. -->
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- Lets the chat find the phone's own speech recogniser (mic) and voices (Listen). No audio permission needed. -->
+    <queries>
+        <intent><action android:name="android.speech.RecognitionService" /></intent>
+        <intent><action android:name="android.speech.action.RECOGNIZE_SPEECH" /></intent>
+        <intent><action android:name="android.intent.action.TTS_SERVICE" /></intent>
+    </queries>
+
     <application
         android:name=".RuvoApp"
         android:allowBackup="false"

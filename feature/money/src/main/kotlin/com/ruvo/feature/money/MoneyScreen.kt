@@ -2,6 +2,11 @@ package com.ruvo.feature.money
 
 import android.content.Intent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import com.ruvo.design.Radius
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
@@ -71,14 +76,39 @@ import kotlinx.coroutines.launch
 
 private enum class MoneyTab(val label: String) { OVERVIEW("Overview"), ACTIVITY("Activity"), HISTORY("History"), OWED("Owed") }
 
-private enum class Period(val label: String, val days: Long?) { WEEK("This week", 7), LAST_WEEK("Last week", 14), MONTH("This month", 31), ALL("All", null) }
+/** How Activity is grouped: by week, by month, or everything. [offset] steps back through earlier periods. */
+private enum class Span(val label: String) { WEEK("Weekly"), MONTH("Monthly"), ALL("All") }
+
+/** The first and last day of the period [back] steps before the current one. Weeks run Monday to Sunday. */
+private fun spanRange(span: Span, back: Int, today: java.time.LocalDate): Pair<java.time.LocalDate, java.time.LocalDate>? = when (span) {
+    Span.WEEK -> {
+        val start = today.with(java.time.DayOfWeek.MONDAY).minusWeeks(back.toLong())
+        start to start.plusDays(6)
+    }
+    Span.MONTH -> {
+        val ym = java.time.YearMonth.from(today).minusMonths(back.toLong())
+        ym.atDay(1) to ym.atEndOfMonth()
+    }
+    Span.ALL -> null
+}
+
+private fun spanLabel(span: Span, back: Int, range: Pair<java.time.LocalDate, java.time.LocalDate>?, today: java.time.LocalDate): String = when {
+    range == null -> "Everything"
+    span == Span.WEEK && back == 0 -> "This week"
+    span == Span.WEEK && back == 1 -> "Last week"
+    span == Span.WEEK -> "${IndianFormat.date(range.first)} – ${IndianFormat.date(range.second)}"
+    back == 0 -> "This month"
+    else -> range.first.month.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.ENGLISH) + " " + range.first.year
+}
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun MoneyScreen(openTxn: (String) -> Unit, openAdd: () -> Unit = {}) {
     val state by RuvoGraph.repository.state.collectAsStateWithLifecycle()
     var tab by rememberSaveable { mutableStateOf(MoneyTab.OVERVIEW) }
-    var period by rememberSaveable { mutableStateOf(Period.WEEK) }
+    var span by rememberSaveable { mutableStateOf(Span.WEEK) }
+    var back by rememberSaveable { mutableStateOf(0) }
+    var editMonth by remember { mutableStateOf<java.time.YearMonth?>(null) }
     var balanceSheet by remember { mutableStateOf(false) }
     val c = Ruvo.colors
 
@@ -106,22 +136,19 @@ fun MoneyScreen(openTxn: (String) -> Unit, openAdd: () -> Unit = {}) {
                 item { Buckets(state) }
             }
             MoneyTab.ACTIVITY -> {
+                val range = spanRange(span, back, state.today)
                 item {
-                    FlowRow(Modifier.padding(horizontal = Space.gutter), horizontalArrangement = Arrangement.spacedBy(Space.xs), verticalArrangement = Arrangement.spacedBy(Space.xs)) {
-                        Period.entries.forEach { p -> Chip(p.label, period == p, { period = p }) }
+                    Column(Modifier.padding(horizontal = Space.gutter)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
+                            Span.entries.forEach { s -> Chip(s.label, span == s, { span = s; back = 0 }) }
+                        }
+                        Spacer(Modifier.height(Space.sm))
+                        FlowCard(state, span, back, range, onBack = { back++ }, onForward = { if (back > 0) back-- }, onUpdateBalance = { balanceSheet = true }, onAdd = openAdd)
                     }
                 }
-                val inPeriod = state.activity.filter { entry ->
-                    val ago = state.today.toEpochDay() - entry.txn.date.toEpochDay()
-                    when (period) {
-                        Period.WEEK -> ago in 0..6
-                        Period.LAST_WEEK -> ago in 7..13
-                        Period.MONTH -> entry.txn.date.month == state.today.month && entry.txn.date.year == state.today.year
-                        Period.ALL -> true
-                    }
-                }
+                val inPeriod = state.activity.filter { entry -> range == null || (!entry.txn.date.isBefore(range.first) && !entry.txn.date.isAfter(range.second)) }
                 val groups = inPeriod.groupBy { it.txn.date }.toSortedMap(compareByDescending { it })
-                if (groups.isEmpty()) item { Empty(if (state.activity.isEmpty()) "Nothing yet. Pull the Orb down to add a spend, or turn on SMS tracking in Settings." else "Nothing in ${period.label.lowercase()}.") }
+                if (groups.isEmpty()) item { Empty(if (state.activity.isEmpty()) "Nothing yet. Tap + Add to record a payment, or turn on SMS tracking in Settings." else "Nothing recorded in ${spanLabel(span, back, range, state.today).lowercase()}.") }
                 groups.forEach { (date, items) ->
                     item(key = "d$date") {
                         val out = items.filter { it.txn.direction == Direction.DEBIT && it.txn.status != TxnStatus.IGNORED }.sumOf { it.txn.yourShare }
@@ -133,11 +160,92 @@ fun MoneyScreen(openTxn: (String) -> Unit, openAdd: () -> Unit = {}) {
                     items.forEach { entry -> item(key = entry.txn.id) { TxnRow(entry, state, openTxn) } }
                 }
             }
-            MoneyTab.HISTORY -> item { History(state) }
+            MoneyTab.HISTORY -> item { History(state) { editMonth = it } }
             MoneyTab.OWED -> item { Owed(state) }
         }
     }
     if (balanceSheet) BalanceSheet(state) { balanceSheet = false }
+    editMonth?.let { m -> MonthEditSheet(state, m) { editMonth = null } }
+}
+
+/**
+ * GPay-style summary of the period on screen: money in, money out and what is left, with arrows to step through
+ * earlier weeks or months, and the two things people do most: update the balance, add a payment.
+ */
+@Composable
+private fun FlowCard(
+    state: AppState, span: Span, back: Int, range: Pair<java.time.LocalDate, java.time.LocalDate>?,
+    onBack: () -> Unit, onForward: () -> Unit, onUpdateBalance: () -> Unit, onAdd: () -> Unit,
+) {
+    val c = Ruvo.colors
+    val f = Insights.flow(state.input.transactions, range?.first ?: java.time.LocalDate.MIN, range?.second ?: java.time.LocalDate.MAX)
+    RuvoCard(Modifier.fillMaxWidth(), padding = PaddingValues(Space.md)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (range != null) IconCircle(RuvoIcons.Back, "Earlier", onBack)
+            Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(spanLabel(span, back, range, state.today), style = Ruvo.type.title, color = c.ink)
+                if (range != null) Text("${IndianFormat.date(range.first)} – ${IndianFormat.date(range.second)}", style = Ruvo.type.caption, color = c.inkFaint)
+            }
+            if (range != null) IconCircle(RuvoIcons.Forward, "Later", onForward, tint = if (back > 0) c.ink else c.inkFaint.copy(alpha = 0.4f))
+        }
+        Spacer(Modifier.height(Space.md))
+        Row {
+            Column(Modifier.weight(1f)) {
+                Eyebrow("Money in", color = c.futureInk)
+                Amount(f.moneyIn, style = Ruvo.type.title, color = c.futureInk, signed = f.moneyIn > 0)
+                Text("credited", style = Ruvo.type.caption, color = c.inkFaint)
+            }
+            Box(Modifier.width(1.dp).height(56.dp).background(c.glassEdge))
+            Column(Modifier.weight(1f).padding(start = Space.md)) {
+                Eyebrow("Money out")
+                Amount(-f.moneyOut, style = Ruvo.type.title)
+                Text("debited", style = Ruvo.type.caption, color = c.inkFaint)
+            }
+            Box(Modifier.width(1.dp).height(56.dp).background(c.glassEdge))
+            Column(Modifier.weight(1f).padding(start = Space.md)) {
+                Eyebrow("Net")
+                Amount(f.net, style = Ruvo.type.title, color = if (f.net < 0) c.warning else c.ink, signed = f.net > 0)
+                Text("${f.count} entries", style = Ruvo.type.caption, color = c.inkFaint)
+            }
+        }
+        Spacer(Modifier.height(Space.md))
+        Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
+            GhostButton("Update balance", onUpdateBalance, Modifier.weight(1f))
+            PrimaryButton("Add", onAdd, Modifier.weight(1f), icon = RuvoIcons.Plus)
+        }
+    }
+}
+
+/** Correct a month in History: what really came in and went out. Display only; the runway never changes. */
+@Composable
+private fun MonthEditSheet(state: AppState, month: java.time.YearMonth, onDismiss: () -> Unit) {
+    val scope = rememberCoroutineScope()
+    val recorded = remember(state.input.transactions, month) {
+        Insights.months(state.input.transactions, state.today, 12).firstOrNull { it.month == month }
+    }
+    val edit = state.settings.monthEditMap()[month]
+    var received by remember { mutableStateOf(((edit?.first ?: recorded?.received ?: 0) / 100).toString()) }
+    var spent by remember { mutableStateOf(((edit?.second ?: recorded?.spent ?: 0) / 100).toString()) }
+    val name = month.month.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.ENGLISH) + " " + month.year
+    RuvoSheet("Correct $name", onDismiss, eyebrow = "History") {
+        Text("Match this to your bank or UPI app. It changes History only; your runway always uses your real balance.", style = Ruvo.type.body, color = Ruvo.colors.inkSoft)
+        Spacer(Modifier.height(Space.md))
+        RuvoField(received, { received = it }, "Money in that month", number = true, prefix = "₹ ")
+        Spacer(Modifier.height(Space.sm))
+        RuvoField(spent, { spent = it }, "Money out that month", number = true, prefix = "₹ ")
+        recorded?.let {
+            Text("Ruvo recorded ${IndianFormat.rupees(it.received)} in and ${IndianFormat.rupees(it.spent)} out.", Modifier.padding(top = Space.xs), style = Ruvo.type.caption, color = Ruvo.colors.inkFaint)
+        }
+        Spacer(Modifier.height(Space.lg))
+        PrimaryButton("Save", {
+            scope.launch { RuvoGraph.repository.setMonthTotals(month, parseRupees(received) ?: 0, parseRupees(spent) ?: 0) }
+            onDismiss()
+        }, Modifier.fillMaxWidth())
+        if (edit != null) {
+            Spacer(Modifier.height(Space.sm))
+            GhostButton("Go back to what Ruvo recorded", { scope.launch { RuvoGraph.repository.clearMonthTotals(month) }; onDismiss() }, Modifier.fillMaxWidth())
+        }
+    }
 }
 
 /** The balance on navy, with how it splits into goals, planned and yours to spend. Can be hidden. */
@@ -210,9 +318,10 @@ private fun WhereItWent(state: AppState, modifier: Modifier) {
 
 /** Received and spent for the last three months, as paired pills, plus each month's numbers. */
 @Composable
-private fun History(state: AppState) {
+private fun History(state: AppState, onEdit: (java.time.YearMonth) -> Unit) {
     val c = Ruvo.colors
-    val months = remember(state.input.transactions, state.today) { Insights.months(state.input.transactions, state.today, 3) }
+    val edits = state.settings.monthEditMap()
+    val months = remember(state.input.transactions, state.today, edits) { Insights.months(state.input.transactions, state.today, 6, edits) }
     Column(Modifier.padding(horizontal = Space.gutter)) {
         RuvoCard(Modifier.fillMaxWidth().reveal(2)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -243,7 +352,16 @@ private fun History(state: AppState) {
         }
         months.reversed().forEachIndexed { i, m ->
             RuvoCard(Modifier.fillMaxWidth().padding(top = Space.xs).reveal(3 + i)) {
-                Text(m.month.month.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.ENGLISH) + " " + m.month.year, style = Ruvo.type.bodyStrong, color = c.ink)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(m.month.month.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.ENGLISH) + " " + m.month.year, Modifier.weight(1f), style = Ruvo.type.title, color = c.ink)
+                    if (m.edited) { com.ruvo.design.Tag("Edited"); Spacer(Modifier.width(Space.xs)) }
+                    Text(
+                        "Edit", Modifier.clip(RoundedCornerShape(Radius.chip)).border(1.dp, c.ink, RoundedCornerShape(Radius.chip))
+                            .clickable(role = androidx.compose.ui.semantics.Role.Button, onClickLabel = "Correct this month") { onEdit(m.month) }
+                            .padding(horizontal = Space.sm, vertical = 6.dp),
+                        style = Ruvo.type.label, color = c.ink,
+                    )
+                }
                 Spacer(Modifier.height(Space.xs))
                 Row {
                     listOf("Received" to m.received, "Spent" to m.spent, "Left over" to m.leftOver).forEach { (k, v) ->

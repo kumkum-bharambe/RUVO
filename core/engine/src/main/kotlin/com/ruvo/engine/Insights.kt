@@ -46,15 +46,21 @@ object Insights {
         return Week(now.sumOf { it.yourShare }, before.sumOf { it.yourShare }, cats, now.maxByOrNull { it.yourShare })
     }
 
-    data class Month(val month: YearMonth, val received: Paise, val spent: Paise) {
+    /** One month in History. [edited] is true when the user corrected the totals by hand. */
+    data class Month(val month: YearMonth, val received: Paise, val spent: Paise, val edited: Boolean = false) {
         val leftOver: Paise get() = received - spent
     }
 
-    /** Money received and spent in each of the last [count] calendar months, oldest first. */
-    fun months(txns: List<Txn>, today: LocalDate, count: Int = 3): List<Month> {
+    /**
+     * Money received and spent in each of the last [count] calendar months, oldest first.
+     * [edits] are totals the user typed in History ("in September I really spent ₹9,000"); they replace the
+     * recorded totals for display only and never change the runway.
+     */
+    fun months(txns: List<Txn>, today: LocalDate, count: Int = 3, edits: Map<YearMonth, Pair<Paise, Paise>> = emptyMap()): List<Month> {
         val current = YearMonth.from(today)
         return (count - 1 downTo 0).map { back ->
             val ym = current.minusMonths(back.toLong())
+            edits[ym]?.let { (received, spent) -> return@map Month(ym, received, spent, edited = true) }
             val inMonth = txns.filter { YearMonth.from(it.date) == ym && it.status != TxnStatus.IGNORED }
             Month(
                 ym,
@@ -62,6 +68,18 @@ object Insights {
                 spent = inMonth.filter { it.countsAsSpending }.sumOf { it.yourShare },
             )
         }
+    }
+
+    /** Money in and money out over a span of days, GPay-style. Settlements and transfers are left out. */
+    data class Flow(val moneyIn: Paise, val moneyOut: Paise, val count: Int) {
+        val net: Paise get() = moneyIn - moneyOut
+    }
+
+    fun flow(txns: List<Txn>, from: LocalDate, to: LocalDate): Flow {
+        val span = txns.filter { !it.date.isBefore(from) && !it.date.isAfter(to) && it.status != TxnStatus.IGNORED }
+        val inflow = span.filter { it.direction == Direction.CREDIT && it.kind == TxnKind.INCOME }
+        val outflow = span.filter { it.countsAsSpending }
+        return Flow(inflow.sumOf { it.amount }, outflow.sumOf { it.yourShare }, inflow.size + outflow.size)
     }
 
     /** Spending by category over the last [days] days, largest first. */

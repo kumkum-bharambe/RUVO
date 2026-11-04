@@ -109,6 +109,15 @@ class RuvoSpeech(context: Context) {
         if (ready) tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "ruvo")
     }
 
+    /** Speaks in another Indian language when the answer is in it; falls back to Indian English. */
+    fun speak(text: String, languageTag: String) {
+        if (!ready) return
+        val locale = Locale.forLanguageTag(languageTag)
+        if (tts.isLanguageAvailable(locale) >= TextToSpeech.LANG_AVAILABLE) tts.language = locale else configure()
+        tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "ruvo")
+        if (!languageTag.startsWith("en")) configure()
+    }
+
     fun stop() {
         if (ready) tts.stop()
     }

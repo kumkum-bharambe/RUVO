@@ -97,20 +97,25 @@ sealed interface Overlay {
     data class Book(val id: String) : Overlay
     data class Txn(val id: String, val split: Boolean = false) : Overlay
     data object Weekly : Overlay
+    data object Profile : Overlay
     data object Monthly : Overlay
 }
 
 @Composable
 fun RuvoRoot(state: AppState, request: LaunchRequest?, consumed: () -> Unit) {
-    if (!state.ready) {
-        Box(Modifier.fillMaxSize().background(Ruvo.colors.canvas))
-        return
+    // A calm splash on every cold start: at least a beat long, and until the data is ready.
+    var splashDone by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { kotlinx.coroutines.delay(1100); splashDone = true }
+    val showApp = state.ready && splashDone
+    Box(Modifier.fillMaxSize()) {
+        if (showApp) {
+            if (!state.settings.onboarded) OnboardingFlow(onDone = {}) else MainShell(state, request, consumed)
+        }
+        // The splash sits on top and fades away over the app.
+        AnimatedVisibility(!showApp, enter = fadeIn(), exit = fadeOut(Motion.gentle())) {
+            com.ruvo.design.RuvoSplash()
+        }
     }
-    if (!state.settings.onboarded) {
-        OnboardingFlow(onDone = {})
-        return
-    }
-    MainShell(state, request, consumed)
 }
 
 @Composable
@@ -123,6 +128,7 @@ private fun MainShell(state: AppState, request: LaunchRequest?, consumed: () -> 
     val reduced = Ruvo.reducedMotion
     var lastBook by remember { mutableStateOf<String?>(null) }
     var newGoal by remember { mutableStateOf(false) }
+    var toMarket by remember { mutableStateOf(false) }
 
     LaunchedEffect(request) {
         when (request) {
@@ -150,6 +156,8 @@ private fun MainShell(state: AppState, request: LaunchRequest?, consumed: () -> 
         openMonthly = { overlay = Overlay.Monthly },
         openChat = { overlay = Overlay.Chat(it) },
         openGuide = { tab = Tab.GUIDE },
+        openAdd = { overlay = Overlay.QuickAdd },
+        openProfile = { overlay = Overlay.Profile },
     )
 
     val guide = GuideActions(
@@ -174,7 +182,7 @@ private fun MainShell(state: AppState, request: LaunchRequest?, consumed: () -> 
                 Tab.TODAY -> TodayScreen(actions)
                 Tab.MONEY -> MoneyScreen(openTxn = { overlay = Overlay.Txn(it) }, openAdd = { overlay = Overlay.QuickAdd })
                 Tab.GOALS -> GoalsScreen(startNewGoal = newGoal, onNewGoalShown = { newGoal = false }, onWeekly = { overlay = Overlay.Weekly })
-                Tab.GUIDE -> GuideScreen(guide)
+                Tab.GUIDE -> GuideScreen(guide, showMarketplace = toMarket, onMarketplaceShown = { toMarket = false })
             }
         }
 
@@ -245,6 +253,13 @@ private fun MainShell(state: AppState, request: LaunchRequest?, consumed: () -> 
         Overlay.Settings -> SettingsSheet(state, onDismiss = { overlay = Overlay.None }, onPersonas = { overlay = Overlay.Personas })
         Overlay.Personas -> PersonaPicker(onDismiss = { overlay = Overlay.None }) { overlay = Overlay.None; tab = Tab.TODAY }
         is Overlay.Txn -> TxnSheet(o.id, o.split) { overlay = Overlay.None }
+        Overlay.Profile -> ProfileSheet(
+            state, onDismiss = { overlay = Overlay.None },
+            onSettings = { overlay = Overlay.Settings },
+            onMarketplace = { tab = Tab.GUIDE; toMarket = true },
+            onPersonas = { overlay = Overlay.Personas },
+            onWeekly = { overlay = Overlay.Weekly },
+        )
         Overlay.Weekly -> WeeklyReviewSheet(onDismiss = { overlay = Overlay.None }, onOpenGuide = { tab = Tab.GUIDE })
         Overlay.Monthly -> MonthlyReviewSheet(state, onDismiss = { overlay = Overlay.None }, onWeekly = { overlay = Overlay.Weekly })
     }

@@ -54,6 +54,31 @@ class InsightsTest {
         assertEquals(rupees(1_000), m[1].spent)
     }
 
+    @Test fun editedMonthsReplaceRecordedTotalsAndAreMarked() {
+        val txns = listOf(spend("a", 700, 1), Txn("in", rupees(12_000), Direction.CREDIT, today.withDayOfMonth(1)))
+        val sep = YearMonth.of(2026, 9)
+        val m = Insights.months(txns, today, 3, mapOf(sep to (rupees(10_000) to rupees(9_000))))
+        val edited = m.first { it.month == sep }
+        assertEquals(true, edited.edited)
+        assertEquals(rupees(9_000), edited.spent)
+        assertEquals(rupees(1_000), edited.leftOver)
+        assertEquals(false, m.last().edited)
+        assertEquals(rupees(700), m.last().spent)
+    }
+
+    @Test fun flowCountsMoneyInAndOutWithinTheSpanOnly() {
+        val txns = listOf(
+            spend("a", 300, 1), spend("b", 200, 9),
+            Txn("in", rupees(5_000), Direction.CREDIT, today.minusDays(2)),
+            Txn("back", rupees(400), Direction.CREDIT, today, kind = TxnKind.SETTLEMENT),
+        )
+        val f = Insights.flow(txns, today.minusDays(6), today)
+        assertEquals(rupees(5_000), f.moneyIn)
+        assertEquals(rupees(300), f.moneyOut)
+        assertEquals(rupees(4_700), f.net)
+        assertEquals(2, f.count)
+    }
+
     @Test fun moodNeverAlarmsAndFollowsTheBuffer() {
         fun r(balance: Long, nextIn: Long) = RunwayEngine.calculate(
             RunwayInput(today, rupees(balance), IncomePlan(Cadence.MONTHLY, rupees(10_000), today.plusDays(nextIn)), transactions = (0L..13L).map { spend("s$it", 200, it) }),

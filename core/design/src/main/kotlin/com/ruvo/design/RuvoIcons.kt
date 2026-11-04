@@ -48,6 +48,14 @@ object RuvoIcons {
         moveTo(5.5f, 14f); curveTo(8f, 12.8f, 10f, 15.2f, 12f, 14f); curveTo(14f, 12.8f, 16f, 15.2f, 18.5f, 14f)
     }
 
+    /** Speak: a microphone. */
+    val Mic = icon("mic") {
+        moveTo(12f, 3.5f); curveTo(13.66f, 3.5f, 15f, 4.84f, 15f, 6.5f); lineTo(15f, 11.5f); curveTo(15f, 13.16f, 13.66f, 14.5f, 12f, 14.5f)
+        curveTo(10.34f, 14.5f, 9f, 13.16f, 9f, 11.5f); lineTo(9f, 6.5f); curveTo(9f, 4.84f, 10.34f, 3.5f, 12f, 3.5f); close()
+        moveTo(5.5f, 11f); curveTo(5.5f, 14.6f, 8.4f, 17.5f, 12f, 17.5f); curveTo(15.6f, 17.5f, 18.5f, 14.6f, 18.5f, 11f)
+        moveTo(12f, 17.5f); lineTo(12f, 20.5f)
+    }
+
     /** Show: an open eye. */
     val Eye = icon("eye") {
         moveTo(2.5f, 12f); curveTo(5f, 7f, 8.5f, 5f, 12f, 5f); curveTo(15.5f, 5f, 19f, 7f, 21.5f, 12f)
