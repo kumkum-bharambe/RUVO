@@ -88,7 +88,7 @@ fun RuvoPet(mood: PetMood, modifier: Modifier = Modifier) {
 
 /** Eyes stay open most of the loop and close briefly, twice in a row now and then. */
 private fun blinkOpen(t: Float): Float {
-    fun dip(at: Float) = (1f - kotlin.math.abs(t - at) / 0.025f).coerceIn(0f, 1f)
+    fun dip(at: Float) = (1f - kotlin.math.abs(t - at) / 0.014f).coerceIn(0f, 1f)
     return 1f - maxOf(dip(0.62f), dip(0.69f)) * 0.95f
 }
 
@@ -127,15 +127,17 @@ private fun DrawScope.drawPet(mood: PetMood, breath: Float, ruffle: Float, eyeOp
 
     // Fur: short strands all round the edge, each with its own length, ruffling in a slow wave.
     scale(1f / squash, squash, pivot = Offset(cx, 90f)) {
-        val strands = 120
+        // A soft halo fills the gaps between strands so the edge reads as fluff, not spikes.
+        drawCircle(fur.mid.copy(alpha = 0.85f), r + 2.5f, Offset(cx, cy))
+        val strands = 170
         for (i in 0 until strands) {
             val a = (i.toFloat() / strands) * 2f * PI.toFloat()
-            val len = 4.5f + strand(i) * 4.5f - if (sin(a) > 0.6f) 2f else 0f
-            val wiggle = 0.12f * sin(ruffle * 2f * PI.toFloat() + i * 0.45f)
+            val len = 2.5f + strand(i) * 3f - if (sin(a) > 0.6f) 1.5f else 0f
+            val wiggle = 0.06f * sin(ruffle * 2f * PI.toFloat() + i * 0.45f)
             val base = Offset(cx + cos(a) * (r - 3f), cy + sin(a) * (r - 3f))
             val tipA = a + wiggle
             val end = Offset(cx + cos(tipA) * (r + len), cy + sin(tipA) * (r + len))
-            drawLine(if (i % 3 == 0) fur.light else fur.mid, base, end, 3.2f, StrokeCap.Round)
+            drawLine(if (i % 3 == 0) fur.light else fur.mid, base, end, 4.6f, StrokeCap.Round)
         }
         // The body itself, lit from the top left.
         drawCircle(Brush.radialGradient(listOf(fur.light, fur.mid, fur.deep), Offset(cx - 12f, cy - 14f), r * 1.7f), r, Offset(cx, cy))
@@ -157,9 +159,15 @@ private fun DrawScope.drawPet(mood: PetMood, breath: Float, ruffle: Float, eyeOp
     val lookX = look * 2.4f
     val lookY = if (mood == PetMood.THINKING) -3f else 0.5f
     listOf(cx - 11f, cx + 11f).forEach { ex ->
-        val h = 19f * eyeOpen.coerceAtLeast(0.08f)
+        if (eyeOpen < 0.35f) {
+            // Mid-blink: a soft closed-eye curve, not a slit.
+            val lid = Path().apply { moveTo(ex - 6.5f, eyeY); quadraticTo(ex, eyeY + 4.5f, ex + 6.5f, eyeY) }
+            drawPath(lid, EyeInk, style = Stroke(2.4f, cap = StrokeCap.Round))
+            return@forEach
+        }
+        val h = 19f * eyeOpen
         drawOval(Color.White, Offset(ex - 8f, eyeY - h / 2f), Size(16f, h))
-        if (eyeOpen > 0.3f) {
+        run {
             val p = Offset(ex + lookX, eyeY + lookY + 1f)
             drawCircle(EyeInk, 5.6f, p)
             drawCircle(Color.White, 1.9f, p + Offset(-1.8f, -2.2f))

@@ -317,7 +317,7 @@ private fun WhereItWent(state: AppState, modifier: Modifier, onCategory: (String
     val cats = remember(state.input.transactions, state.today) { Insights.byCategory(state.input.transactions, state.today, 30) }
     if (cats.isEmpty()) return
     val top = cats.first().second.toFloat().coerceAtLeast(1f)
-    val palette = listOf(c.fuel, c.future, c.fixed, c.warning, c.sun, c.inkFaint)
+    val palette = listOf(c.fuel, c.future, c.fixed, c.heroTop, c.sun, c.inkFaint)
     RuvoCard(Modifier.padding(horizontal = Space.gutter).fillMaxWidth().then(modifier)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {

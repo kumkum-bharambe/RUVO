@@ -208,7 +208,7 @@ private fun DrawScope.drawIllustration(id: String) {
             dot(PK, 0.27f, 0.5f, 0.34f); dot(PK, 0.1f, 0.76f, 0.33f); dot(PKD, 0.03f, 0.79f, 0.33f)
             poly(PK, 0.36f, 0.17f, 0.42f, 0.08f, 0.48f, 0.16f); box(PKD, 0.42f, 0.15f, 0.16f, 0.025f, 0.01f)
             box(PK, 0.33f, 0.5f, 0.08f, 0.08f); box(PK, 0.59f, 0.5f, 0.08f, 0.08f); dot(N, 0.025f, 0.63f, 0.29f)
-            coin(0.5f, 0.07f, 0.06f)
+            coin(0.24f, 0.1f, 0.06f)
         }
         "protect" -> { // A shield keeping a coin safe.
             poly(P, 0.5f, 0.06f, 0.82f, 0.14f, 0.78f, 0.4f, 0.5f, 0.58f, 0.22f, 0.4f, 0.18f, 0.14f)
@@ -231,7 +231,7 @@ private fun DrawScope.drawIllustration(id: String) {
             listOf(1, 2, 3, 5).forEachIndexed { i, n ->
                 repeat(n) { k -> box(YD, 0.12f + i * 0.2f, 0.53f - k * 0.07f, 0.16f, 0.06f, 0.03f); box(Y, 0.12f + i * 0.2f, 0.52f - k * 0.07f, 0.16f, 0.05f, 0.03f) }
             }
-            poly(W, 0.14f, 0.24f, 0.42f, 0.1f, 0.4f, 0.16f, 0.52f, 0.06f, 0.5f, 0.15f)
+            stroke(N, 0.14f, 0.3f, 0.5f, 0.1f, 0.04f); poly(N, 0.44f, 0.06f, 0.58f, 0.06f, 0.52f, 0.18f)
         }
         "pause" -> { // A pause button: a day to think before buying.
             dot(O, 0.3f, 0.5f, 0.3f); box(N, 0.38f, 0.19f, 0.08f, 0.22f, 0.03f); box(N, 0.54f, 0.19f, 0.08f, 0.22f, 0.03f)

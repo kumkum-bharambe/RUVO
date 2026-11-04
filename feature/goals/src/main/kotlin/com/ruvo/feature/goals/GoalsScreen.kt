@@ -159,7 +159,7 @@ fun GoalsScreen(startNewGoal: Boolean = false, onNewGoalShown: () -> Unit = {}, 
         }
         if (state.goals.isNotEmpty()) item { GoalInsights(state, Modifier.padding(horizontal = Space.gutter).padding(top = Space.md).reveal(3)) }
         item {
-            RuvoCard(Modifier.padding(horizontal = Space.gutter).padding(top = Space.xl), brush = c.heroBrush, border = null, elevated = true, onClick = { review = true }, onClickLabel = "Open monthly review") {
+            RuvoCard(Modifier.fillMaxWidth().padding(horizontal = Space.gutter).padding(top = Space.xl), brush = c.heroBrush, border = null, elevated = true, onClick = { review = true }, onClickLabel = "Open monthly review") {
                 Eyebrow("Monthly review", color = c.onHero.copy(alpha = 0.7f))
                 Text("Your month in 30 seconds", style = Ruvo.type.title, color = c.onHero)
                 Text("What came in, what went out, what you protected.", style = Ruvo.type.caption, color = c.onHero.copy(alpha = 0.7f))

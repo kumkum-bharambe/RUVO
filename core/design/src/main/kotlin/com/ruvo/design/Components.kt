@@ -439,13 +439,14 @@ fun StatusChips(items: List<StatusItem>, modifier: Modifier = Modifier) {
     val t by loop.animateFloat(0f, 1f, infiniteRepeatable(tween(2800, easing = LinearEasing)), label = "t")
     val sweep by loop.animateFloat(-0.6f, 1.6f, infiniteRepeatable(tween(4200, easing = LinearEasing)), label = "sweep")
     LazyRow(
-        modifier.fillMaxWidth().drawWithContent {
+        // Offscreen first, so the edge fade erases only the chips and never the screen behind them.
+        modifier.fillMaxWidth().graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }.drawWithContent {
             // Chips fade in and out at the screen edges instead of being cut off.
             drawContent()
             val fade = 28.dp.toPx()
             drawRect(Brush.horizontalGradient(listOf(Color.Black, Color.Transparent), endX = fade), blendMode = BlendMode.DstOut)
             drawRect(Brush.horizontalGradient(listOf(Color.Transparent, Color.Black), startX = size.width - fade), blendMode = BlendMode.DstOut)
-        }.graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen },
+        },
         state = list, horizontalArrangement = Arrangement.spacedBy(Space.xs),
         contentPadding = PaddingValues(horizontal = if (reduced) Space.gutter else 0.dp, vertical = 8.dp),
     ) {
