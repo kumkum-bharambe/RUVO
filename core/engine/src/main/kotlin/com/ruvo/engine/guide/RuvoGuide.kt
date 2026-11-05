@@ -371,15 +371,17 @@ object Lessons {
 }
 
 /**
- * The Marketplace: curated, clearly labelled listings from made-up brands. Every listing says who published it,
- * when Ruvo last checked it and when it ends, as in Ruvo 7, so nobody mistakes a stale offer for a live one.
- * Each also shows its saving in days. These are sample listings, not real offers.
+ * The Marketplace: real student offers from real brands (Kumkum, 5 Nov 2026), each checked against public reports
+ * or the brand's own page on the date shown. Every listing says where it comes from, when Ruvo last checked it and
+ * when it ends, so nobody mistakes a stale offer for a live one. Prices change, so the app always asks people to
+ * confirm on the brand's own app before paying. Ruvo is not paid for any listing and shows no ads.
  */
 object Perks {
     data class Perk(
         val id: String,
         val brand: String,
         val offer: String,
+        /** What it saves a month compared with the usual price, when that is known. 0 when it varies. */
         val monthlySaving: Paise,
         /** Save, Earn, Learn or Student offers. */
         val kind: String,
@@ -387,44 +389,67 @@ object Perks {
         val source: String = "",
         val sourceType: String = "",
         /** When Ruvo last checked the listing, and when the offer ends (null if it has no end). */
-        val checked: LocalDate = LocalDate.of(2026, 10, 20),
+        val checked: LocalDate = LocalDate.of(2026, 11, 5),
         val ends: LocalDate? = null,
         /** The one step to take it up. */
         val how: String = "",
+        /** A short badge when the saving is not a simple monthly amount, e.g. "Free" or "App deals". */
+        val badge: String? = null,
     )
+
+    private val checkedOn = LocalDate.of(2026, 11, 5)
 
     val all = listOf(
         Perk(
-            "p1", "Kettle Club", "₹40 off chai and a snack, weekdays before 11 am", 80_000, "Save",
-            "Kettle Club counter notice", "Partner listing", LocalDate.of(2026, 10, 28), LocalDate.of(2026, 12, 31),
-            "Show your college ID at the counter before 11 am.",
+            "spotify", "Spotify", "Premium Student at ₹69 a month, instead of ₹139 for Standard", 7_000, "Student offers",
+            "Spotify India price change, reported May 2026", "Company pricing", checkedOn, null,
+            "In Spotify, choose Premium Student and verify that you are enrolled at a recognised college.",
         ),
         Perk(
-            "p2", "LoopRide", "Student monthly pass for metro feeder buses", 1_20_000, "Save",
-            "LoopRide website", "Transport operator", LocalDate.of(2026, 10, 15), LocalDate.of(2027, 3, 31),
-            "Apply at a LoopRide counter with your college ID and a photo.",
+            "youtube", "YouTube Premium", "Student plan at ₹89 a month, instead of ₹149 for Individual", 6_000, "Student offers",
+            "YouTube Premium India pricing", "Company pricing", checkedOn, null,
+            "In the YouTube app, pick the Student plan and verify that you are a full-time student. Eligible for up to four years.",
         ),
         Perk(
-            "p3", "Chalk & Co.", "15% off stationery and printing with a college ID", 45_000, "Student offers",
-            "Chalk & Co. store", "Partner listing", LocalDate.of(2026, 10, 30), LocalDate.of(2026, 11, 14),
-            "Show your college ID at the billing counter.",
+            "swiggy", "Swiggy", "Student Rewards: discounted Swiggy One and One Lite memberships and food deals for verified students", 0, "Student offers",
+            "Swiggy Student Rewards programme", "Company programme", checkedOn, null,
+            "In the Swiggy app, search \"Identity card\" and upload a photo of your valid student ID to unlock the student rates.",
+            badge = "Student ID",
         ),
         Perk(
-            "p4", "Thali Tribe", "Mess-style lunch plan, 20 meals", 1_50_000, "Save",
-            "Thali Tribe menu card", "Partner listing", LocalDate.of(2026, 9, 18), LocalDate.of(2027, 1, 31),
-            "Buy the 20-meal card at the counter; it lasts a month.",
+            "swiggylite", "Swiggy One Lite", "₹99 for 3 months: 10 free food deliveries on orders above ₹149 and 10 on Instamart above ₹199", 0, "Save",
+            "Swiggy One Lite launch details", "Company announcement", checkedOn, null,
+            "Buy One Lite in the Swiggy app. It is worth it only if you would have ordered anyway.",
+            badge = "₹99 / 3 mo",
         ),
         Perk(
-            "p5", "Pixelpass", "Free student plan for design tools", 99_900, "Learn",
-            "Pixelpass student page", "Company website", LocalDate.of(2026, 10, 25), null,
-            "Sign up with your college email address.",
+            "mcdonalds", "McDonald's", "No student discount in India, but app-only deals such as McSaver meals in the Offers tab", 0, "Save",
+            "McDonald's India app offers", "Company app", checkedOn, null,
+            "Open the Offers tab in the McDonald's India app before you order; deals change often.",
+            badge = "App deals",
         ),
         Perk(
-            "p6", "GigNest", "Paid weekend projects for beginner designers", 0, "Earn",
-            "GigNest job board", "Partner listing", LocalDate.of(2026, 10, 2), LocalDate.of(2026, 10, 31),
-            "Make a profile and apply to one project at a time.",
+            "github", "GitHub Student Developer Pack", "Free GitHub Pro and free partner tools and credits while you are a student", 0, "Learn",
+            "education.github.com/pack", "Company website", checkedOn, null,
+            "Apply at education.github.com/pack with your college email or a student ID.",
+            badge = "Free",
+        ),
+        Perk(
+            "figma", "Figma for Education", "Free Professional plan for verified students", 0, "Learn",
+            "figma.com/education", "Company website", checkedOn, null,
+            "Apply at figma.com/education; approval usually takes a few days.",
+            badge = "Free",
+        ),
+        Perk(
+            "internshala", "Internshala", "Internships and part-time work for students, many of them paid", 0, "Earn",
+            "internshala.com", "Job platform", checkedOn, null,
+            "Make a free profile and apply to a few roles that match your course.",
+            badge = "Earn",
         ),
     )
+
+    /** "Saves about 3 days a year" at the current daily spend: the yearly saving in days of usual spending. */
+    fun daysPerYear(p: Perk, dailySpend: Paise): Int = if (dailySpend <= 0) 0 else (p.monthlySaving * 12 / dailySpend).toInt()
 
     /** "Saves you 2 days" at the current daily spend. */
     fun daysSaved(p: Perk, dailySpend: Paise): Int = if (dailySpend <= 0) 0 else (p.monthlySaving / dailySpend).toInt()

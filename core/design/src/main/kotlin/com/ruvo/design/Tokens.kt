@@ -282,7 +282,7 @@ object Covers {
 
     /**
      * Bright, saturated colours for small coloured things that must read on white glass and on black alike: book
-     * spines on the reading shelf and made-up brand marks in the Marketplace. Each pairs with its own text colour.
+     * spines on the reading shelf and brand initials in the Marketplace. Each pairs with its own text colour.
      */
     val brights: List<Pair<Color, Color>> = listOf(
         Color(0xFFFFC23D) to Navy,

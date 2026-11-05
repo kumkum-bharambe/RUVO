@@ -204,8 +204,8 @@ fun TodayContent(state: AppState, a: TodayActions) {
             // Only listings that are current and recently checked; never one that has ended or gone stale.
             val current = Perks.listed(state.today).filter { Perks.status(it, state.today).state.let { s -> s == Perks.State.ACTIVE || s == Perks.State.ENDING } }
             val perk = current.getOrNull(state.today.dayOfYear % current.size.coerceAtLeast(1)) ?: return@item
-            val days = Perks.daysSaved(perk, r.dailySpend)
-            if (days > 0) {
+            val badge = if (perk.monthlySaving > 0) "Saves ${IndianFormat.rupees(perk.monthlySaving)} a month" else perk.badge.orEmpty()
+            run {
                 val ink = c.onLight
                 RuvoCard(
                     Modifier.padding(horizontal = Space.gutter).padding(top = Space.sm).reveal(11), brush = c.marketBrush, border = null, elevated = true,
@@ -214,9 +214,9 @@ fun TodayContent(state: AppState, a: TodayActions) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(RuvoIcons.Store, null, Modifier.size(20.dp), tint = ink)
                         Spacer(Modifier.width(Space.xs))
-                        Eyebrow("Marketplace · sample", color = ink.copy(alpha = 0.75f))
+                        Eyebrow("Marketplace · student offer", color = ink.copy(alpha = 0.75f))
                         Spacer(Modifier.weight(1f))
-                        Text("Saves you ${IndianFormat.days(days)}", style = Ruvo.type.label, color = ink)
+                        Text(badge, style = Ruvo.type.label, color = ink)
                     }
                     Spacer(Modifier.height(Space.xs))
                     Text("${perk.brand}: ${perk.offer}", style = Ruvo.type.bodyStrong, color = ink)

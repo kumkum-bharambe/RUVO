@@ -66,6 +66,8 @@ data class OrbMood(
     val energy: Float,
     /** A goal just completed: the Orb glows. */
     val glow: Boolean,
+    /** Money arrives within two days and the runway makes it: the pet gets excited. */
+    val paydaySoon: Boolean = false,
 ) {
     companion object {
         fun from(r: RunwayResult, anyGoalComplete: Boolean): OrbMood {
@@ -83,7 +85,7 @@ data class OrbMood(
                 buffer != null && buffer < 3 -> 0.55f
                 else -> 0.1f
             }
-            return OrbMood(level, energy, anyGoalComplete)
+            return OrbMood(level, energy, anyGoalComplete, paydaySoon = r.makesIt && next != null && next in 0..2)
         }
     }
 }
@@ -142,7 +144,7 @@ fun RuvoOrb(
             .size(size)
             .semantics {
                 role = Role.Button
-                contentDescription = "Ruvo. Tap to ask a question. Pull down to add a spend. Press and hold to pat."
+                contentDescription = "Ruvo, ${mood.pet().meaning()}. Tap to ask a question. Pull down to add a spend. Press and hold to pat."
                 onClick(label = "Talk to Ruvo") { onTalk(); true }
                 customActions = listOf(
                     CustomAccessibilityAction("Add a spend") { onQuickAdd(); true },

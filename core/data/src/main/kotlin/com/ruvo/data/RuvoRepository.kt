@@ -348,6 +348,11 @@ class RuvoRepository(
         it.copy(savedIdeas = if (key in it.savedIdeas) it.savedIdeas - key else it.savedIdeas + key)
     }
 
+    /** Saves or unsaves a Marketplace offer. */
+    suspend fun toggleOffer(id: String) = settingsStore.update {
+        it.copy(savedOffers = if (id in it.savedOffers) it.savedOffers - id else it.savedOffers + id)
+    }
+
     /** Weekly review: was this purchase worth it? WORTH, NOT or UNSURE. */
     suspend fun reviewPurchase(txnId: String, verdict: String) = settingsStore.update { s ->
         s.copy(purchaseReviews = s.purchaseReviews.filterNot { it.startsWith("$txnId:") }.toSet() + "$txnId:$verdict")

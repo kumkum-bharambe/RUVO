@@ -274,38 +274,38 @@ private fun MonthEditSheet(state: AppState, month: java.time.YearMonth, onDismis
     }
 }
 
-/** The balance on navy, with how it splits into goals, planned and yours to spend. Hidden when Settings says so. */
+/**
+ * The balance on the same pane of white glass as the runway on Home, with how it splits into goals, planned and
+ * yours to spend. Hidden when Settings says so.
+ */
 @Composable
 private fun BalanceCard(state: AppState, modifier: Modifier, onUpdate: () -> Unit) {
     val c = Ruvo.colors
     val r = state.runway
-    val scope = rememberCoroutineScope()
     val hidden = state.settings.hideBalance
-    RuvoCard(modifier.fillMaxWidth(), brush = c.heroBrush, border = null, elevated = true, onClick = onUpdate, onClickLabel = "Update balance") {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Eyebrow("You have", color = c.onHero.copy(alpha = 0.7f))
-                if (hidden) Text("₹ ••••", style = Ruvo.type.display, color = c.onHero)
-                else Amount(r.balance, style = Ruvo.type.display, color = c.onHero, countUp = true)
-            }
-        }
-        Spacer(Modifier.height(Space.sm))
-        val total = (r.fixedReserved + r.futureProtected + r.fuel.coerceAtLeast(0)).toFloat().coerceAtLeast(1f)
-        SplitBar(listOf(Segment(r.futureProtected / total, c.future), Segment(r.fixedReserved / total, c.fixed), Segment(r.fuel.coerceAtLeast(0) / total, c.fuel)))
-        Spacer(Modifier.height(Space.sm))
-        Row {
-            listOf(Triple(c.future, "In goals", r.futureProtected), Triple(c.fixed, "Planned", r.fixedReserved), Triple(c.fuel, "Yours to use", r.fuel.coerceAtLeast(0))).forEach { (col, label, v) ->
-                Column(Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        androidx.compose.foundation.layout.Box(Modifier.padding(end = 6.dp).size(8.dp).clip(CircleShape).background(col))
-                        Text(label, style = Ruvo.type.caption, color = c.onHero.copy(alpha = 0.7f), maxLines = 1)
+    com.ruvo.design.GlassHero(modifier, onClick = onUpdate, onClickLabel = "Update balance") {
+        Column(Modifier.fillMaxWidth().padding(Space.lg)) {
+            Eyebrow("You have", color = c.inkSoft)
+            if (hidden) Text("₹ ••••", style = Ruvo.type.display, color = c.ink)
+            else Amount(r.balance, style = Ruvo.type.display, color = c.ink, countUp = true)
+            Spacer(Modifier.height(Space.sm))
+            val total = (r.fixedReserved + r.futureProtected + r.fuel.coerceAtLeast(0)).toFloat().coerceAtLeast(1f)
+            SplitBar(listOf(Segment(r.futureProtected / total, c.future), Segment(r.fixedReserved / total, c.fixed), Segment(r.fuel.coerceAtLeast(0) / total, c.fuel)))
+            Spacer(Modifier.height(Space.sm))
+            Row {
+                listOf(Triple(c.future, "In goals", r.futureProtected), Triple(c.fixed, "Planned", r.fixedReserved), Triple(c.fuel, "Yours to use", r.fuel.coerceAtLeast(0))).forEach { (col, label, v) ->
+                    Column(Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            androidx.compose.foundation.layout.Box(Modifier.padding(end = 6.dp).size(8.dp).clip(CircleShape).background(col))
+                            Text(label, style = Ruvo.type.caption, color = c.inkSoft, maxLines = 1)
+                        }
+                        if (hidden) Text("••••", style = Ruvo.type.bodyStrong, color = c.ink) else Amount(v, style = Ruvo.type.bodyStrong, color = c.ink)
                     }
-                    if (hidden) Text("••••", style = Ruvo.type.bodyStrong, color = c.onHero) else Amount(v, style = Ruvo.type.bodyStrong, color = c.onHero)
                 }
             }
+            Spacer(Modifier.height(Space.xs))
+            Text("Across accounts and cash · tap to update", style = Ruvo.type.caption, color = c.inkFaint)
         }
-        Spacer(Modifier.height(Space.xs))
-        Text("Across accounts and cash · tap to update", style = Ruvo.type.caption, color = c.onHero.copy(alpha = 0.6f))
     }
 }
 

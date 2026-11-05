@@ -29,22 +29,53 @@ import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
 
-/** The pet's colours and eyes follow the money: happy, calm, worried, or thinking while Ruvo answers. */
-enum class PetMood { HAPPY, CALM, WORRIED, THINKING }
+/**
+ * The pet's feelings, each tied to something real in your money, and none of them sad: Ruvo never makes anyone feel
+ * bad about money. [WORRIED] is kept as the name for "short of next money", but the pet shows it as supportive:
+ * hopeful eyebrows, a warm smile and little hearts, cheering you on.
+ */
+enum class PetMood {
+    /** Plenty of runway: a big smile and rosy cheeks. */
+    HAPPY,
+    /** A thin cushion: a calm, steady little smile. */
+    CALM,
+    /** Short of next money: hopeful, warm and encouraging, sending hearts. */
+    WORRIED,
+    /** Working out an answer in chat: eyes up, a small "o". */
+    THINKING,
+    /** A goal just completed: sparkling star eyes and a golden glow. */
+    PROUD,
+    /** Money arrives within two days: wide shiny eyes and an open grin. */
+    EXCITED,
+}
 
-/** Happy when the runway is comfortable, calm when the cushion is thin, worried when money is short. */
+/** What each mood means, in a few words, for screen readers and the pet's own lines. */
+fun PetMood.meaning(): String = when (this) {
+    PetMood.HAPPY -> "happy: your runway is comfortable"
+    PetMood.CALM -> "steady: your cushion is thin, so it's keeping an eye on things"
+    PetMood.WORRIED -> "cheering you on: money is a little short, and you can plan for it"
+    PetMood.THINKING -> "thinking"
+    PetMood.PROUD -> "proud: you finished a goal"
+    PetMood.EXCITED -> "excited: your next money arrives very soon"
+}
+
+/** Proud when a goal is done, excited just before payday, happy when comfortable, steady when thin, supportive when short. */
 fun OrbMood.pet(): PetMood = when {
+    glow -> PetMood.PROUD
+    paydaySoon -> PetMood.EXCITED
     energy >= 0.9f -> PetMood.WORRIED
     energy >= 0.5f -> PetMood.CALM
     else -> PetMood.HAPPY
 }
 
-/** Four liquid colours that swirl inside the sphere, deepest first. */
+/** Four liquid colours that swirl inside the sphere, deepest first. Always warm and friendly, never alarm red. */
 private fun swirlFor(m: PetMood): List<Color> = when (m) {
     PetMood.HAPPY -> listOf(Color(0xFFFF7A3D), Color(0xFFFFC23D), Color(0xFFFF6FA8), Color(0xFF8B6CFF))
     PetMood.CALM -> listOf(Color(0xFF3550D6), Color(0xFF3FA9FF), Color(0xFFFF6FA8), Color(0xFFB79CFF))
-    PetMood.WORRIED -> listOf(Color(0xFFE5402F), Color(0xFFFF8A45), Color(0xFFFF5C8A), Color(0xFFFFC23D))
+    PetMood.WORRIED -> listOf(Color(0xFFFF8A65), Color(0xFFFFB347), Color(0xFFFF8FB8), Color(0xFFB79CFF))
     PetMood.THINKING -> listOf(Color(0xFF2338A8), Color(0xFF8B6CFF), Color(0xFF3FD0FF), Color(0xFFFF8FC8))
+    PetMood.PROUD -> listOf(Color(0xFFF2A516), Color(0xFFFFE08A), Color(0xFFFF8A45), Color(0xFFFFF1B8))
+    PetMood.EXCITED -> listOf(Color(0xFFFF6FA8), Color(0xFFFFC23D), Color(0xFF3FD0FF), Color(0xFF8B6CFF))
 }
 
 /** A fixed pseudo-random number in 0..1 for sparkle [i], so the ring looks scattered but never flickers. */
@@ -273,14 +304,24 @@ private fun DrawScope.drawFace(o: Pose) {
                         drawPath(arcPath, Color.White, style = Stroke(3.4f, cap = StrokeCap.Round))
                     }
                     surprised -> drawCircle(Color.White, 5.4f, Offset(ex, eyeY))
+                    o.mood == PetMood.PROUD -> sparkle(Offset(ex, eyeY), 6.5f * (0.85f + 0.15f * o.eyeOpen), Color.White)
+                    o.mood == PetMood.EXCITED -> {
+                        // Big round shiny eyes with a glint.
+                        drawCircle(Color.White, 5.6f * o.eyeOpen.coerceAtLeast(0.3f), Offset(ex, eyeY))
+                        drawCircle(Color(0xFF2338A8).copy(alpha = 0.5f), 2.2f, Offset(ex + 1.2f, eyeY + 1f))
+                        drawCircle(Color.White, 1f, Offset(ex + 2f, eyeY - 1f))
+                    }
                     else -> {
                         val h = (17f * o.eyeOpen).coerceAtLeast(2.6f) * if (o.mood == PetMood.HAPPY) 0.92f else 1f
-                        val lean = if (o.mood == PetMood.WORRIED) (if (i == 0) 6f else -6f) else 0f
-                        rotate(lean, Offset(ex, eyeY)) {
-                            drawRoundRect(Color.White, Offset(ex - w / 2f, eyeY - h / 2f), Size(w, h), CornerRadius(w / 2f))
-                        }
+                        drawRoundRect(Color.White, Offset(ex - w / 2f, eyeY - h / 2f), Size(w, h), CornerRadius(w / 2f))
                     }
                 }
+            }
+            // Supportive (short of money): hopeful eyebrows lifted in the middle, like "we've got this".
+            if (o.mood == PetMood.WORRIED && !happy && !surprised) {
+                val brow = Stroke(2.2f, cap = StrokeCap.Round)
+                drawLine(Color.White.copy(alpha = 0.9f), Offset(36.5f + lookX, eyeY - 12.5f), Offset(45f + lookX, eyeY - 14.5f), brow.width, StrokeCap.Round)
+                drawLine(Color.White.copy(alpha = 0.9f), Offset(55f + lookX, eyeY - 14.5f), Offset(63.5f + lookX, eyeY - 12.5f), brow.width, StrokeCap.Round)
             }
             // The mouth: a big open smile when delighted, an "o" when surprised, otherwise it follows the mood.
             val mx = 50f + lookX * 0.6f
@@ -290,12 +331,15 @@ private fun DrawScope.drawFace(o: Pose) {
                 happy -> drawPath(Path().apply { moveTo(mx - 6.5f, my - 1f); quadraticTo(mx, my + 9f, mx + 6.5f, my - 1f); close() }, Color.White)
                 surprised -> drawCircle(Color.White, 2.8f, Offset(mx, my + 1.5f), style = Stroke(2.4f))
                 winking -> drawPath(Path().apply { moveTo(mx - 5f, my); quadraticTo(mx + 1f, my + 4.5f, mx + 6f, my - 2f) }, Color.White, style = line)
-                o.mood == PetMood.WORRIED -> drawPath(Path().apply { moveTo(mx - 4.5f, my + 2.5f); quadraticTo(mx, my - 1f, mx + 4.5f, my + 2.5f) }, Color.White, style = line)
+                // Supportive: a warm, gentle smile, never a frown.
+                o.mood == PetMood.WORRIED -> drawPath(Path().apply { moveTo(mx - 4.5f, my); quadraticTo(mx, my + 4f, mx + 4.5f, my) }, Color.White, style = line)
                 o.mood == PetMood.THINKING -> drawCircle(Color.White, 1.8f, Offset(mx + 3f, my + 1f), style = Stroke(2f))
                 o.mood == PetMood.CALM -> drawPath(Path().apply { moveTo(mx - 3.5f, my); quadraticTo(mx, my + 3f, mx + 3.5f, my) }, Color.White, style = line)
+                o.mood == PetMood.PROUD || o.mood == PetMood.EXCITED ->
+                    drawPath(Path().apply { moveTo(mx - 6.5f, my - 1f); quadraticTo(mx, my + 9f, mx + 6.5f, my - 1f); close() }, Color.White)
                 else -> drawPath(Path().apply { moveTo(mx - 5.5f, my - 0.5f); quadraticTo(mx, my + 5f, mx + 5.5f, my - 0.5f) }, Color.White, style = line)
             }
-            if (o.mood == PetMood.HAPPY || happy) {
+            if (o.mood == PetMood.HAPPY || o.mood == PetMood.WORRIED || o.mood == PetMood.PROUD || happy) {
                 // Warm cheeks under the eyes.
                 drawCircle(Color(0xFFFFD6EA).copy(alpha = 0.5f), 3.4f, Offset(34f + lookX, eyeY + 9f))
                 drawCircle(Color(0xFFFFD6EA).copy(alpha = 0.5f), 3.4f, Offset(66f + lookX, eyeY + 9f))
@@ -307,6 +351,21 @@ private fun DrawScope.drawFace(o: Pose) {
 /** Things outside the sphere: hearts when it is happy, a sparkle with the wink, the coin it tosses. */
 private fun DrawScope.drawExtras(o: Pose, lift: Float) {
     val p = o.p
+    // Supportive: one small heart floats up every few seconds, like a quiet "you can do this".
+    if (o.mood == PetMood.WORRIED && o.joy <= 0.02f) {
+        val q = (o.drift * 4f) % 1f
+        if (q < 0.6f) {
+            val k = q / 0.6f
+            heart(Offset(74f + sin(k * 6f) * 2f, 24f - k * 22f + lift), 4.2f + k * 1.5f, Color(0xFFFF6FA8).copy(alpha = (1f - k) * 0.9f))
+        }
+    }
+    // Proud: golden sparkles twinkle around it.
+    if (o.mood == PetMood.PROUD) {
+        listOf(Offset(14f, 22f), Offset(86f, 30f), Offset(80f, 78f), Offset(18f, 74f)).forEachIndexed { i, at ->
+            val tw = (sin((o.drift * 10f + i * 0.25f) * 2f * PI.toFloat()) + 1f) / 2f
+            sparkle(at + Offset(0f, lift), 3f + 3f * tw, Color(0xFFFFE08A).copy(alpha = 0.5f + 0.5f * tw))
+        }
+    }
     if (o.joy > 0.02f) {
         // Three little hearts float up and fade.
         val q = 1f - o.joy

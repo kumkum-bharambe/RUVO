@@ -99,9 +99,20 @@ class RuvoGuideTest {
         }
     }
 
-    @Test fun `perk saving is shown in days`() {
-        assertEquals(4, Perks.daysSaved(Perks.all[0], rupees(200)))
-        assertEquals(0, Perks.daysSaved(Perks.all[5], rupees(200)))
+    @Test fun `perk saving is shown in days a year`() {
+        // Spotify Student saves ₹70 a month: ₹840 a year is 4 days at ₹200 a day.
+        val spotify = Perks.all.first { it.id == "spotify" }
+        assertEquals(4, Perks.daysPerYear(spotify, rupees(200)))
+        assertEquals(0, Perks.daysPerYear(Perks.all.first { it.id == "github" }, rupees(200)))
+    }
+
+    @Test fun `every real listing says where it comes from, how to get it, and has no made-up saving`() {
+        Perks.all.forEach { p ->
+            assertTrue(p.source.isNotBlank() && p.how.isNotBlank(), "${p.id} needs a source and a how")
+            // A listing either has a known monthly saving or a badge saying what it is; never both missing.
+            assertTrue(p.monthlySaving > 0 || !p.badge.isNullOrBlank(), "${p.id} needs a saving or a badge")
+        }
+        assertEquals(Perks.all.size, Perks.all.map { it.id }.toSet().size)
     }
 
     private fun listing(checked: LocalDate, ends: LocalDate?) =

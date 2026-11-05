@@ -46,6 +46,8 @@ data class UserSettings(
     val readBooks: Set<String> = emptySet(),
     /** Ideas saved from a book or an insight, as "bookId:page". */
     val savedIdeas: Set<String> = emptySet(),
+    /** Marketplace offers the user saved, by listing id. */
+    val savedOffers: Set<String> = emptySet(),
     /** Weekly review answers, as "txnId:WORTH|NOT|UNSURE". */
     val purchaseReviews: Set<String> = emptySet(),
     /** Shows •••• instead of the balance on Money. */
@@ -97,6 +99,7 @@ class SettingsStore(private val context: Context) {
         val vpa = stringPreferencesKey("upi_vpa")
         val read = stringSetPreferencesKey("read_books")
         val ideas = stringSetPreferencesKey("saved_ideas")
+        val offers = stringSetPreferencesKey("saved_offers")
         val reviews = stringSetPreferencesKey("purchase_reviews")
         val hide = booleanPreferencesKey("hide_balance")
         val nCapture = booleanPreferencesKey("notify_capture")
@@ -136,6 +139,7 @@ class SettingsStore(private val context: Context) {
             p[K.vpa] = s.upiVpa
             p[K.read] = s.readBooks
             p[K.ideas] = s.savedIdeas
+            p[K.offers] = s.savedOffers
             p[K.reviews] = s.purchaseReviews
             p[K.hide] = s.hideBalance
             p[K.nCapture] = s.notifyCapture
@@ -170,6 +174,7 @@ class SettingsStore(private val context: Context) {
         upiVpa = p[K.vpa] ?: "",
         readBooks = p[K.read] ?: emptySet(),
         savedIdeas = p[K.ideas] ?: emptySet(),
+        savedOffers = p[K.offers] ?: emptySet(),
         purchaseReviews = p[K.reviews] ?: emptySet(),
         hideBalance = p[K.hide] ?: false,
         notifyCapture = p[K.nCapture] ?: true,
