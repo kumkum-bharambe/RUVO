@@ -1,7 +1,10 @@
 package com.ruvo.feature.today
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import com.ruvo.design.REVIEW_LINE
+import com.ruvo.design.REVIEW_TITLE
 import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -169,20 +172,23 @@ fun TodayContent(state: AppState, a: TodayActions) {
                 }
             }
         }
+        // Before you buy in brand blue, then the review in its pearly colours: the same tiles as everywhere else.
+        item { BuyCard(a.openBuy, Modifier.padding(top = Space.md).reveal(8)) }
         item {
-            Row(Modifier.padding(horizontal = Space.gutter).padding(top = Space.md).reveal(8), horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
-                // One review: this week and this month on one sheet.
-                ReviewTile("Your review", "This week and this month", RuvoIcons.Chart, Modifier.weight(1f), a.openWeekly)
-            }
+            com.ruvo.design.BigTile(
+                REVIEW_TITLE, REVIEW_LINE, RuvoIcons.Chart,
+                Modifier.padding(horizontal = Space.gutter).padding(top = Space.sm).reveal(9), style = com.ruvo.design.TileStyle.IRIS, onClick = a.openWeekly,
+            )
         }
-        item { BuyCard(a.openBuy, Modifier.reveal(9)) }
         item {
             val lesson = Lessons.forNow(state.input, r)
             RuvoCard(Modifier.padding(horizontal = Space.gutter).padding(top = Space.sm).reveal(10), onClick = { a.openLesson(lesson.id) }, onClickLabel = "Read ${lesson.title}") {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(RuvoIcons.Book, null, Modifier.size(20.dp), tint = c.brandInk)
+                    Box(Modifier.size(32.dp).clip(CircleShape).background(c.ink.copy(alpha = if (c.isDark) 0.1f else 0.06f)), contentAlignment = Alignment.Center) {
+                        Icon(RuvoIcons.Book, null, Modifier.size(17.dp), tint = c.ink)
+                    }
                     Spacer(Modifier.width(Space.xs))
-                    Eyebrow("A small idea", color = c.brandInk)
+                    Eyebrow("A small idea")
                     Spacer(Modifier.weight(1f))
                     Text("5 min read", style = Ruvo.type.caption, color = c.inkFaint)
                 }
@@ -190,26 +196,30 @@ fun TodayContent(state: AppState, a: TodayActions) {
                 Text(lesson.title, style = Ruvo.type.title, color = c.ink)
                 Text(lesson.body, style = Ruvo.type.body, color = c.inkSoft, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Spacer(Modifier.height(Space.xs))
-                Text("Open the book ›", style = Ruvo.type.label, color = c.brandInk)
+                Text("Open the book ›", style = Ruvo.type.label, color = c.ink)
             }
         }
-        // An occasional perk card: one a day, rotating, with its saving in days.
+        // An occasional perk card: one a day, rotating, with its saving in days. Marketplace yellow, like everywhere.
         item {
             // Only listings that are current and recently checked; never one that has ended or gone stale.
             val current = Perks.listed(state.today).filter { Perks.status(it, state.today).state.let { s -> s == Perks.State.ACTIVE || s == Perks.State.ENDING } }
             val perk = current.getOrNull(state.today.dayOfYear % current.size.coerceAtLeast(1)) ?: return@item
             val days = Perks.daysSaved(perk, r.dailySpend)
             if (days > 0) {
-                RuvoCard(Modifier.padding(horizontal = Space.gutter).padding(top = Space.sm).reveal(11), brush = c.bucketBrush(Bucket.FIXED), border = null, onClick = a.openGuide, onClickLabel = "See the marketplace") {
+                val ink = c.onLight
+                RuvoCard(
+                    Modifier.padding(horizontal = Space.gutter).padding(top = Space.sm).reveal(11), brush = c.marketBrush, border = null, elevated = true,
+                    glow = androidx.compose.ui.graphics.Color(0xFFFF8A45), onClick = a.openGuide, onClickLabel = "See the marketplace",
+                ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(RuvoIcons.Perk, null, Modifier.size(20.dp), tint = c.onAccent)
+                        Icon(RuvoIcons.Store, null, Modifier.size(20.dp), tint = ink)
                         Spacer(Modifier.width(Space.xs))
-                        Eyebrow("Perk · sample", color = c.onAccent.copy(alpha = 0.75f))
+                        Eyebrow("Marketplace · sample", color = ink.copy(alpha = 0.75f))
                         Spacer(Modifier.weight(1f))
-                        Text("Saves you ${IndianFormat.days(days)}", style = Ruvo.type.label, color = c.onAccent)
+                        Text("Saves you ${IndianFormat.days(days)}", style = Ruvo.type.label, color = ink)
                     }
                     Spacer(Modifier.height(Space.xs))
-                    Text("${perk.brand}: ${perk.offer}", style = Ruvo.type.bodyStrong, color = c.onAccent)
+                    Text("${perk.brand}: ${perk.offer}", style = Ruvo.type.bodyStrong, color = ink)
                 }
             }
         }
@@ -315,29 +325,6 @@ private fun DailySpendingCard(state: AppState, modifier: Modifier) {
 }
 
 @Composable
-private fun ReviewTile(title: String, sub: String, icon: androidx.compose.ui.graphics.vector.ImageVector, modifier: Modifier, open: () -> Unit) {
-    ActionRow(title, sub, icon, modifier, open)
-}
-
-/** The one shape every "open something" row on Home uses: a quiet icon, a title and line, and an arrow. */
-@Composable
-private fun ActionRow(title: String, sub: String, icon: androidx.compose.ui.graphics.vector.ImageVector, modifier: Modifier, open: () -> Unit) {
-    val c = Ruvo.colors
-    RuvoCard(modifier, onClick = open, onClickLabel = "Open $title") {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(40.dp).clip(CircleShape).background(c.ink.copy(alpha = if (c.isDark) 0.1f else 0.06f)), contentAlignment = Alignment.Center) {
-                Icon(icon, null, Modifier.size(20.dp), tint = c.ink)
-            }
-            Spacer(Modifier.width(Space.sm))
-            Column(Modifier.weight(1f)) {
-                Text(title, style = Ruvo.type.bodyStrong, color = c.ink)
-                Text(sub, style = Ruvo.type.caption, color = c.inkSoft)
-            }
-            Icon(RuvoIcons.Forward, null, Modifier.size(18.dp), tint = c.inkSoft)
-        }
-    }
-}
-@Composable
 private fun Header(state: AppState, a: TodayActions) {
     val c = Ruvo.colors
     val hour = LocalTime.now().hour
@@ -357,11 +344,12 @@ private fun Header(state: AppState, a: TodayActions) {
             if (state.isDemo) {
                 Text(
                     "Sample student · switch",
-                    Modifier.padding(top = 4.dp).clip(RoundedCornerShape(Radius.chip))
-                        .background(c.brand.copy(alpha = if (c.isDark) 0.22f else 0.1f))
+                    Modifier.padding(top = 6.dp).clip(RoundedCornerShape(Radius.chip))
+                        .background(c.glassTop)
+                        .border(1.dp, if (c.isDark) c.glassEdge else androidx.compose.ui.graphics.Color.White, RoundedCornerShape(Radius.chip))
                         .clickable(role = Role.Button, onClick = a.openPersonas)
                         .padding(horizontal = Space.sm, vertical = 6.dp),
-                    style = Ruvo.type.caption, color = c.brandInk,
+                    style = Ruvo.type.caption, color = c.inkSoft,
                 )
             }
         }
@@ -375,25 +363,28 @@ private fun Header(state: AppState, a: TodayActions) {
 @Composable
 private fun SortCard(count: Int, open: () -> Unit, modifier: Modifier = Modifier) {
     val c = Ruvo.colors
-    RuvoCard(Modifier.padding(horizontal = Space.gutter).padding(top = Space.sm).then(modifier), brush = c.softAmberBrush, border = null, elevated = true, onClick = open, onClickLabel = "Start the weekly sort") {
+    RuvoCard(Modifier.padding(horizontal = Space.gutter).padding(top = Space.sm).then(modifier), onClick = open, onClickLabel = "Start the weekly sort") {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(44.dp).clip(CircleShape).background(c.ink), contentAlignment = Alignment.Center) {
-                Text(count.toString(), style = Ruvo.type.title, color = if (c.isDark) c.canvas else c.surface)
+                Text(count.toString(), style = Ruvo.type.title, color = if (c.isDark) c.onLight else c.surface)
             }
             Spacer(Modifier.width(Space.sm))
             Column(Modifier.weight(1f)) {
-                Text(if (count == 1) "1 new payment found" else "$count new payments found", style = Ruvo.type.bodyStrong, color = c.onAccent)
-                Text("Swipe through them in about two minutes", style = Ruvo.type.caption, color = c.onAccent.copy(alpha = 0.72f))
+                Text(if (count == 1) "1 new payment found" else "$count new payments found", style = Ruvo.type.bodyStrong, color = c.ink)
+                Text("Swipe through them in about two minutes", style = Ruvo.type.caption, color = c.inkSoft)
             }
-            Icon(RuvoIcons.Forward, null, tint = c.onAccent)
+            Icon(RuvoIcons.Forward, null, tint = c.ink)
         }
     }
 }
 
+/** Before you buy: brand blue wherever it is offered. */
 @Composable
 private fun BuyCard(open: () -> Unit, modifier: Modifier = Modifier) {
-    val c = Ruvo.colors
-    ActionRow("Before you buy", "Type a price, see what it costs in days", RuvoIcons.Cart, Modifier.padding(horizontal = Space.gutter).padding(top = Space.sm).then(modifier), open)
+    com.ruvo.design.BigTile(
+        "Before you buy", "Type a price, see what it costs in days", RuvoIcons.Cart,
+        Modifier.padding(horizontal = Space.gutter).then(modifier), style = com.ruvo.design.TileStyle.BRAND, onClick = open,
+    )
 }
 
 @Composable
@@ -415,6 +406,6 @@ fun ActivityLine(item: ActivityItem, state: AppState, open: (String) -> Unit) {
         leading = { MerchantLogo(t.merchant, t.category) },
         onClick = { open(t.id) },
     ) {
-        Amount(if (credit) t.amount else -t.yourShare, color = if (credit) c.futureInk else c.ink, signed = credit)
+        Amount(if (credit) t.amount else -t.yourShare, color = if (credit) c.brandInk else c.ink, signed = credit)
     }
 }

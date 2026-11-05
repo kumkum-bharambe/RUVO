@@ -220,7 +220,7 @@ private fun SwipeCard(
         Spacer(Modifier.height(Space.lg))
         com.ruvo.design.MerchantLogo(t.merchant, t.category, size = 52.dp)
         Spacer(Modifier.height(Space.sm))
-        Text((if (credit) "+" else "") + IndianFormat.rupees(t.amount), style = Ruvo.type.display, color = if (credit) c.fuel else c.ink)
+        Text((if (credit) "+" else "") + IndianFormat.rupees(t.amount), style = Ruvo.type.display, color = if (credit) c.brandInk else c.ink)
         Text(t.merchant, style = Ruvo.type.headline, color = c.ink)
         Text("${IndianFormat.relativeDay(t.date, today)} · ${t.category}", style = Ruvo.type.body, color = c.inkSoft)
         Spacer(Modifier.height(Space.xl))

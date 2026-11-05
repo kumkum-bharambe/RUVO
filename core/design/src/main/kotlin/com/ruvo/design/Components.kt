@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedContent
 import kotlin.math.sin
 import kotlin.math.PI
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.drawBehind
@@ -118,6 +119,33 @@ fun Modifier.hardShadow(shape: androidx.compose.ui.graphics.Shape, offset: Dp, c
     },
 )
 
+/**
+ * A soft, wide shadow drawn only outside a rounded shape, so it never greys the frosted glass on top of it. A few
+ * stacked rings fade out from the edge, which reads like a blur without needing one. Draw it before clipping.
+ */
+fun Modifier.softShadow(radius: Dp, color: Color, spread: Dp = 14.dp, drop: Dp = 6.dp): Modifier = this.then(
+    Modifier.drawBehind {
+        val r = radius.toPx().coerceAtMost(size.minDimension / 2f)
+        val outline = androidx.compose.ui.graphics.Path().apply {
+            addRoundRect(androidx.compose.ui.geometry.RoundRect(0f, 0f, size.width, size.height, androidx.compose.ui.geometry.CornerRadius(r)))
+        }
+        val s = spread.toPx()
+        val y = drop.toPx()
+        val steps = 7
+        clipPath(outline, androidx.compose.ui.graphics.ClipOp.Difference) {
+            for (i in 1..steps) {
+                val e = s * i / steps
+                drawRoundRect(
+                    color.copy(alpha = color.alpha / steps * 0.85f),
+                    Offset(-e * 0.8f, -e * 0.5f + y),
+                    androidx.compose.ui.geometry.Size(size.width + e * 1.6f, size.height + e),
+                    androidx.compose.ui.geometry.CornerRadius(r + e),
+                )
+            }
+        }
+    },
+)
+
 /** Scales down slightly while pressed, springing back on release. */
 @Composable
 fun Modifier.pressable(interaction: MutableInteractionSource): Modifier {
@@ -163,13 +191,19 @@ fun RuvoCard(
     padding: PaddingValues = PaddingValues(Space.md),
     brush: Brush? = null,
     elevated: Boolean = false,
+    /** The coloured light that drifts inside a [brush] card. Defaults to brand blue on deep cards, white on pale ones. */
+    glow: Color? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val c = Ruvo.colors
     val interaction = remember { MutableInteractionSource() }
     val shape = RoundedCornerShape(Radius.card)
+    val glassCard = brush == null && color == Color.Unspecified
     var m = modifier.pressable(interaction)
-    if (elevated) m = m.shadow(18.dp, shape, ambientColor = c.shadow, spotColor = c.shadow)
+    // Glass floats on a soft blue shadow by day (drawn only outside the card, so the frost stays clean); at night
+    // the glass needs none. Filled cards that ask to be raised get a coloured shadow.
+    if (glassCard && !c.isDark) m = m.softShadow(Radius.card, c.shadow)
+    else if (elevated) m = m.shadow(18.dp, shape, ambientColor = c.shadow, spotColor = c.shadow)
     m = m.clip(shape)
     m = when {
         // Gradient cards glow like the bucket boxes: two soft lights drift inside, light sweeps across now
@@ -179,38 +213,41 @@ fun RuvoCard(
             val loop = rememberInfiniteTransition(label = "cardGlow")
             val t by loop.animateFloat(0f, 1f, infiniteRepeatable(tween(11_000, easing = LinearEasing)), label = "drift")
             val sweep by loop.animateFloat(-0.6f, 2.4f, infiniteRepeatable(tween(8_000, easing = LinearEasing)), label = "sweep")
-            // Deep cards (night, or the blue brand cards by day) get gentle lights; pale cards get brighter ones.
-            val deep = c.isDark || brush == c.heroBrush || brush == c.brandBrush
+            // Deep cards (the blue brand cards, and the bucket cards at night) get gentle lights; pale cards (the
+            // yellow Marketplace, the pearly review, Daybreak's pastels) get brighter ones.
+            val pale = brush == c.marketBrush || brush == c.irisBrush
+            val deep = !pale && (c.isDark || brush == c.heroBrush || brush == c.brandBrush)
+            val second = glow ?: if (deep) c.brand else Color.White
             m.background(brush).drawWithContent {
                 val a = (if (reduced) 0.2f else t) * 2f * PI.toFloat()
                 val r = size.maxDimension * 0.5f
                 val one = Offset(size.width * (0.85f + 0.08f * cos(a)), size.height * (0.15f + 0.12f * sin(a)))
                 val two = Offset(size.width * (0.12f + 0.08f * sin(a)), size.height * (0.9f + 0.08f * cos(a)))
-                drawCircle(Brush.radialGradient(listOf(Color.White.copy(alpha = if (deep) 0.1f else 0.5f), Color.Transparent), one, r), r, one)
-                drawCircle(Brush.radialGradient(listOf((if (deep) c.brand else c.fixed).copy(alpha = if (deep) 0.28f else 0.22f), Color.Transparent), two, r), r, two)
-                drawRect(Brush.verticalGradient(listOf(Color.White.copy(alpha = if (deep) 0.06f else 0.3f), Color.Transparent), endY = size.height * 0.4f))
+                drawCircle(Brush.radialGradient(listOf(Color.White.copy(alpha = if (deep) 0.12f else 0.55f), Color.Transparent), one, r), r, one)
+                drawCircle(Brush.radialGradient(listOf(second.copy(alpha = if (deep) 0.3f else 0.4f), Color.Transparent), two, r), r, two)
+                drawRect(Brush.verticalGradient(listOf(Color.White.copy(alpha = if (deep) 0.08f else 0.3f), Color.Transparent), endY = size.height * 0.4f))
                 if (!reduced) {
                     val x = size.width * sweep
-                    drawRect(Brush.linearGradient(listOf(Color.Transparent, Color.White.copy(alpha = if (deep) 0.07f else 0.22f), Color.Transparent), Offset(x - size.width * 0.3f, 0f), Offset(x + size.width * 0.3f, size.height)))
+                    drawRect(Brush.linearGradient(listOf(Color.Transparent, Color.White.copy(alpha = if (deep) 0.08f else 0.24f), Color.Transparent), Offset(x - size.width * 0.3f, 0f), Offset(x + size.width * 0.3f, size.height)))
                 }
                 drawContent()
-            }.border(1.dp, Brush.verticalGradient(listOf(Color.White.copy(alpha = if (deep) 0.2f else 0.9f), Color.White.copy(alpha = 0.04f))), shape)
+            }.border(1.dp, Brush.verticalGradient(listOf(Color.White.copy(alpha = if (deep) 0.24f else 0.9f), Color.White.copy(alpha = 0.05f))), shape)
         }
         color != Color.Unspecified -> m.background(color)
-        // Frosted glass: brighter at the top where light falls, with a thin highlight along the top edge.
-        else -> m.background(Brush.verticalGradient(listOf(c.glass.copy(alpha = (c.glass.alpha * 1.45f).coerceAtMost(1f)), c.glass)))
+        // Frosted glass: milkier at the top where light falls, with a bright line along the top edge.
+        else -> m.background(Brush.verticalGradient(listOf(c.glassTop, c.glass)))
             .drawWithContent {
                 drawContent()
                 drawRect(
-                    Brush.horizontalGradient(listOf(Color.Transparent, Color.White.copy(alpha = if (c.isDark) 0.18f else 0.9f), Color.Transparent)),
+                    Brush.horizontalGradient(listOf(Color.Transparent, Color.White.copy(alpha = if (c.isDark) 0.22f else 1f), Color.Transparent)),
                     size = androidx.compose.ui.geometry.Size(size.width, 1.5.dp.toPx()),
                 )
             }
     }
     when {
         border == null -> {}
-        border == Color.Unspecified && brush == null && color == Color.Unspecified ->
-            m = m.border(BorderStroke(1.dp, Brush.verticalGradient(listOf(c.glassEdge, c.glassEdge.copy(alpha = c.glassEdge.alpha * 0.25f)))), shape)
+        border == Color.Unspecified && glassCard ->
+            m = m.border(BorderStroke(1.dp, Brush.verticalGradient(listOf(c.glassEdge, c.glassEdge.copy(alpha = c.glassEdge.alpha * 0.3f)))), shape)
         border == Color.Unspecified -> {}
         else -> m = m.border(BorderStroke(1.dp, border), shape)
     }
@@ -311,31 +348,44 @@ private fun PillButton(
     }
 }
 
-/** Selectable chip used for categories, cadence, amounts. Selected is brand blue in both moods. */
+/**
+ * Selectable chip used for categories, cadence, amounts. Unselected it is a white glass pill; selected it fills with
+ * ink (navy by day, white at night) or with [accent], e.g. yellow in the Marketplace or a bucket's colour.
+ */
 @Composable
 fun Chip(text: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier, accent: Color = Ruvo.colors.ink) {
     val c = Ruvo.colors
     val shape = RoundedCornerShape(Radius.chip)
-    val fill = when {
-        !selected -> c.glass
-        accent == c.ink -> c.brand
-        else -> accent
-    }
+    val fill = if (selected) accent else c.glassTop
     val text_ = when {
         !selected -> c.ink
-        accent == c.ink -> c.onBrand
         accent.luminance() < 0.45f -> Color.White
         else -> Color(0xFF141B4D)
     }
     Box(
         modifier.heightIn(min = 48.dp).clip(shape)
             .background(fill)
-            .border(1.dp, if (selected) fill else c.hairline, shape)
+            .border(1.dp, if (selected) fill else if (c.isDark) Color.White.copy(alpha = 0.14f) else c.hairline, shape)
             .clickable(role = Role.RadioButton, onClick = onClick)
             .padding(horizontal = Space.md, vertical = Space.sm),
         contentAlignment = Alignment.Center,
     ) {
         Text(text, style = Ruvo.type.label, color = text_)
+    }
+}
+
+/** A quiet status label with a coloured dot, e.g. "On track". The dot carries the colour; the pill stays calm. */
+@Composable
+fun StatusTag(text: String, dot: Color, modifier: Modifier = Modifier) {
+    val c = Ruvo.colors
+    Row(
+        modifier.clip(RoundedCornerShape(Radius.chip)).background(c.ink.copy(alpha = if (c.isDark) 0.1f else 0.06f))
+            .padding(horizontal = 10.dp, vertical = 5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(7.dp).clip(CircleShape).background(dot))
+        Spacer(Modifier.width(6.dp))
+        Text(text, style = Ruvo.type.label, color = c.ink, maxLines = 1)
     }
 }
 
@@ -361,21 +411,25 @@ fun IconCircle(icon: ImageVector, description: String, onClick: () -> Unit, modi
 }
 
 /**
- * A pill segmented control. The amber pill slides between options on a spring.
+ * A pill segmented control on a frosted track. The chosen option is a white pill that slides across on a spring,
+ * with navy text, in both moods.
  */
 @Composable
 fun SegmentedControl(options: List<String>, selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
     val c = Ruvo.colors
     val shape = RoundedCornerShape(Radius.chip)
     BoxWithConstraints(
-        modifier.fillMaxWidth().clip(shape).background(c.ink.copy(alpha = if (c.isDark) 0.1f else 0.07f)).padding(4.dp),
+        modifier.fillMaxWidth().clip(shape)
+            .background(if (c.isDark) Color.White.copy(alpha = 0.08f) else c.ink.copy(alpha = 0.07f))
+            .border(1.dp, if (c.isDark) Color.White.copy(alpha = 0.1f) else Color.White.copy(alpha = 0.7f), shape)
+            .padding(4.dp),
     ) {
         val w = maxWidth / options.size
         val x by animateDpAsState(w * selected, Motion.snappy(), label = "seg")
         Box(
             Modifier.offset(x = x).width(w).height(48.dp)
-                .shadow(8.dp, shape, ambientColor = c.brand, spotColor = c.brand)
-                .clip(shape).background(c.brandBrush),
+                .shadow(if (c.isDark) 0.dp else 6.dp, shape, ambientColor = c.shadow, spotColor = c.shadow)
+                .clip(shape).background(Color.White),
         )
         Row(Modifier.fillMaxWidth()) {
             options.forEachIndexed { i, label ->
@@ -386,7 +440,7 @@ fun SegmentedControl(options: List<String>, selected: Int, onSelect: (Int) -> Un
                         .clickable(role = Role.Tab, onClickLabel = "Show $label") { onSelect(i) },
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(label, style = Ruvo.type.label.copy(fontWeight = androidx.compose.ui.text.font.FontWeight(600)), color = if (on) c.onBrand else c.inkSoft, maxLines = 1, softWrap = false)
+                    Text(label, style = Ruvo.type.label.copy(fontWeight = androidx.compose.ui.text.font.FontWeight(600)), color = if (on) c.onLight else c.inkSoft, maxLines = 1, softWrap = false)
                 }
             }
         }
@@ -463,12 +517,13 @@ fun StatusChips(items: List<StatusItem>, modifier: Modifier = Modifier) {
             last = now
         }
     }
-    // White chips on Daybreak, black chips on Night swim (Ruvo 7).
-    val dark = Ruvo.colors.isDark
-    val fill = if (dark) Color(0xFF0B0B0D) else Color.White
-    val text = if (dark) Color.White else Color(0xFF111113)
-    val edge = if (dark) Color.White.copy(alpha = 0.16f) else Color(0xFF111113).copy(alpha = 0.14f)
-    val shine = if (dark) Color.White.copy(alpha = 0.18f) else Color(0xFF111113).copy(alpha = 0.1f)
+    // Frosted glass pills: milky white on Daybreak, smoky at night, each with a bright edge.
+    val c = Ruvo.colors
+    val dark = c.isDark
+    val fill = if (dark) Color.White.copy(alpha = 0.1f) else Color.White.copy(alpha = 0.82f)
+    val text = c.ink
+    val edge = if (dark) Color.White.copy(alpha = 0.18f) else Color.White
+    val shine = if (dark) Color.White.copy(alpha = 0.16f) else Color.White
     val loop = rememberInfiniteTransition(label = "chips")
     val t by loop.animateFloat(0f, 1f, infiniteRepeatable(tween(2800, easing = LinearEasing)), label = "t")
     val sweep by loop.animateFloat(-0.6f, 1.6f, infiniteRepeatable(tween(4200, easing = LinearEasing)), label = "sweep")
@@ -491,7 +546,7 @@ fun StatusChips(items: List<StatusItem>, modifier: Modifier = Modifier) {
             val shape = RoundedCornerShape(Radius.chip)
             Row(
                 Modifier
-                    .shadow(6.dp, shape, ambientColor = Color.Black.copy(alpha = if (dark) 1f else 0.3f), spotColor = Color.Black.copy(alpha = if (dark) 1f else 0.3f))
+                    .then(if (dark) Modifier else Modifier.softShadow(Radius.chip, c.shadow, spread = 7.dp, drop = 3.dp))
                     .clip(shape).background(fill).border(1.dp, edge, shape)
                     .clickable(role = Role.Button, onClickLabel = "Open ${item.label}", onClick = item.onClick)
                     .drawWithContent {
@@ -702,28 +757,64 @@ fun LegendDot(color: Color, label: String, modifier: Modifier = Modifier) {
     }
 }
 
+/** The review tile's words, shared by Home and Goals so it reads the same in both places. */
+const val REVIEW_TITLE = "Your review"
+const val REVIEW_LINE = "This week and this month: what came in, what went out, what you protected."
+
+/** The four looks a [BigTile] can take. Each one always means the same thing, wherever it appears. */
+enum class TileStyle {
+    /** Sunny yellow: the Marketplace, everywhere. */
+    MARKET,
+    /** Royal blue: Before you buy. */
+    BRAND,
+    /** Pearly pastel: your review. */
+    IRIS,
+    /** White glass: places like Settings. */
+    GLASS,
+}
+
 /**
- * A big tile that opens a place: amber for the Marketplace, ink for Settings. The same tile is used in Profile
- * and in the Guide, so the Marketplace looks and opens the same from both.
+ * A big tile that opens a place. The same tile in the same colour is used wherever that place is offered, so the
+ * Marketplace is always yellow, Before you buy always blue and the review always pearly.
  */
 @Composable
-fun BigTile(title: String, line: String, icon: ImageVector, modifier: Modifier = Modifier, amber: Boolean = true, onClick: () -> Unit) {
+fun BigTile(title: String, line: String, icon: ImageVector, modifier: Modifier = Modifier, style: TileStyle = TileStyle.MARKET, onClick: () -> Unit) {
     val c = Ruvo.colors
-    val fg = if (amber) c.onAccent else c.onHero
+    val fg = when (style) {
+        TileStyle.MARKET, TileStyle.IRIS -> c.onLight
+        TileStyle.BRAND -> c.onHero
+        TileStyle.GLASS -> c.ink
+    }
+    val brush = when (style) {
+        TileStyle.MARKET -> c.marketBrush
+        TileStyle.IRIS -> c.irisBrush
+        TileStyle.BRAND -> c.heroBrush
+        TileStyle.GLASS -> null
+    }
+    val badge = when (style) {
+        TileStyle.MARKET, TileStyle.IRIS -> Color.White.copy(alpha = 0.6f)
+        TileStyle.BRAND -> Color.White.copy(alpha = 0.16f)
+        TileStyle.GLASS -> c.ink.copy(alpha = if (c.isDark) 0.1f else 0.06f)
+    }
     RuvoCard(
-        modifier.fillMaxWidth(), brush = if (amber) c.softAmberBrush else c.heroBrush,
-        border = null, elevated = true, onClick = onClick, onClickLabel = "Open $title", padding = PaddingValues(Space.md),
+        modifier.fillMaxWidth(), brush = brush,
+        border = if (style == TileStyle.GLASS) Color.Unspecified else null, elevated = style != TileStyle.GLASS,
+        glow = if (style == TileStyle.MARKET) Color(0xFFFF8A45) else null,
+        onClick = onClick, onClickLabel = "Open $title", padding = PaddingValues(Space.md),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(44.dp).clip(RoundedCornerShape(14.dp)).background(fg.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
+            Box(Modifier.size(46.dp).clip(RoundedCornerShape(15.dp)).background(badge), contentAlignment = Alignment.Center) {
                 Icon(icon, null, Modifier.size(22.dp), tint = fg)
             }
             Spacer(Modifier.width(Space.sm))
             Column(Modifier.weight(1f)) {
                 Text(title, style = Ruvo.type.title, color = fg)
-                Text(line, style = Ruvo.type.caption, color = fg.copy(alpha = 0.75f))
+                Text(line, style = Ruvo.type.caption, color = fg.copy(alpha = 0.78f))
             }
-            Icon(RuvoIcons.Forward, null, Modifier.size(20.dp), tint = fg)
+            Spacer(Modifier.width(Space.xs))
+            Box(Modifier.size(32.dp).clip(CircleShape).background(badge), contentAlignment = Alignment.Center) {
+                Icon(RuvoIcons.Forward, null, Modifier.size(16.dp), tint = fg)
+            }
         }
     }
 }

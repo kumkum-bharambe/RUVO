@@ -149,8 +149,8 @@ fun MoneyScreen(openTxn: (String) -> Unit, openAdd: () -> Unit = {}) {
                 item {
                     Column(Modifier.padding(horizontal = Space.gutter)) {
                         Row(horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
-                            // Ruvo 7's black period menu.
-                            Span.entries.forEach { s -> Chip(s.label, span == s, { span = s; back = 0 }, accent = androidx.compose.ui.graphics.Color(0xFF0B0B0D)) }
+                            // The period menu: the chosen one is an ink pill, navy by day and white at night.
+                            Span.entries.forEach { s -> Chip(s.label, span == s, { span = s; back = 0 }) }
                         }
                         category?.let { cat ->
                             Spacer(Modifier.height(Space.xs))
@@ -214,13 +214,12 @@ private fun FlowCard(
             if (range != null) IconCircle(RuvoIcons.Forward, "Later", onForward, tint = if (back > 0) c.ink else c.inkFaint.copy(alpha = 0.4f))
         }
         Spacer(Modifier.height(Space.md))
-        // Ruvo 7: Credited in blue, Debited beside it, and what is left underneath.
-        val blueInk = c.onAccent
+        // Credited in brand blue (money in is always blue), Debited beside it, and what is left underneath.
         Row(horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
-            RuvoCard(Modifier.weight(1f), brush = c.bucketBrush(com.ruvo.engine.Bucket.FUTURE), border = null, elevated = !c.isDark, padding = PaddingValues(Space.md)) {
-                Eyebrow("Credited", color = blueInk.copy(alpha = 0.75f))
-                Amount(f.moneyIn, style = Ruvo.type.title, color = blueInk, signed = f.moneyIn > 0, countUp = true)
-                Text("money in", style = Ruvo.type.caption, color = blueInk.copy(alpha = 0.7f))
+            RuvoCard(Modifier.weight(1f), color = c.brandTint, border = null, padding = PaddingValues(Space.md)) {
+                Eyebrow("Credited", color = c.brandInk)
+                Amount(f.moneyIn, style = Ruvo.type.title, color = c.ink, signed = f.moneyIn > 0, countUp = true)
+                Text("money in", style = Ruvo.type.caption, color = c.inkSoft)
             }
             RuvoCard(Modifier.weight(1f), padding = PaddingValues(Space.md)) {
                 Eyebrow("Debited")
@@ -364,18 +363,21 @@ private fun History(state: AppState, onEdit: (java.time.YearMonth) -> Unit, onVi
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.Bottom) {
                 months.forEach { m ->
                     val on = m.month == sel.month
-                    val fade by androidx.compose.animation.core.animateFloatAsState(if (on) 1f else 0.42f, label = "fade${m.month}")
                     Column(
                         Modifier.weight(1f).clip(RoundedCornerShape(Radius.inner))
                             .clickable(role = androidx.compose.ui.semantics.Role.Tab, onClickLabel = "Show ${m.month.month.name.lowercase()}") { picked = m.month.toString() }
-                            .semantics(mergeDescendants = true) { contentDescription = "${m.month.month.name.lowercase()}, received ${IndianFormat.spoken(m.received)}, spent ${IndianFormat.spoken(m.spent)}" }
-                            .graphicsLayer { alpha = fade },
+                            .semantics(mergeDescendants = true) { contentDescription = "${m.month.month.name.lowercase()}, received ${IndianFormat.spoken(m.received)}, spent ${IndianFormat.spoken(m.spent)}" },
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         Row(Modifier.height(120.dp), horizontalArrangement = Arrangement.spacedBy(3.dp), verticalAlignment = Alignment.Bottom) {
-                            listOf(m.received to c.future, m.spent to c.fuel).forEach { (v, col) ->
+                            // Only the chosen month is in colour; the others are two quiet greys, never a muddy tint.
+                            listOf(
+                                Triple(m.received, c.brand, c.ink.copy(alpha = if (c.isDark) 0.3f else 0.22f)),
+                                Triple(m.spent, c.fuel, c.ink.copy(alpha = if (c.isDark) 0.16f else 0.11f)),
+                            ).forEach { (v, col, grey) ->
                                 val h by androidx.compose.animation.core.animateFloatAsState((v / max).coerceIn(0.04f, 1f), Motion.gentle(), label = "h")
-                                Box(Modifier.width(14.dp).fillMaxHeight(h).clip(RoundedCornerShape(Radius.chip)).background(col))
+                                val fill by androidx.compose.animation.animateColorAsState(if (on) col else grey, Motion.soft(), label = "c")
+                                Box(Modifier.width(14.dp).fillMaxHeight(h).clip(RoundedCornerShape(Radius.chip)).background(fill))
                             }
                         }
                         Spacer(Modifier.height(6.dp))
@@ -388,7 +390,7 @@ private fun History(state: AppState, onEdit: (java.time.YearMonth) -> Unit, onVi
             }
             Spacer(Modifier.height(Space.sm))
             Row(horizontalArrangement = Arrangement.spacedBy(Space.md)) {
-                LegendDot(c.future, "Received")
+                LegendDot(c.brand, "Received")
                 LegendDot(c.fuel, "Spent")
             }
             Spacer(Modifier.height(Space.md))
@@ -467,7 +469,7 @@ private fun TxnRow(entry: com.ruvo.data.ActivityItem, state: AppState, open: (St
     ) {
         Amount(
             if (credit) t.amount else -t.yourShare,
-            color = when { ignored -> c.inkFaint; credit -> c.futureInk; else -> c.ink }, signed = credit,
+            color = when { ignored -> c.inkFaint; credit -> c.brandInk; else -> c.ink }, signed = credit,
         )
     }
 }

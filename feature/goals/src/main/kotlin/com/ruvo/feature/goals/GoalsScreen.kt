@@ -1,6 +1,8 @@
 package com.ruvo.feature.goals
 
 import android.content.Context
+import androidx.compose.foundation.layout.heightIn
+import com.ruvo.design.lighten
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
@@ -154,12 +156,12 @@ fun GoalsScreen(startNewGoal: Boolean = false, onNewGoalShown: () -> Unit = {}, 
             }
         }
         if (state.goals.isNotEmpty()) item { GoalInsights(state, Modifier.padding(horizontal = Space.gutter).padding(top = Space.md).reveal(3)) }
+        // The review, in the same pearly tile as on Home.
         item {
-            RuvoCard(Modifier.fillMaxWidth().padding(horizontal = Space.gutter).padding(top = Space.xl), brush = c.heroBrush, border = null, elevated = true, onClick = { review = true }, onClickLabel = "Open your review") {
-                Eyebrow("Your review", color = c.onHero.copy(alpha = 0.7f))
-                Text("This week and this month", style = Ruvo.type.title, color = c.onHero)
-                Text("What you spent, what came in, what you protected.", style = Ruvo.type.caption, color = c.onHero.copy(alpha = 0.7f))
-            }
+            com.ruvo.design.BigTile(
+                com.ruvo.design.REVIEW_TITLE, com.ruvo.design.REVIEW_LINE, RuvoIcons.Chart,
+                Modifier.padding(horizontal = Space.gutter).padding(top = Space.xl), style = com.ruvo.design.TileStyle.IRIS,
+            ) { review = true }
         }
     }
     openGoal?.let { id -> GoalSheet(id, state) { openGoal = null } }
@@ -244,10 +246,9 @@ private fun GoalCard(g: Goal, shape: Int, tilt: Float, today: LocalDate, fuel: L
                     }
                 }
                 val ok = onTrack(g, today)
-                if (ok != null) com.ruvo.design.Tag(
+                if (ok != null) com.ruvo.design.StatusTag(
                     if (g.isComplete) "Complete" else if (ok) "On track" else "Catching up",
-                    color = (if (g.isComplete) c.sun else if (ok) c.future else c.fuel).copy(alpha = 0.22f),
-                    content = if (ok) c.futureInk else c.fuelInk,
+                    dot = if (g.isComplete) c.sun else if (ok) c.future else c.fuel,
                 )
             }
             Spacer(Modifier.height(Space.sm))
@@ -260,15 +261,17 @@ private fun GoalCard(g: Goal, shape: Int, tilt: Float, today: LocalDate, fuel: L
                 )
                 // One tap to move a little Fuel into the goal; only offered when there's Fuel to move.
                 if (!g.isComplete && fuel >= 100_00) {
+                    // Solid Future orange with navy text: clear in both moods, never a muddy tint.
                     Text(
                         "+ ₹100",
-                        Modifier.clip(RoundedCornerShape(Radius.chip)).background(c.future.copy(alpha = 0.18f))
+                        Modifier.heightIn(min = 40.dp).clip(RoundedCornerShape(Radius.chip))
+                            .background(androidx.compose.ui.graphics.Brush.linearGradient(listOf(c.future.lighten(0.2f), c.future)))
                             .clickable(role = androidx.compose.ui.semantics.Role.Button, onClickLabel = "Add 100 rupees to ${g.name} from Fuel") {
                                 Haptics.confirm(view)
                                 scope.launch { RuvoGraph.repository.pour(g.id, 100_00) }
                             }
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                        style = Ruvo.type.label, color = c.futureInk,
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        style = Ruvo.type.label, color = c.onLight,
                     )
                 }
             }
@@ -507,13 +510,15 @@ fun ReviewSheet(state: AppState, onDismiss: () -> Unit, startWithWeek: Boolean =
 private fun WeekReview(state: AppState) {
     val c = Ruvo.colors
     val week = remember(state.input.transactions, state.today) { com.ruvo.engine.Insights.week(state.input.transactions, state.today) }
-    RuvoCard(Modifier.fillMaxWidth(), brush = c.heroBrush, border = null) {
-        Eyebrow("Spent in the last 7 days", color = c.onHero.copy(alpha = 0.7f))
-        Amount(week.total, style = Ruvo.type.display, color = c.onHero, countUp = true)
+    // The review's own pearly colours, the same as the tile that opens it.
+    val ink = c.onLight
+    RuvoCard(Modifier.fillMaxWidth(), brush = c.irisBrush, border = null) {
+        Eyebrow("Spent in the last 7 days", color = ink.copy(alpha = 0.72f))
+        Amount(week.total, style = Ruvo.type.display, color = ink, countUp = true)
         Text(
             week.changePercent?.let { com.ruvo.engine.Insights.changeWords(it, "last week").replaceFirstChar { ch -> ch.uppercase() } }
                 ?: "Nothing to compare with last week yet.",
-            style = Ruvo.type.body, color = c.onHero.copy(alpha = 0.85f),
+            style = Ruvo.type.body, color = ink.copy(alpha = 0.85f),
         )
     }
     if (week.categories.isEmpty()) {
@@ -545,16 +550,17 @@ private fun MonthReview(state: AppState, onDismiss: () -> Unit, onSeeWeek: () ->
     var giveJob by remember { mutableStateOf(false) }
     Column {
         Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
-            RuvoCard(Modifier.weight(1f).reveal(0), brush = c.bucketBrush(com.ruvo.engine.Bucket.FUTURE), border = null) {
-                Eyebrow("Received", color = c.onAccent.copy(alpha = 0.75f))
-                Amount(came, style = Ruvo.type.title, color = c.onAccent, countUp = true)
+            // Money in is brand blue; spent is plain glass; saved is Future orange; still free is Fuel yellow.
+            RuvoCard(Modifier.weight(1f).reveal(0), color = c.brandTint, border = null) {
+                Eyebrow("Received", color = c.brandInk)
+                Amount(came, style = Ruvo.type.title, color = c.ink, countUp = true)
             }
-            RuvoCard(Modifier.weight(1f).reveal(1), brush = c.heroBrush, border = null) { Eyebrow("Spent", color = c.onHero.copy(alpha = 0.7f)); Amount(went, style = Ruvo.type.title, color = c.onHero) }
+            RuvoCard(Modifier.weight(1f).reveal(1)) { Eyebrow("Spent"); Amount(went, style = Ruvo.type.title) }
         }
         Spacer(Modifier.height(Space.sm))
         Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
-            RuvoCard(Modifier.weight(1f).reveal(2), brush = c.bucketBrush(com.ruvo.engine.Bucket.FUTURE), border = null) { Eyebrow("Saved", color = c.onAccent.copy(alpha = 0.7f)); Amount(state.runway.futureProtected, style = Ruvo.type.title, color = c.onAccent) }
-            RuvoCard(Modifier.weight(1f).reveal(3), brush = c.softAmberBrush, border = null) { Eyebrow("Still free", color = c.onAccent.copy(alpha = 0.7f)); Amount(state.runway.fuel.coerceAtLeast(0), style = Ruvo.type.title, color = c.onAccent) }
+            RuvoCard(Modifier.weight(1f).reveal(2), brush = c.bucketBrush(com.ruvo.engine.Bucket.FUTURE), border = null) { Eyebrow("Saved", color = if (c.isDark) c.futureInk else c.onAccent.copy(alpha = 0.7f)); Amount(state.runway.futureProtected, style = Ruvo.type.title, color = c.onAccent) }
+            RuvoCard(Modifier.weight(1f).reveal(3), brush = c.bucketBrush(com.ruvo.engine.Bucket.FUEL), border = null) { Eyebrow("Still free", color = if (c.isDark) c.fuelInk else c.onAccent.copy(alpha = 0.7f)); Amount(state.runway.fuel.coerceAtLeast(0), style = Ruvo.type.title, color = c.onAccent) }
         }
         Spacer(Modifier.height(Space.lg))
         Text("What can you do next?", style = Ruvo.type.title, color = c.ink)

@@ -109,7 +109,7 @@ fun RuvoRoot(state: AppState, request: LaunchRequest?, consumed: () -> Unit) {
     // The opening plays on every cold start, until it finishes or is tapped, and until the data is ready.
     val reduced = Ruvo.reducedMotion
     var splashDone by rememberSaveable { mutableStateOf(false) }
-    LaunchedEffect(Unit) { kotlinx.coroutines.delay(if (reduced) 500 else 3_400); splashDone = true }
+    LaunchedEffect(Unit) { kotlinx.coroutines.delay(if (reduced) 500 else 4_000); splashDone = true }
     val showApp = state.ready && splashDone
     val unlocked by com.ruvo.data.Session.unlocked.collectAsStateWithLifecycle()
     Box(Modifier.fillMaxSize()) {
@@ -124,7 +124,10 @@ fun RuvoRoot(state: AppState, request: LaunchRequest?, consumed: () -> Unit) {
         }
         // The splash sits on top and fades away over the app.
         AnimatedVisibility(!showApp, enter = fadeIn(), exit = fadeOut(Motion.gentle())) {
-            com.ruvo.design.RuvoSplash(onSkip = { splashDone = true })
+            com.ruvo.design.RuvoSplash(
+                onSkip = { splashDone = true },
+                mascot = { m, cheer -> com.ruvo.feature.orb.RuvoPet(com.ruvo.feature.orb.PetMood.HAPPY, m, joy = cheer, tricks = false) },
+            )
         }
     }
 }
@@ -210,33 +213,40 @@ private fun MainShell(state: AppState, request: LaunchRequest?, consumed: () -> 
             Modifier.align(Alignment.BottomCenter).fillMaxWidth().navigationBarsPadding().padding(horizontal = Space.gutter, vertical = Space.md),
         )
 
+        // On Home the pet says hello once per start: a short line about the runway, tap to talk. A pat (press and
+        // hold) makes it spin and say something light; each pat brings the next line.
+        var greeted by rememberSaveable { mutableStateOf(false) }
+        var bubble by remember { mutableStateOf<String?>(null) }
+        var pats by rememberSaveable { mutableStateOf(0) }
+        var bubbleKey by remember { mutableStateOf(0) }
+        LaunchedEffect(tab) {
+            if (tab == Tab.TODAY && !greeted) {
+                kotlinx.coroutines.delay(700); bubble = petLine(state); greeted = true; bubbleKey++
+            } else if (tab != Tab.TODAY) bubble = null
+        }
+        LaunchedEffect(bubbleKey) { if (bubble != null) { kotlinx.coroutines.delay(6_500); bubble = null } }
+
         val anyComplete = state.goals.any { it.isComplete }
         RuvoOrb(
             mood = OrbMood.from(state.runway, anyComplete),
             tilt = tilt,
-            onTalk = { overlay = Overlay.Chat() },
-            onQuickAdd = { overlay = Overlay.QuickAdd },
-            size = 60.dp,
+            onTalk = { bubble = null; overlay = Overlay.Chat() },
+            onQuickAdd = { bubble = null; overlay = Overlay.QuickAdd },
+            onPat = { bubble = patLine(state, pats); pats++; bubbleKey++ },
+            size = 70.dp,
             // Floats above the dock's right end, with room below it to be pulled down.
-            modifier = Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(end = Space.gutter + 4.dp, bottom = 92.dp),
+            modifier = Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(end = Space.gutter + 2.dp, bottom = 90.dp),
         )
 
-        // On Home the pet says hello once per start: a short line about the runway, tap to talk.
-        var greeted by rememberSaveable { mutableStateOf(false) }
-        var greeting by remember { mutableStateOf(false) }
-        LaunchedEffect(tab) {
-            if (tab == Tab.TODAY && !greeted) {
-                kotlinx.coroutines.delay(700); greeting = true; greeted = true
-                kotlinx.coroutines.delay(7_000); greeting = false
-            } else greeting = false
-        }
         AnimatedVisibility(
-            greeting && overlay == Overlay.None,
-            Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(end = Space.gutter, bottom = 160.dp),
+            bubble != null && overlay == Overlay.None,
+            Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(end = Space.gutter, bottom = 170.dp),
             enter = scaleIn(Motion.bouncy(), initialScale = 0.6f, transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.9f, 1f)) + fadeIn(),
             exit = scaleOut(Motion.soft(), targetScale = 0.8f, transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.9f, 1f)) + fadeOut(),
         ) {
-            PetBubble(petLine(state), onClick = { greeting = false; overlay = Overlay.Chat() })
+            var last by remember { mutableStateOf("") }
+            bubble?.let { last = it }
+            PetBubble(last, onClick = { bubble = null; overlay = Overlay.Chat() })
         }
 
         AnimatedVisibility(
@@ -300,20 +310,22 @@ private fun MainShell(state: AppState, request: LaunchRequest?, consumed: () -> 
 }
 
 /**
- * The floating dock: a dark pill of round icon buttons. The chosen tab opens into a yellow pill with its name,
- * springing wider as the others make room, so the current place is clear without reading. Every button keeps
- * its name for TalkBack. It leaves room on the right for the pet, which floats just above it.
+ * The floating dock: a dark glass pill of icon buttons, in both moods. The chosen tab opens into a white pill with
+ * its name in navy, springing wider as the others make room, so the current place is clear without reading. Every
+ * button keeps its name for TalkBack. It leaves room on the right for the pet, which floats just above it.
  */
 @Composable
 fun FloatingDock(selected: Tab, onSelect: (Tab) -> Unit, modifier: Modifier = Modifier) {
     val c = Ruvo.colors
     val shape = RoundedCornerShape(Radius.chip)
-    // A white pill by day and a deep grey one at night; the chosen tab is the one spot of brand blue.
-    val bar = if (c.isDark) c.raised else c.surface
-    val idle = c.inkSoft
+    // Deep navy glass by day, smoky glass at night, with a faint bright edge.
+    val bar = if (c.isDark) androidx.compose.ui.graphics.Color(0xF0171A2E) else androidx.compose.ui.graphics.Color(0xF2141B4D)
+    val idle = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.7f)
     Row(
-        modifier.shadow(18.dp, shape, ambientColor = c.shadow, spotColor = c.shadow)
-            .clip(shape).background(bar).padding(6.dp),
+        modifier.shadow(20.dp, shape, ambientColor = c.shadow, spotColor = c.shadow)
+            .clip(shape).background(bar)
+            .border(1.dp, androidx.compose.ui.graphics.Color.White.copy(alpha = if (c.isDark) 0.12f else 0.16f), shape)
+            .padding(6.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -326,7 +338,7 @@ fun FloatingDock(selected: Tab, onSelect: (Tab) -> Unit, modifier: Modifier = Mo
                 Tab.GUIDE -> RuvoIcons.Book
             }
             val weight by androidx.compose.animation.core.animateFloatAsState(if (on) 2.1f else 1f, Motion.bouncy(), label = "w${t.name}")
-            val fill by androidx.compose.animation.animateColorAsState(if (on) c.brand else bar.copy(alpha = 0f), Motion.soft(), label = "f${t.name}")
+            val fill by androidx.compose.animation.animateColorAsState(if (on) androidx.compose.ui.graphics.Color.White else androidx.compose.ui.graphics.Color.White.copy(alpha = 0f), Motion.soft(), label = "f${t.name}")
             Row(
                 Modifier.weight(weight).height(50.dp).clip(shape).background(fill)
                     .semantics { this.selected = on }
@@ -334,13 +346,31 @@ fun FloatingDock(selected: Tab, onSelect: (Tab) -> Unit, modifier: Modifier = Mo
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(icon, t.label, Modifier.size(21.dp), tint = if (on) c.onBrand else idle)
+                Icon(icon, t.label, Modifier.size(21.dp), tint = if (on) c.onLight else idle)
                 AnimatedVisibility(on, enter = fadeIn() + androidx.compose.animation.expandHorizontally(), exit = fadeOut() + androidx.compose.animation.shrinkHorizontally()) {
-                    Text(t.label, Modifier.padding(start = 6.dp), style = Ruvo.type.label, color = c.onBrand, maxLines = 1)
+                    Text(t.label, Modifier.padding(start = 6.dp), style = Ruvo.type.label, color = c.onLight, maxLines = 1)
                 }
             }
         }
     }
+}
+
+/**
+ * What the pet says when patted: light and warm, never about spending less. Each pat brings the next line, and
+ * the runway line stays honest (an estimate, said as one).
+ */
+private fun patLine(state: AppState, n: Int): String {
+    val r = state.runway
+    val lines = listOf(
+        "Hehe, that tickles!",
+        "Wheee! Okay, a little dizzy now.",
+        if (r.unlimited) "Your runway has no end in sight. I checked twice." else "I counted again: about ${IndianFormat.days(r.runwayDays)} of runway.",
+        "Psst, the Marketplace has a few student offers.",
+        "Even ₹100 into a goal makes me wiggle.",
+        "I don't judge spends. I just count days.",
+        "Tap me any time you have a money question.",
+    )
+    return lines[Math.floorMod(n, lines.size)]
 }
 
 /** What the pet says on Home: the runway in a sentence, warm and never judging. Estimates are said as estimates. */
@@ -365,7 +395,8 @@ private fun PetBubble(text: String, onClick: () -> Unit) {
     Text(
         text,
         Modifier.widthIn(max = 240.dp).shadow(12.dp, shape, ambientColor = c.shadow, spotColor = c.shadow)
-            .clip(shape).background(c.surface).border(1.dp, c.hairline, shape)
+            .clip(shape).background(if (c.isDark) c.raised else c.surface)
+            .border(1.dp, if (c.isDark) c.glassEdge else androidx.compose.ui.graphics.Color.White, shape)
             .clickable(role = Role.Button, onClickLabel = "Talk to Ruvo", onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 10.dp),
         style = Ruvo.type.label, color = c.ink,

@@ -87,30 +87,30 @@ fun GuideScreen(a: GuideActions) {
             Eyebrow("Guide", Modifier.reveal(0))
             Spacer(Modifier.height(Space.xs))
 
-            // Hero: what the Guide is, and how far you have read.
-            RuvoCard(Modifier.fillMaxWidth().reveal(1), brush = c.heroBrush, border = null, elevated = true, padding = PaddingValues(Space.lg)) {
+            // Hero: what the Guide is, and how far you have read, on white glass with a shelf of bright spines.
+            RuvoCard(Modifier.fillMaxWidth().reveal(1), padding = PaddingValues(Space.lg)) {
                 Row(verticalAlignment = Alignment.Top) {
                     Text(
                         "Understand your money. One small idea at a time.",
                         Modifier.weight(1f).semantics { heading() },
-                        style = Ruvo.type.headline, color = c.onHero,
+                        style = Ruvo.type.headline, color = c.ink,
                     )
                 }
                 Spacer(Modifier.height(Space.lg))
-                // One spine per book: tall amber ones are read, short outlines are still to read.
+                // One spine per book: tall coloured ones are read, short outlines are still to read.
                 ReadingShelf(read)
                 Spacer(Modifier.height(Space.sm))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text("$done read · ${total - done} to go", style = Ruvo.type.bodyStrong, color = c.onHero)
-                        Text("No streaks, no pressure", style = Ruvo.type.caption, color = c.onHero.copy(alpha = 0.6f))
+                        Text("$done read · ${total - done} to go", style = Ruvo.type.bodyStrong, color = c.ink)
+                        Text("No streaks, no pressure", style = Ruvo.type.caption, color = c.inkSoft)
                     }
                     Text(
                         "See the list",
-                        Modifier.clip(RoundedCornerShape(Radius.chip)).background(c.onHero.copy(alpha = 0.14f))
+                        Modifier.clip(RoundedCornerShape(Radius.chip)).background(c.ink)
                             .clickable(role = androidx.compose.ui.semantics.Role.Button, onClickLabel = "See which books you have read") { readingOpen = true }
                             .padding(horizontal = Space.md, vertical = Space.sm),
-                        style = Ruvo.type.label, color = c.onHero,
+                        style = Ruvo.type.label, color = if (c.isDark) c.onLight else c.surface,
                     )
                 }
             }
@@ -165,17 +165,17 @@ fun GuideScreen(a: GuideActions) {
 private fun NewThisWeek(book: Library.Book, read: Boolean, modifier: Modifier, onOpen: () -> Unit) {
     val c = Ruvo.colors
     Box(modifier.fillMaxWidth()) {
-        RuvoCard(Modifier.fillMaxWidth(), brush = c.softAmberBrush, elevated = true, onClick = onOpen, onClickLabel = "Read ${book.title}", padding = PaddingValues(Space.md)) {
+        RuvoCard(Modifier.fillMaxWidth(), onClick = onOpen, onClickLabel = "Read ${book.title}", padding = PaddingValues(Space.md)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 BookCover(book, read, width = 64.dp, showLabel = false, modifier = Modifier.graphicsLayer { rotationZ = -5f })
                 Spacer(Modifier.width(Space.md))
                 Column(Modifier.weight(1f)) {
-                    Tag("New this week", color = c.ink, content = if (c.isDark) c.canvas else c.surface)
+                    Tag("New this week", color = c.ink, content = if (c.isDark) c.onLight else c.surface)
                     Spacer(Modifier.height(Space.xs))
-                    Text(book.title, style = Ruvo.type.title, color = c.onAccent)
-                    Text("${book.minutes} min read · tap to open", style = Ruvo.type.caption, color = c.onAccent.copy(alpha = 0.7f))
+                    Text(book.title, style = Ruvo.type.title, color = c.ink)
+                    Text("${book.minutes} min read · tap to open", style = Ruvo.type.caption, color = c.inkSoft)
                 }
-                Icon(RuvoIcons.Forward, null, Modifier.size(22.dp), tint = c.onAccent)
+                Icon(RuvoIcons.Forward, null, Modifier.size(22.dp), tint = c.ink)
             }
         }
     }

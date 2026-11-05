@@ -69,6 +69,10 @@ import com.ruvo.design.Ruvo
 import com.ruvo.design.RuvoIcons
 import com.ruvo.design.Space
 import com.ruvo.design.hardShadow
+import com.ruvo.design.softShadow
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
 import com.ruvo.engine.DayStrip
 import com.ruvo.engine.IndianFormat
 import com.ruvo.engine.Insights
@@ -91,52 +95,70 @@ fun runwaySpoken(r: RunwayResult): String =
     if (r.unlimited) "Runway: no end at current spending." else "Runway ${IndianFormat.days(r.runwayDays)}. ${runwaySubline(r).replace("·", ".")}"
 
 /**
- * The hero, Ruvo 6's "sun" card: a light card lit by an amber glow in the top corner and a lavender glow below,
- * with a slow sheen that sweeps across every few seconds. The runway number sits huge in navy, with the next money,
- * the Fuel behind it and a three-word mood.
+ * The hero: a big pane of white glass. A warm sun glows in its top corner, a blue light pools at the bottom left
+ * and a blush of pink drifts between them, all slowly breathing, with a sheen that sweeps across every few
+ * seconds. The runway number sits huge in ink, with the next money, the Fuel behind it and a three-word mood.
+ * By day the glass is milky white; at night it is smoky, so the lights show through more.
  */
 @Composable
 fun RunwayHero(r: RunwayResult, onWhy: () -> Unit, modifier: Modifier = Modifier) {
     val c = Ruvo.colors
     val reduced = Ruvo.reducedMotion
     val mood = Insights.mood(r)
-    val shape = RoundedCornerShape(Radius.card + 6.dp)
+    val radius = Radius.card + 6.dp
+    val shape = RoundedCornerShape(radius)
     val loop = rememberInfiniteTransition(label = "sun")
     val sheen by loop.animateFloat(-0.8f, 2.2f, infiniteRepeatable(tween(7000, easing = LinearEasing)), label = "sheen")
-    val glow by loop.animateFloat(0.8f, 1f, infiniteRepeatable(tween(3200), RepeatMode.Reverse), label = "glow")
+    val glow by loop.animateFloat(0.75f, 1f, infiniteRepeatable(tween(3200), RepeatMode.Reverse), label = "glow")
+    val drift by loop.animateFloat(0f, 1f, infiniteRepeatable(tween(14_000, easing = LinearEasing)), label = "drift")
+    val dark = c.isDark
 
     Box(
         modifier.fillMaxWidth()
-            .shadow(20.dp, shape, ambientColor = c.shadow, spotColor = c.shadow)
-            .clip(shape).background(c.heroBrush)
+            .then(if (dark) Modifier else Modifier.softShadow(radius, c.shadow, spread = 22.dp, drop = 10.dp))
+            .clip(shape)
+            .background(
+                Brush.verticalGradient(
+                    if (dark) listOf(Color.White.copy(alpha = 0.13f), Color.White.copy(alpha = 0.05f))
+                    else listOf(Color.White.copy(alpha = 0.92f), Color.White.copy(alpha = 0.6f)),
+                ),
+            )
+            .border(1.dp, Brush.verticalGradient(listOf(Color.White.copy(alpha = if (dark) 0.3f else 1f), Color.White.copy(alpha = if (dark) 0.05f else 0.4f))), shape)
             .clickable(role = Role.Button, onClickLabel = "Why this many days", onClick = onWhy)
             .semantics { contentDescription = runwaySpoken(r) + ". " + mood.title },
     ) {
         Canvas(Modifier.matchParentSize()) {
             val g = if (reduced) 0.9f else glow
-            // The brand card: deep royal blue, a warm sunrise glow in the top corner and a brighter blue pooling below.
-            drawRect(Brush.radialGradient(listOf(c.fuel.copy(alpha = (if (c.isDark) 0.12f else 0.26f) * g), Color.Transparent), Offset(size.width, 0f), size.width * 0.9f))
-            drawRect(Brush.radialGradient(listOf(c.brand.lighten(0.25f).copy(alpha = if (c.isDark) 0.3f else 0.45f), Color.Transparent), Offset(0f, size.height), size.width * 0.85f))
+            val a = (if (reduced) 0.2f else drift) * 2f * PI.toFloat()
+            fun light(color: Color, at: Offset, r: Float) = drawCircle(Brush.radialGradient(listOf(color, Color.Transparent), at, r), r, at)
+            // A warm sun in the top corner, breathing.
+            light(c.fuel.copy(alpha = (if (dark) 0.2f else 0.5f) * g), Offset(size.width * (0.96f + 0.04f * cos(a)), size.height * (0.02f + 0.04f * sin(a))), size.width * 0.8f)
+            // Blue pooling at the bottom left.
+            light(c.brand.lighten(0.3f).copy(alpha = if (dark) 0.34f else 0.32f), Offset(size.width * (0.04f + 0.06f * sin(a)), size.height * 0.98f), size.width * 0.85f)
+            // A blush of pink drifting through the middle.
+            light(Color(0xFFFF8FB8).copy(alpha = if (dark) 0.12f else 0.22f), Offset(size.width * (0.7f + 0.12f * cos(a)), size.height * (0.62f + 0.1f * sin(a))), size.width * 0.5f)
             if (!reduced) {
                 val x = size.width * sheen
-                drawRect(Brush.linearGradient(listOf(Color.Transparent, Color.White.copy(alpha = 0.08f), Color.Transparent), Offset(x - size.width * 0.3f, 0f), Offset(x + size.width * 0.3f, size.height)))
+                drawRect(Brush.linearGradient(listOf(Color.Transparent, Color.White.copy(alpha = if (dark) 0.07f else 0.3f), Color.Transparent), Offset(x - size.width * 0.3f, 0f), Offset(x + size.width * 0.3f, size.height)))
             }
+            // A bright line along the top edge, where light catches the glass.
+            drawRect(Brush.horizontalGradient(listOf(Color.Transparent, Color.White.copy(alpha = if (dark) 0.3f else 1f), Color.Transparent)), size = Size(size.width, 1.5.dp.toPx()))
         }
         Column(Modifier.fillMaxWidth().padding(Space.xl).clearAndSetSemantics { }) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Eyebrow("Estimated financial runway", Modifier.weight(1f), color = c.onHero.copy(alpha = 0.7f))
+                Eyebrow("Estimated financial runway", Modifier.weight(1f), color = c.inkSoft)
             }
             Spacer(Modifier.height(Space.xs))
             val heroStyle = if (r.runwayDays >= 100) Ruvo.type.hero.copy(fontSize = Ruvo.type.hero.fontSize * 0.78f) else Ruvo.type.hero
             Row(verticalAlignment = Alignment.Bottom) {
-                if (r.unlimited) Text("∞", style = heroStyle, color = c.onHero)
-                else RollingNumber(r.runwayDays, heroStyle, c.onHero)
+                if (r.unlimited) Text("∞", style = heroStyle, color = c.ink)
+                else RollingNumber(r.runwayDays, heroStyle, c.ink)
                 Spacer(Modifier.width(Space.xs))
-                Text(if (r.runwayDays == 1) "day" else "days", Modifier.padding(bottom = 16.dp), style = Ruvo.type.display, color = c.onHero, maxLines = 1, softWrap = false)
+                Text(if (r.runwayDays == 1) "day" else "days", Modifier.padding(bottom = 16.dp), style = Ruvo.type.display, color = c.ink, maxLines = 1, softWrap = false)
             }
-            Text(runwaySubline(r), style = Ruvo.type.bodyStrong, color = if (r.makesIt) c.onHero else Color(0xFFFF9DB2))
+            Text(runwaySubline(r), style = Ruvo.type.bodyStrong, color = if (r.makesIt) c.ink else c.warning)
             Spacer(Modifier.height(Space.xxs))
-            Text("${IndianFormat.rupees(r.fuel.coerceAtLeast(0))} of Fuel at about ${IndianFormat.rupees(r.dailySpend)} a day", style = Ruvo.type.caption, color = c.onHero.copy(alpha = 0.7f))
+            Text("${IndianFormat.rupees(r.fuel.coerceAtLeast(0))} of Fuel at about ${IndianFormat.rupees(r.dailySpend)} a day", style = Ruvo.type.caption, color = c.inkSoft)
             val toIncome = r.daysToNextIncome
             if (!r.unlimited && toIncome != null && toIncome > 0) {
                 Spacer(Modifier.height(Space.md))
@@ -145,15 +167,17 @@ fun RunwayHero(r: RunwayResult, onWhy: () -> Unit, modifier: Modifier = Modifier
             Spacer(Modifier.height(Space.md))
             @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
             androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.xs), verticalArrangement = Arrangement.spacedBy(Space.xs)) {
+                // The one strong pill on the card: ink, so it reads as the way in.
+                val onInk = if (dark) c.onLight else Color.White
                 Row(
-                    Modifier.clip(RoundedCornerShape(Radius.chip)).background(Color.White).padding(horizontal = Space.md, vertical = 9.dp),
+                    Modifier.clip(RoundedCornerShape(Radius.chip)).background(c.ink).padding(horizontal = Space.md, vertical = 9.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("Why ${if (r.unlimited) "no end" else IndianFormat.days(r.runwayDays)}?", style = Ruvo.type.label, color = c.heroBottom, maxLines = 1)
-                    Icon(RuvoIcons.Forward, null, Modifier.padding(start = 2.dp).size(14.dp), tint = c.heroBottom)
+                    Text("Why ${if (r.unlimited) "no end" else IndianFormat.days(r.runwayDays)}?", style = Ruvo.type.label, color = onInk, maxLines = 1)
+                    Icon(RuvoIcons.Forward, null, Modifier.padding(start = 2.dp).size(14.dp), tint = onInk)
                 }
                 Row(
-                    Modifier.clip(RoundedCornerShape(Radius.chip)).background(Color.White.copy(alpha = 0.14f)).padding(horizontal = Space.sm, vertical = 9.dp),
+                    Modifier.clip(RoundedCornerShape(Radius.chip)).background(c.ink.copy(alpha = if (dark) 0.12f else 0.07f)).padding(horizontal = Space.sm, vertical = 9.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     val dot = when (mood.level) {
@@ -163,7 +187,7 @@ fun RunwayHero(r: RunwayResult, onWhy: () -> Unit, modifier: Modifier = Modifier
                     }
                     Box(Modifier.size(8.dp).clip(CircleShape).background(dot))
                     Spacer(Modifier.width(6.dp))
-                    Text(mood.title, style = Ruvo.type.label, color = c.onHero, maxLines = 1)
+                    Text(mood.title, style = Ruvo.type.label, color = c.ink, maxLines = 1)
                 }
             }
         }
@@ -277,19 +301,19 @@ private fun RunwayStrip(r: RunwayResult) {
             val y = size.height * 0.62f
             val w = size.width
             val track = 8.dp.toPx()
-            drawRoundRect(Color.White.copy(alpha = 0.14f), Offset(0f, y - track / 2), Size(w, track), androidx.compose.ui.geometry.CornerRadius(track / 2))
+            drawRoundRect(c.ink.copy(alpha = if (c.isDark) 0.14f else 0.08f), Offset(0f, y - track / 2), Size(w, track), androidx.compose.ui.geometry.CornerRadius(track / 2))
             val p = glide.value
             val fuelX = w * fuelEnd * p
             if (!r.makesIt) {
-                drawRect(Color(0xFFFF9DB2).copy(alpha = 0.3f), Offset(w * fuelEnd, y - track / 2), Size((w * (flagAt - fuelEnd)).coerceAtLeast(0f), track))
+                drawRect(c.warning.copy(alpha = 0.28f), Offset(w * fuelEnd, y - track / 2), Size((w * (flagAt - fuelEnd)).coerceAtLeast(0f), track))
             }
             drawRoundRect(Brush.horizontalGradient(listOf(c.sun, c.fuel)), Offset(0f, y - track / 2), Size(fuelX.coerceAtLeast(track), track), androidx.compose.ui.geometry.CornerRadius(track / 2))
             // Dashed centre line, like runway markings.
-            drawLine(Color.White.copy(alpha = 0.85f), Offset(track, y), Offset((fuelX - track).coerceAtLeast(track), y), 1.5.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 8f)))
-            // The flag at next money.
+            drawLine(Color.White.copy(alpha = 0.9f), Offset(track, y), Offset((fuelX - track).coerceAtLeast(track), y), 1.5.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 8f)))
+            // The flag at next money, in brand blue: money coming in.
             val fx = w * flagAt
-            drawLine(Color.White, Offset(fx, y + track / 2), Offset(fx, 2.dp.toPx()), 1.5.dp.toPx())
-            drawPath(Path().apply { moveTo(fx, 2.dp.toPx()); lineTo(fx + 11.dp.toPx(), 6.dp.toPx()); lineTo(fx, 10.dp.toPx()); close() }, c.fuel)
+            drawLine(c.ink, Offset(fx, y + track / 2), Offset(fx, 2.dp.toPx()), 1.5.dp.toPx())
+            drawPath(Path().apply { moveTo(fx, 2.dp.toPx()); lineTo(fx + 11.dp.toPx(), 6.dp.toPx()); lineTo(fx, 10.dp.toPx()); close() }, c.brandInk)
             // The paper plane, tilted up as if taking off, floating gently.
             val px = fuelX
             val py = y - 11.dp.toPx() + (if (reduced) 0f else bob) * 1.5.dp.toPx()
@@ -298,13 +322,13 @@ private fun RunwayStrip(r: RunwayResult) {
                 moveTo(px + s, py - s * 0.35f); lineTo(px - s, py - s * 0.15f); lineTo(px - s * 0.3f, py + s * 0.15f); close()
                 moveTo(px + s, py - s * 0.35f); lineTo(px - s * 0.3f, py + s * 0.15f); lineTo(px - s * 0.2f, py + s * 0.65f); close()
             }
-            drawPath(plane, Color.White)
+            drawPath(plane, c.ink)
         }
         Row(Modifier.fillMaxWidth()) {
-            Text("Today", style = Ruvo.type.caption, color = c.onHero.copy(alpha = 0.6f), modifier = Modifier.weight(1f))
+            Text("Today", style = Ruvo.type.caption, color = c.inkSoft, modifier = Modifier.weight(1f))
             Text(
                 r.nextIncomeDate?.let { "Next money · ${IndianFormat.date(it, r.today)}" } ?: "Next money",
-                style = Ruvo.type.caption, color = c.onHero.copy(alpha = 0.6f),
+                style = Ruvo.type.caption, color = c.inkSoft,
             )
         }
     }

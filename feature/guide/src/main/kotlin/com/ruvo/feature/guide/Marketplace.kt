@@ -2,7 +2,10 @@ package com.ruvo.feature.guide
 
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
+import com.ruvo.design.StatusTag
+import com.ruvo.design.lighten
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -69,35 +72,44 @@ fun MarketplaceSheet(onDismiss: () -> Unit) {
     val monthDays = live.sumOf { Perks.daysSaved(it, daily) }
 
     RuvoSheet("Marketplace", onDismiss, eyebrow = "Student savings and opportunities") {
-        RuvoCard(Modifier.fillMaxWidth(), brush = c.heroBrush, border = null, elevated = true) {
-            Text("Worth up to", style = Ruvo.type.caption, color = c.onHero.copy(alpha = 0.7f))
-            Text(if (monthDays > 0) "${IndianFormat.days(monthDays)} a month" else "More income", style = Ruvo.type.display, color = c.onHero)
-            Text("of runway, if you used every current saving here at how you spend now.", style = Ruvo.type.caption, color = c.onHero.copy(alpha = 0.75f))
+        // The Marketplace is yellow wherever it appears, in both moods, with navy text.
+        val ink = c.onLight
+        RuvoCard(Modifier.fillMaxWidth(), brush = c.marketBrush, border = null, elevated = true, glow = Color(0xFFFF8A45)) {
+            Text("Worth up to", style = Ruvo.type.caption, color = ink.copy(alpha = 0.72f))
+            Text(if (monthDays > 0) "${IndianFormat.days(monthDays)} a month" else "More income", style = Ruvo.type.display, color = ink)
+            Text("of runway, if you used every current saving here at how you spend now.", style = Ruvo.type.caption, color = ink.copy(alpha = 0.78f))
             Spacer(Modifier.height(Space.sm))
-            Row(verticalAlignment = Alignment.Top) {
-                Icon(RuvoIcons.Shield, null, Modifier.size(16.dp), tint = c.onHero)
+            Row(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(Radius.inner)).background(Color.White.copy(alpha = 0.5f)).padding(Space.sm),
+                verticalAlignment = Alignment.Top,
+            ) {
+                Icon(RuvoIcons.Shield, null, Modifier.size(16.dp), tint = ink)
                 Spacer(Modifier.width(Space.xs))
                 Text(
                     "Every listing shows who published it, when Ruvo last checked it and when it ends. These are samples with made-up brands, not real offers yet.",
-                    style = Ruvo.type.caption, color = c.onHero.copy(alpha = 0.85f),
+                    style = Ruvo.type.caption, color = ink.copy(alpha = 0.85f),
                 )
             }
         }
         // Top pick: the current listing worth the most days, so the best first step is obvious.
         live.maxByOrNull { Perks.daysSaved(it, daily) }?.takeIf { Perks.daysSaved(it, daily) > 0 }?.let { best ->
             Spacer(Modifier.height(Space.md))
-            RuvoCard(Modifier.fillMaxWidth(), brush = c.softAmberBrush, border = null, elevated = true, onClick = { open = best.id }, onClickLabel = "See ${best.brand}") {
-                Text("Top pick for you", style = Ruvo.type.label, color = c.onAccent.copy(alpha = 0.7f))
+            RuvoCard(Modifier.fillMaxWidth(), onClick = { open = best.id }, onClickLabel = "See ${best.brand}") {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(RuvoIcons.Perk, null, Modifier.size(16.dp), tint = c.fuelInk)
+                    Spacer(Modifier.width(6.dp))
+                    Text("Top pick for you", style = Ruvo.type.label, color = c.inkSoft)
+                }
                 Spacer(Modifier.height(Space.xs))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     PerkLogo(best.brand)
                     Spacer(Modifier.width(Space.sm))
                     Column(Modifier.weight(1f)) {
-                        Text(best.brand, style = Ruvo.type.title, color = c.onAccent)
-                        Text(best.offer, style = Ruvo.type.caption, color = c.onAccent.copy(alpha = 0.75f), maxLines = 2)
+                        Text(best.brand, style = Ruvo.type.title, color = c.ink)
+                        Text(best.offer, style = Ruvo.type.caption, color = c.inkSoft, maxLines = 2)
                     }
                     Spacer(Modifier.width(Space.xs))
-                    DaysBadge(Perks.daysSaved(best, daily), onCard = true)
+                    DaysBadge(Perks.daysSaved(best, daily))
                 }
             }
         }
@@ -105,7 +117,7 @@ fun MarketplaceSheet(onDismiss: () -> Unit) {
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
             KINDS.forEach { k ->
                 val n = if (k == "All") listed.size else listed.count { it.kind == k }
-                if (n > 0) Chip("$k · $n", kind == k, { kind = k })
+                if (n > 0) Chip("$k · $n", kind == k, { kind = k }, accent = c.fuel)
             }
         }
         Spacer(Modifier.height(Space.sm))
@@ -124,13 +136,13 @@ fun MarketplaceSheet(onDismiss: () -> Unit) {
 
 private data class StatusLook(val label: String, val tint: Color)
 
-/** Colour only where it means something: Active stays quiet; ending, stale and over each get a tint. */
+/** Colour only where it means something: a running listing needs no label; ending, stale and over each get a dot. */
 @Composable
 private fun statusLook(s: Perks.Status): StatusLook {
     val c = Ruvo.colors
     return when (s.state) {
-        Perks.State.ACTIVE -> StatusLook("Active", c.ink.copy(alpha = 0.35f))
-        Perks.State.ENDING -> StatusLook("Ends in ${IndianFormat.days(s.daysLeft ?: 0)}", c.future)
+        Perks.State.ACTIVE -> StatusLook("Running", c.fuel)
+        Perks.State.ENDING -> StatusLook("Ends in ${IndianFormat.days(s.daysLeft ?: 0)}", c.warning)
         Perks.State.RECHECK -> StatusLook("Needs a re-check", c.fixed)
         Perks.State.EXPIRED -> StatusLook("Ended", c.inkFaint)
     }
@@ -140,16 +152,6 @@ private fun ago(days: Int) = when {
     days <= 0 -> "today"
     days == 1 -> "yesterday"
     else -> "$days days ago"
-}
-
-@Composable
-private fun Pill(text: String, tint: Color) {
-    val c = Ruvo.colors
-    Text(
-        text,
-        Modifier.clip(RoundedCornerShape(Radius.chip)).background(tint.copy(alpha = if (c.isDark) 0.28f else 0.24f)).padding(horizontal = 10.dp, vertical = 4.dp),
-        style = Ruvo.type.label, color = c.ink, maxLines = 1,
-    )
 }
 
 @Composable
@@ -171,40 +173,48 @@ private fun Listing(p: Perks.Perk, today: LocalDate, daily: Long, modifier: Modi
             when {
                 over -> Unit
                 days > 0 -> DaysBadge(days)
-                p.kind == "Earn" -> Pill("Earn", c.future)
-                else -> Pill("Free", c.fixed)
+                p.kind == "Earn" -> KindBadge("Earn")
+                else -> KindBadge("Free")
             }
         }
         Spacer(Modifier.height(Space.sm))
+        // What kind it is and when it ends, in words; a status only when it needs attention.
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Pill(p.kind, c.ink.copy(alpha = 0.3f))
-            Spacer(Modifier.width(Space.xs))
-            Pill(look.label, look.tint)
-            Spacer(Modifier.weight(1f))
             Text(
-                p.ends?.let { e -> if (over) "Ended ${IndianFormat.date(e, today)}" else "Ends ${IndianFormat.date(e, today)}" } ?: "No end date",
-                style = Ruvo.type.caption, color = c.inkFaint,
+                p.kind + " · " + (p.ends?.let { e -> if (over) "ended ${IndianFormat.date(e, today)}" else "ends ${IndianFormat.date(e, today)}" } ?: "no end date"),
+                Modifier.weight(1f), style = Ruvo.type.caption, color = c.inkSoft, maxLines = 1,
             )
+            if (s.state != Perks.State.ACTIVE) StatusTag(look.label, look.tint)
         }
         Spacer(Modifier.height(Space.xs))
+        // How much of its time is left.
         FillBar(s.timeLeft, if (s.state == Perks.State.ACTIVE) c.fuel else look.tint, height = 4.dp)
         Spacer(Modifier.height(Space.xxs))
         Text("${p.source} · checked ${ago(s.checkedDaysAgo)}", style = Ruvo.type.caption, color = c.inkFaint, maxLines = 1)
     }
 }
 
-/** "+5 days": what a listing is worth in runway, the one number worth reading first. */
+/** "+5 days": what a listing is worth in runway, the one number worth reading first. Marketplace yellow. */
 @Composable
-private fun DaysBadge(days: Int, onCard: Boolean = false) {
-    val c = Ruvo.colors
+private fun DaysBadge(days: Int) {
+    val ink = Ruvo.colors.onLight
     Column(
-        Modifier.clip(RoundedCornerShape(14.dp)).background(if (onCard) Color.White.copy(alpha = 0.7f) else c.future.copy(alpha = if (c.isDark) 0.22f else 0.16f))
-            .padding(horizontal = 10.dp, vertical = 6.dp),
+        Modifier.clip(RoundedCornerShape(14.dp)).background(Ruvo.colors.marketBrush).padding(horizontal = 10.dp, vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text("+$days", style = Ruvo.type.title, color = if (onCard) Color(0xFF141B4D) else c.futureInk)
-        Text(if (days == 1) "day / month" else "days / month", style = Ruvo.type.caption, color = if (onCard) Color(0xFF141B4D).copy(alpha = 0.7f) else c.inkSoft)
+        Text("+$days", style = Ruvo.type.title, color = ink)
+        Text(if (days == 1) "day / month" else "days / month", style = Ruvo.type.caption, color = ink.copy(alpha = 0.75f))
     }
+}
+
+/** "Earn" or "Free", for listings that are not about saving money. */
+@Composable
+private fun KindBadge(text: String) {
+    Text(
+        text,
+        Modifier.clip(RoundedCornerShape(14.dp)).background(Ruvo.colors.marketBrush).padding(horizontal = 12.dp, vertical = 8.dp),
+        style = Ruvo.type.bodyStrong, color = Ruvo.colors.onLight, maxLines = 1,
+    )
 }
 
 /** Source, last check and end date, each on its own line with a quiet label. */
@@ -243,15 +253,16 @@ private fun ListingSheet(p: Perks.Perk, today: LocalDate, daily: Long, onDismiss
             Column(Modifier.weight(1f)) {
                 Text(p.offer, style = Ruvo.type.bodyStrong, color = c.ink)
                 Spacer(Modifier.height(4.dp))
-                Pill(look.label, look.tint)
+                StatusTag(look.label, look.tint)
             }
         }
         if (s.state != Perks.State.EXPIRED && days > 0) {
             Spacer(Modifier.height(Space.md))
-            RuvoCard(Modifier.fillMaxWidth(), brush = c.bucketBrush(com.ruvo.engine.Bucket.FUEL), border = null) {
-                Text("Worth about", style = Ruvo.type.caption, color = c.onAccent.copy(alpha = 0.7f))
-                Text("${IndianFormat.days(days)} of runway a month", style = Ruvo.type.title, color = c.onAccent)
-                Text("${IndianFormat.rupees(p.monthlySaving)} a month at about ${IndianFormat.rupees(daily)} a day.", style = Ruvo.type.caption, color = c.onAccent.copy(alpha = 0.75f))
+            val ink = c.onLight
+            RuvoCard(Modifier.fillMaxWidth(), brush = c.marketBrush, border = null, glow = Color(0xFFFF8A45)) {
+                Text("Worth about", style = Ruvo.type.caption, color = ink.copy(alpha = 0.72f))
+                Text("${IndianFormat.days(days)} of runway a month", style = Ruvo.type.title, color = ink)
+                Text("${IndianFormat.rupees(p.monthlySaving)} a month at about ${IndianFormat.rupees(daily)} a day.", style = Ruvo.type.caption, color = ink.copy(alpha = 0.78f))
             }
         }
         Spacer(Modifier.height(Space.md))
@@ -269,12 +280,20 @@ private fun ListingSheet(p: Perks.Perk, today: LocalDate, daily: Long, onDismiss
     }
 }
 
-/** A made-up brand's mark: its initials on a poster colour picked from its name, so it stays the same. */
+/**
+ * A made-up brand's mark: its initials on a bright colour picked from its name, so it stays the same, with a soft
+ * gloss across the top like a real app icon.
+ */
 @Composable
 private fun PerkLogo(brand: String) {
-    val (bg, fg, _) = Covers.palettes[Math.floorMod(brand.hashCode(), Covers.palettes.size)]
+    val (bg, fg) = Covers.brights[Math.floorMod(brand.hashCode(), Covers.brights.size)]
     val initials = brand.split(' ', '&', '.').filter { it.isNotBlank() }.take(2).joinToString("") { it.first().uppercase() }
-    Box(Modifier.size(46.dp).clip(RoundedCornerShape(14.dp)).background(bg), contentAlignment = Alignment.Center) {
+    Box(
+        Modifier.size(46.dp).clip(RoundedCornerShape(14.dp))
+            .background(androidx.compose.ui.graphics.Brush.linearGradient(listOf(bg.lighten(0.22f), bg)))
+            .border(1.dp, Color.White.copy(alpha = 0.5f), RoundedCornerShape(14.dp)),
+        contentAlignment = Alignment.Center,
+    ) {
         Text(initials, style = Ruvo.type.bodyStrong, color = fg)
     }
 }

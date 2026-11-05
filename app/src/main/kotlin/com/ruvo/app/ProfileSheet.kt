@@ -1,7 +1,11 @@
 package com.ruvo.app
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -74,7 +78,8 @@ fun ProfileSheet(
     var editing by remember { mutableStateOf(false) }
     var changingPin by remember { mutableStateOf(false) }
     var name by remember { mutableStateOf(state.settings.name) }
-    val who = state.persona?.let { "${it.name}, ${it.age} · ${it.livesIn}" }
+    // The name is already the title, so the line under it says only age and where they live.
+    val who = state.persona?.let { "${it.age} · ${it.livesIn}" }
         ?: when (state.settings.cadence) {
             Cadence.MONTHLY -> "Money every month"
             Cadence.LUMP_SUM -> "One big amount a term"
@@ -83,28 +88,33 @@ fun ProfileSheet(
     val read = Library.all.count { it.id in state.settings.readBooks }
 
     RuvoSheet("Profile", onDismiss) {
-        // Who you are, on navy, with the three numbers that sum it up.
-        RuvoCard(Modifier.fillMaxWidth().reveal(0), brush = c.heroBrush, border = null, elevated = true) {
+        // Who you are, on white glass, with the three numbers that sum it up. The avatar carries the brand blue.
+        RuvoCard(Modifier.fillMaxWidth().reveal(0)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(60.dp).clip(CircleShape).background(androidx.compose.ui.graphics.Color.White), contentAlignment = Alignment.Center) {
-                    Text(state.displayName.firstOrNull { it.isLetter() }?.uppercase() ?: "R", style = Ruvo.type.headline, color = c.brand)
+                Box(
+                    Modifier.size(62.dp).clip(CircleShape).background(c.brandBrush)
+                        .border(3.dp, androidx.compose.ui.graphics.Color.White.copy(alpha = if (c.isDark) 0.25f else 0.9f), CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(state.displayName.firstOrNull { it.isLetter() }?.uppercase() ?: "R", style = Ruvo.type.headline, color = c.onBrand)
                 }
                 Spacer(Modifier.width(Space.sm))
                 Column(Modifier.weight(1f)) {
-                    Text(if (state.displayName == "there") "You" else state.displayName, style = Ruvo.type.headline, color = c.onHero)
-                    Text(who, style = Ruvo.type.caption, color = c.onHero.copy(alpha = 0.72f))
-                    if (state.isDemo) Text("Sample student, none of this is real", style = Ruvo.type.caption, color = c.onHero.copy(alpha = 0.75f))
+                    Text(if (state.displayName == "there") "You" else state.displayName, style = Ruvo.type.headline, color = c.ink)
+                    Text(who, style = Ruvo.type.caption, color = c.inkSoft)
+                    if (state.isDemo) Text("Sample student, none of this is real", style = Ruvo.type.caption, color = c.inkFaint)
                 }
                 if (!state.isDemo) {
                     androidx.compose.material3.TextButton({ editing = !editing }) {
-                        Text(if (editing) "Close" else "Edit", style = Ruvo.type.label, color = c.onHero)
+                        Text(if (editing) "Close" else "Edit", style = Ruvo.type.label, color = c.ink)
                     }
                 }
             }
             Spacer(Modifier.height(Space.md))
-            Row {
+            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(Radius.inner)).background(c.ink.copy(alpha = if (c.isDark) 0.08f else 0.05f)).padding(Space.sm)) {
+                val goals = state.goals.size
                 HeroStat("Runway", if (state.runway.unlimited) "No end" else IndianFormat.days(state.runway.runwayDays), Modifier.weight(1f))
-                HeroStat("Goals", state.goals.size.toString(), Modifier.weight(1f))
+                HeroStat(if (goals == 1) "Goal" else "Goals", goals.toString(), Modifier.weight(1f))
                 HeroStat("Books read", "$read of ${Library.all.size}", Modifier.weight(1f))
             }
         }
@@ -119,32 +129,44 @@ fun ProfileSheet(
         Spacer(Modifier.height(Space.md))
         val from = state.today.withDayOfMonth(1)
         val flow = Insights.flow(state.activity.map { it.txn }, from, state.today)
-        RuvoCard(Modifier.fillMaxWidth().reveal(1), brush = c.heroBrush, border = null, elevated = !c.isDark) {
+        RuvoCard(Modifier.fillMaxWidth().reveal(1)) {
             Eyebrow("${state.today.month.name.lowercase().replaceFirstChar { it.uppercase() }} so far")
             Spacer(Modifier.height(Space.xs))
+            // Money in is brand blue, protected is Future orange, what went out stays plain ink.
             Row {
-                MonthFigure("Came in", flow.moneyIn, c.futureInk, Modifier.weight(1f))
+                MonthFigure("Came in", flow.moneyIn, c.brandInk, Modifier.weight(1f))
                 MonthFigure("Went out", flow.moneyOut, c.ink, Modifier.weight(1f))
                 MonthFigure("Protected", state.runway.futureProtected, c.futureInk, Modifier.weight(1f))
             }
             Spacer(Modifier.height(Space.sm))
+            val spentShade = c.ink.copy(alpha = if (c.isDark) 0.45f else 0.3f)
             val total = (flow.moneyOut + state.runway.futureProtected + state.runway.fuel.coerceAtLeast(0)).toFloat().coerceAtLeast(1f)
             SplitBar(
                 listOf(
-                    Segment(flow.moneyOut / total, c.fixed),
+                    Segment(flow.moneyOut / total, spentShade),
                     Segment(state.runway.futureProtected / total, c.future),
                     Segment(state.runway.fuel.coerceAtLeast(0) / total, c.fuel),
                 ),
                 height = 10.dp,
             )
-            Spacer(Modifier.height(Space.xxs))
-            Text("Spent, protected and still yours to use", style = Ruvo.type.caption, color = c.inkFaint)
+            Spacer(Modifier.height(Space.xs))
+            Row(horizontalArrangement = Arrangement.spacedBy(Space.md)) {
+                com.ruvo.design.LegendDot(spentShade, "Spent")
+                com.ruvo.design.LegendDot(c.future, "Protected")
+                com.ruvo.design.LegendDot(c.fuel, "Still yours")
+            }
         }
 
-        // Mood, one tap away.
+        // Mood, one tap away: a frosted track with a white pill on the chosen one.
         Spacer(Modifier.height(Space.md))
         val theme = state.settings.theme
-        Row(Modifier.reveal(2), horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
+        Row(
+            Modifier.reveal(2).fillMaxWidth().clip(RoundedCornerShape(Radius.chip))
+                .background(if (c.isDark) androidx.compose.ui.graphics.Color.White.copy(alpha = 0.08f) else c.ink.copy(alpha = 0.07f))
+                .border(1.dp, if (c.isDark) androidx.compose.ui.graphics.Color.White.copy(alpha = 0.1f) else androidx.compose.ui.graphics.Color.White.copy(alpha = 0.7f), RoundedCornerShape(Radius.chip))
+                .padding(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
             MoodPill("Daybreak", RuvoIcons.Sun, theme == ThemeChoice.DAYBREAK.name || (theme == ThemeChoice.SYSTEM.name && !c.isDark), Modifier.weight(1f)) {
                 scope.launch { RuvoGraph.repository.setTheme(ThemeChoice.DAYBREAK.name) }
             }
@@ -156,7 +178,7 @@ fun ProfileSheet(
         Spacer(Modifier.height(Space.md))
         BigTile("Marketplace", MARKETPLACE_LINE, RuvoIcons.Store, Modifier.reveal(3)) { onDismiss(); onMarketplace() }
         Spacer(Modifier.height(Space.sm))
-        BigTile("Settings", "Mood, tracking, notifications, your data, help.", RuvoIcons.Settings, Modifier.reveal(4), amber = false) { onDismiss(); onSettings() }
+        BigTile("Settings", "Mood, tracking, notifications, your data, help.", RuvoIcons.Settings, Modifier.reveal(4), style = com.ruvo.design.TileStyle.GLASS) { onDismiss(); onSettings() }
 
         Spacer(Modifier.height(Space.md))
         RuvoCard(Modifier.fillMaxWidth().reveal(5), padding = PaddingValues(horizontal = Space.md, vertical = Space.xs)) {
@@ -189,8 +211,8 @@ fun ProfileSheet(
 private fun HeroStat(label: String, value: String, modifier: Modifier) {
     val c = Ruvo.colors
     Column(modifier) {
-        Text(value, style = Ruvo.type.title, color = c.onHero, maxLines = 1)
-        Text(label, style = Ruvo.type.caption, color = c.onHero.copy(alpha = 0.65f), maxLines = 1)
+        Text(value, style = Ruvo.type.title, color = c.ink, maxLines = 1)
+        Text(label, style = Ruvo.type.caption, color = c.inkSoft, maxLines = 1)
     }
 }
 
@@ -199,24 +221,29 @@ private fun MonthFigure(label: String, paise: Long, color: androidx.compose.ui.g
     val c = Ruvo.colors
     Column(modifier) {
         Amount(paise, style = Ruvo.type.bodyStrong, color = color)
-        Text(label, style = Ruvo.type.caption, color = c.inkFaint)
+        Text(label, style = Ruvo.type.caption, color = c.inkSoft)
     }
 }
 
+/** One half of the mood switch: a white pill with navy text when chosen, plain text on the track when not. */
 @Composable
 private fun MoodPill(label: String, icon: ImageVector, on: Boolean, modifier: Modifier, onClick: () -> Unit) {
     val c = Ruvo.colors
     val shape = RoundedCornerShape(Radius.chip)
+    val fg = if (on) c.onLight else c.inkSoft
     Row(
-        modifier.heightIn(min = 48.dp).clip(shape)
-            .background(if (on) c.ink else c.ink.copy(alpha = if (c.isDark) 0.1f else 0.06f))
+        modifier.heightIn(min = 48.dp)
+            .then(if (on && !c.isDark) Modifier.shadow(6.dp, shape, ambientColor = c.shadow, spotColor = c.shadow) else Modifier)
+            .clip(shape)
+            .background(if (on) androidx.compose.ui.graphics.Color.White else androidx.compose.ui.graphics.Color.Transparent)
+            .semantics { selected = on }
             .clickable(role = Role.RadioButton, onClickLabel = "Use $label", onClick = onClick)
             .padding(horizontal = Space.md),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center,
     ) {
-        Icon(icon, null, Modifier.size(18.dp), tint = if (on) c.canvas else c.ink)
+        Icon(icon, null, Modifier.size(18.dp), tint = fg)
         Spacer(Modifier.width(Space.xs))
-        Text(label, style = Ruvo.type.label, color = if (on) c.canvas else c.ink)
+        Text(label, style = Ruvo.type.label, color = fg)
     }
 }
 

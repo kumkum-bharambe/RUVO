@@ -90,8 +90,8 @@ data class OrbMood(
 
 /**
  * The Ruvo Orb. One object replaces the mascot, the AI button and the capture button.
- * Tap to talk. Pull down to add a spend. Poke it and it ripples; drag it and it stretches like a droplet;
- * tilt the phone and the liquid leans. No face: motion and light carry the emotion.
+ * Tap to talk. Pull down to add a spend. Press and hold to pat it: it spins with happy eyes and hearts, and says
+ * something. Drag it and it stretches like a droplet, looking surprised; tilt the phone and its eyes follow.
  */
 @Composable
 fun RuvoOrb(
@@ -101,6 +101,7 @@ fun RuvoOrb(
     onQuickAdd: () -> Unit,
     modifier: Modifier = Modifier,
     size: Dp = 76.dp,
+    onPat: () -> Unit = {},
 ) {
     val view = LocalView.current
     val scope = rememberCoroutineScope()
@@ -110,8 +111,19 @@ fun RuvoOrb(
     val drag = remember { Animatable(Offset.Zero, Offset.VectorConverter) }
     val poke = remember { Animatable(0f) }
     val hop = remember { Animatable(0f) }
+    val joy = remember { Animatable(0f) }
+    val spin = remember { Animatable(0f) }
     var pokeAt by remember { mutableStateOf(Offset.Zero) }
     var armed by remember { mutableStateOf(false) }
+    // A pat: a full spin and a burst of hearts, then whatever the app wants it to say.
+    val pat = {
+        Haptics.confirm(view)
+        if (!reduced) {
+            scope.launch { spin.snapTo(0f); spin.animateTo(1f, tween(900, easing = androidx.compose.animation.core.FastOutSlowInEasing)); spin.snapTo(0f) }
+            scope.launch { joy.snapTo(1f); joy.animateTo(0f, tween(1800)) }
+        }
+        onPat()
+    }
 
     val stretchY = 1f + (drag.value.y / 700f).coerceIn(-0.15f, 0.35f)
     val stretchX = 1f / stretchY.coerceAtLeast(0.6f)
@@ -130,9 +142,12 @@ fun RuvoOrb(
             .size(size)
             .semantics {
                 role = Role.Button
-                contentDescription = "Ruvo. Tap to ask a question. Pull down to add a spend."
+                contentDescription = "Ruvo. Tap to ask a question. Pull down to add a spend. Press and hold to pat."
                 onClick(label = "Talk to Ruvo") { onTalk(); true }
-                customActions = listOf(CustomAccessibilityAction("Add a spend") { onQuickAdd(); true })
+                customActions = listOf(
+                    CustomAccessibilityAction("Add a spend") { onQuickAdd(); true },
+                    CustomAccessibilityAction("Pat Ruvo") { pat(); true },
+                )
             }
             .pointerInput(Unit) {
                 detectTapGestures(
@@ -140,9 +155,13 @@ fun RuvoOrb(
                         pokeAt = at
                         scope.launch { poke.snapTo(1f); poke.animateTo(0f, tween(1100)) }
                     },
+                    onLongPress = { pat() },
                     onTap = {
                         Haptics.tick(view)
-                        if (!reduced) scope.launch { hop.snapTo(0f); hop.animateTo(1f, tween(520)); hop.snapTo(0f) }
+                        if (!reduced) {
+                            scope.launch { hop.snapTo(0f); hop.animateTo(1f, tween(520)); hop.snapTo(0f) }
+                            scope.launch { joy.snapTo(0.8f); joy.animateTo(0f, tween(900)) }
+                        }
                         onTalk()
                     },
                 )
@@ -176,7 +195,11 @@ fun RuvoOrb(
         }
         RuvoPet(
             mood.pet(),
-            Modifier.fillMaxSize().graphicsLayer {
+            joy = joy.value,
+            spin = spin.value,
+            pull = (drag.value.y / pullThreshold).coerceIn(0f, 1f),
+            lean = tilt,
+            modifier = Modifier.fillMaxSize().graphicsLayer {
                 val p = hop.value
                 translationY = hopY * sin(PI.toFloat() * p)
                 val squash = if (p < 0.15f || p > 0.85f) 1f - 0.08f * sin(PI.toFloat() * (if (p < 0.15f) p / 0.15f else (1f - p) / 0.15f)) else 1f

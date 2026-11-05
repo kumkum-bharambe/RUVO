@@ -232,7 +232,7 @@ fun ChatSheet(onDismiss: () -> Unit, firstQuestion: String? = null) {
                 } else {
                     // Ruvo's answer: glass bubble beside a small amber orb.
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-                        RuvoPet(petMood, Modifier.size(38.dp))
+                        RuvoPet(petMood, Modifier.size(38.dp), tricks = false)
                         Spacer(Modifier.size(10.dp))
                         Column(
                             Modifier.weight(1f).clip(RoundedCornerShape(topStart = 6.dp, topEnd = 22.dp, bottomStart = 22.dp, bottomEnd = 22.dp))
@@ -266,7 +266,7 @@ fun ChatSheet(onDismiss: () -> Unit, firstQuestion: String? = null) {
             }
             if (thinking) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    RuvoPet(PetMood.THINKING, Modifier.size(38.dp))
+                    RuvoPet(PetMood.THINKING, Modifier.size(38.dp), tricks = false)
                     Spacer(Modifier.size(10.dp))
                     Text("Ruvo is thinking", style = Ruvo.type.caption, color = c.inkFaint)
                 }

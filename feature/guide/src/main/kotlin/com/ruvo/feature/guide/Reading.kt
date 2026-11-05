@@ -38,33 +38,35 @@ import com.ruvo.design.RuvoIcons
 import com.ruvo.design.RuvoSheet
 import com.ruvo.design.SegmentedControl
 import com.ruvo.design.Space
+import com.ruvo.design.lighten
 import com.ruvo.engine.guide.Library
 
 /**
- * Your shelf at a glance: one spine per book, in shelf order. Read books stand tall in amber, unread ones are
- * short outlines, so you can see what is done and what is left without counting.
+ * Your shelf at a glance: one spine per book, in shelf order. Read books stand tall in their own bright colours,
+ * like real spines on a shelf; unread ones are short outlines, so you can see what is done and what is left
+ * without counting. A thin shelf runs underneath.
  */
 @Composable
 fun ReadingShelf(read: Set<String>, modifier: Modifier = Modifier) {
     val c = Ruvo.colors
     val books = Library.all
-    Row(
-        modifier.fillMaxWidth().height(34.dp).clearAndSetSemantics {
-            contentDescription = "${books.count { it.id in read }} of ${books.size} books read"
-        },
-        horizontalArrangement = Arrangement.spacedBy(3.dp), verticalAlignment = Alignment.Bottom,
-    ) {
-        books.forEach { b ->
-            val done = b.id in read
-            val h by animateFloatAsState(if (done) 1f else 0.62f, Motion.bouncy(), label = "spine${b.id}")
-            Box(
-                Modifier.weight(1f).height(34.dp * h).clip(RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp))
-                    .then(
-                        if (done) Modifier.background(c.fuel)
-                        else Modifier.border(1.dp, c.onHero.copy(alpha = 0.35f), RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp)),
-                    ),
-            )
+    Column(modifier.fillMaxWidth().clearAndSetSemantics { contentDescription = "${books.count { it.id in read }} of ${books.size} books read" }) {
+        Row(Modifier.fillMaxWidth().height(36.dp), horizontalArrangement = Arrangement.spacedBy(3.dp), verticalAlignment = Alignment.Bottom) {
+            books.forEachIndexed { i, b ->
+                val done = b.id in read
+                val h by animateFloatAsState(if (done) 1f else 0.6f, Motion.bouncy(), label = "spine${b.id}")
+                val spine = com.ruvo.design.Covers.brights[i % com.ruvo.design.Covers.brights.size].first
+                val shape = RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp)
+                Box(
+                    Modifier.weight(1f).height(36.dp * h).clip(shape)
+                        .then(
+                            if (done) Modifier.background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(spine.lighten(0.25f), spine)))
+                            else Modifier.border(1.dp, c.ink.copy(alpha = if (c.isDark) 0.3f else 0.22f), shape),
+                        ),
+                )
+            }
         }
+        Box(Modifier.fillMaxWidth().height(3.dp).clip(RoundedCornerShape(Radius.chip)).background(c.ink.copy(alpha = if (c.isDark) 0.25f else 0.16f)))
     }
 }
 

@@ -5,6 +5,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -310,15 +311,23 @@ private fun Toggle(title: String, subtitle: String, on: Boolean, onChange: (Bool
 private fun MoodCard(name: String, line: String, palette: RuvoColors, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
     val c = Ruvo.colors
     val shape = RoundedCornerShape(Radius.inner)
-    RuvoCard(modifier, brush = androidx.compose.ui.graphics.Brush.linearGradient(listOf(palette.glowWarm.compositeOver(palette.canvas), palette.canvas)), border = if (selected) c.fuel else c.hairline, onClick = onClick, onClickLabel = "Use $name", padding = androidx.compose.foundation.layout.PaddingValues(Space.md)) {
+    // Painted in the mood's own sky, with a pane of its glass and its brand blue, so you see it before you pick it.
+    val card = RoundedCornerShape(Radius.card)
+    androidx.compose.foundation.layout.Column(
+        modifier.clip(card)
+            .background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(palette.glowCool.compositeOver(palette.canvasTop), palette.canvas)))
+            .border(if (selected) 2.dp else 1.dp, if (selected) c.ink else c.hairline, card)
+            .clickable(role = androidx.compose.ui.semantics.Role.RadioButton, onClickLabel = "Use $name", onClick = onClick)
+            .padding(Space.md),
+    ) {
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             listOf(palette.fixed, palette.fuel, palette.future).forEach { col ->
                 Box(Modifier.size(18.dp).clip(CircleShape).background(col))
             }
         }
         Spacer(Modifier.height(Space.sm))
-        Box(Modifier.fillMaxWidth().height(28.dp).clip(shape).background(palette.surface).border(1.dp, palette.hairline, shape)) {
-            Box(Modifier.fillMaxWidth(0.6f).height(28.dp).clip(shape).background(palette.fuel.copy(alpha = 0.5f)))
+        Box(Modifier.fillMaxWidth().height(28.dp).clip(shape).background(palette.glassTop).border(1.dp, palette.glassEdge, shape)) {
+            Box(Modifier.fillMaxWidth(0.6f).height(28.dp).clip(shape).background(palette.brand.copy(alpha = 0.85f)))
         }
         Spacer(Modifier.height(Space.sm))
         Text(name, style = Ruvo.type.bodyStrong, color = palette.ink)

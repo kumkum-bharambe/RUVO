@@ -51,21 +51,21 @@ fun RuvoSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = state,
-        containerColor = c.canvas,
+        // The top of the sky, so the strip behind the handle meets the glowing sky below without a seam.
+        containerColor = c.canvasTop,
         scrimColor = c.scrim,
+        // The content pads itself for the navigation bar, so the glowing sky reaches the very bottom.
+        contentWindowInsets = { androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0) },
         shape = RoundedCornerShape(topStart = Radius.sheet, topEnd = Radius.sheet),
         dragHandle = {
-            Box(Modifier.padding(top = Space.sm).size(width = 40.dp, height = 5.dp).clip(RoundedCornerShape(Radius.chip)).background(c.hairline))
+            Box(Modifier.padding(top = Space.sm).size(width = 40.dp, height = 5.dp).clip(RoundedCornerShape(Radius.chip)).background(c.ink.copy(alpha = 0.2f)))
         },
     ) {
         val scroll = rememberScrollState()
         Column(
             Modifier.fillMaxWidth()
-                // A low warm glow in the corner, echoing the canvas behind the sheet.
-                .drawBehind {
-                    drawRect(Brush.radialGradient(listOf(c.glowWarm, Color.Transparent), Offset(size.width, 0f), size.width * 0.9f))
-                    drawRect(Brush.radialGradient(listOf(c.glowCool.copy(alpha = c.glowCool.alpha * 0.6f), Color.Transparent), Offset(0f, size.height), size.width))
-                }
+                // The same glowing sky as the screens, held still, so glass cards look the same in a sheet.
+                .drawBehind { drawSky(c, 0.15f, 0.55f) }
                 .let { if (scrollable) it.verticalScroll(scroll) else it }
                 .padding(horizontal = Space.gutter)
                 .navigationBarsPadding()

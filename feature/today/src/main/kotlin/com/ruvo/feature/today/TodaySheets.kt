@@ -148,31 +148,34 @@ fun BeforeYouBuySheet(onDismiss: () -> Unit, onBought: (Long) -> Unit) {
         }
         Spacer(Modifier.height(Space.md))
         if (result != null) {
+            // Before you buy is blue wherever it appears. The bar's colour carries the verdict: yellow when you
+            // still make it, butter when it gets tight, a light rose when it leaves you short.
             val accent = when (result.verdict) {
                 BeforeYouBuy.Verdict.COMFORTABLE -> c.fuel
                 BeforeYouBuy.Verdict.TIGHT -> c.sun
-                BeforeYouBuy.Verdict.SHORT -> c.warning
+                BeforeYouBuy.Verdict.SHORT -> androidx.compose.ui.graphics.Color(0xFFFF9DB2)
             }
-            RuvoCard(color = accent.copy(alpha = if (c.isDark) 0.16f else 0.18f), border = null) {
-                Eyebrow("Costs", color = c.ink)
+            val on = c.onHero
+            RuvoCard(brush = c.heroBrush, border = null, elevated = true) {
+                Eyebrow("Costs", color = on.copy(alpha = 0.75f))
                 Text(
                     if (result.costDays == Math.floor(result.costDays)) IndianFormat.days(result.costDays.toInt()) else "${result.costDays} days",
-                    style = Ruvo.type.display, color = c.ink,
+                    style = Ruvo.type.display, color = on,
                 )
-                Text("of your usual spending", style = Ruvo.type.caption, color = c.inkSoft)
+                Text("of your usual spending", style = Ruvo.type.caption, color = on.copy(alpha = 0.75f))
                 Spacer(Modifier.height(Space.md))
                 val before = r.runwayDays.coerceAtLeast(1)
                 val shrink by animateFloatAsState(result.runwayAfter.toFloat() / before, Motion.soft(), label = "shrink")
-                FillBar(shrink, accent)
+                FillBar(shrink, accent, track = on.copy(alpha = 0.18f))
                 Spacer(Modifier.height(Space.xs))
-                Text("Runway ${r.runwayDays} → ${result.runwayAfter} days", style = Ruvo.type.bodyStrong, color = c.ink)
+                Text("Runway ${r.runwayDays} → ${result.runwayAfter} days", style = Ruvo.type.bodyStrong, color = on)
                 Text(
                     when (result.verdict) {
                         BeforeYouBuy.Verdict.COMFORTABLE -> result.bufferAfter?.let { "You would still make it with ${IndianFormat.days(it)} spare." } ?: "Plenty of runway left."
                         BeforeYouBuy.Verdict.TIGHT -> result.bufferAfter?.let { "You would make it with ${IndianFormat.days(it)} spare. The rest of the month gets tight." } ?: "Your runway gets short."
                         BeforeYouBuy.Verdict.SHORT -> result.bufferAfter?.let { "You would be ${IndianFormat.days(-it)} short of your next money." } ?: "It uses more than your Fuel."
                     },
-                    style = Ruvo.type.body, color = c.ink,
+                    style = Ruvo.type.body, color = on.copy(alpha = 0.9f),
                 )
             }
             Spacer(Modifier.height(Space.md))
