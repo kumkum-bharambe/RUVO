@@ -214,7 +214,7 @@ private fun Listing(p: Perks.Perk, today: LocalDate, daily: Paise, saved: Boolea
             PerkLogo(p.brand)
             Spacer(Modifier.width(Space.sm))
             Column(Modifier.weight(1f)) {
-                Text(p.brand, style = Ruvo.type.title, color = c.ink, maxLines = 1)
+                Text(p.brand, style = Ruvo.type.title, color = c.ink, maxLines = 2)
                 Text(p.offer, style = Ruvo.type.caption, color = c.inkSoft, maxLines = 3)
             }
             Spacer(Modifier.width(Space.xs))
@@ -331,7 +331,7 @@ private fun ListingSheet(p: Perks.Perk, today: LocalDate, daily: Paise, saved: B
 @Composable
 private fun PerkLogo(brand: String) {
     val (bg, fg) = Covers.brights[Math.floorMod(brand.hashCode(), Covers.brights.size)]
-    val initials = brand.split(' ', '&', '.', '\'').filter { it.isNotBlank() }.take(2).joinToString("") { it.first().uppercase() }
+    val initials = brand.replace("'s", "").split(' ', '&', '.').filter { it.isNotBlank() }.take(2).joinToString("") { it.first().uppercase() }
     Box(
         Modifier.size(46.dp).clip(RoundedCornerShape(14.dp))
             .background(androidx.compose.ui.graphics.Brush.linearGradient(listOf(bg.lighten(0.22f), bg)))
