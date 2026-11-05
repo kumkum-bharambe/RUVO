@@ -156,13 +156,6 @@ fun GoalsScreen(startNewGoal: Boolean = false, onNewGoalShown: () -> Unit = {}, 
             }
         }
         if (state.goals.isNotEmpty()) item { GoalInsights(state, Modifier.padding(horizontal = Space.gutter).padding(top = Space.md).reveal(3)) }
-        // The review, in the same pearly tile as on Home.
-        item {
-            com.ruvo.design.BigTile(
-                com.ruvo.design.REVIEW_TITLE, com.ruvo.design.REVIEW_LINE, RuvoIcons.Chart,
-                Modifier.padding(horizontal = Space.gutter).padding(top = Space.xl), style = com.ruvo.design.TileStyle.IRIS,
-            ) { review = true }
-        }
     }
     openGoal?.let { id -> GoalSheet(id, state) { openGoal = null } }
     if (newGoal) NewGoalSheet { newGoal = false }
@@ -381,7 +374,7 @@ private fun GoalSheet(id: String, state: AppState, onDismiss: () -> Unit) {
                     Spacer(Modifier.height(Space.sm))
                     Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
                         GhostButton("Keep it", { removing = false }, Modifier.weight(1f))
-                        AccentButton("Remove", { scope.launch { RuvoGraph.repository.deleteGoal(g.id) }; onDismiss() }, Modifier.weight(1f), accent = c.warning)
+                        AccentButton("Remove", { RuvoGraph.appScope.launch { RuvoGraph.repository.deleteGoal(g.id) }; onDismiss() }, Modifier.weight(1f), accent = c.warning)
                     }
                 }
             }

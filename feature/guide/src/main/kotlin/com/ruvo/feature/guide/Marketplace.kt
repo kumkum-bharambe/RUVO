@@ -60,7 +60,7 @@ import java.time.LocalDate
 /** One line under the Marketplace tile, shared by Profile and the Guide. */
 const val MARKETPLACE_LINE = "Real student offers on music, food, apps and learning. Checked by Ruvo, no ads."
 
-private val KINDS = listOf("All", "Saved", "Student offers", "Save", "Earn", "Learn")
+private val KINDS = listOf("All", "Saved")
 
 /**
  * The Marketplace: real student offers, each saying where it comes from, when Ruvo last checked it and when it
@@ -135,7 +135,7 @@ fun MarketplaceSheet(onDismiss: () -> Unit) {
                     "Saved" -> listed.count { it.id in saved }
                     else -> listed.count { it.kind == k }
                 }
-                if (n > 0 || k == "Saved") Chip("$k · $n", kind == k, { kind = k }, accent = c.fuel)
+                Chip("$k · $n", kind == k, { kind = k }, accent = c.fuel)
             }
         }
         Spacer(Modifier.height(Space.sm))

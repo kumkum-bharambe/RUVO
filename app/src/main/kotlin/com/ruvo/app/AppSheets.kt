@@ -79,19 +79,25 @@ fun QuickAddSheet(onDismiss: () -> Unit) {
     var bucket by remember { mutableStateOf(Bucket.FUEL) }
     var sharing by remember { mutableStateOf(false) }
     var owed by remember { mutableStateOf<List<Pair<String, Long>>>(emptyList()) }
+    var making by remember { mutableStateOf(false) }
+    var newCategory by remember { mutableStateOf("") }
     val paise = parseRupees(amount) ?: 0
     val quick = listOf("Food", "Transport", "Groceries", "Shopping", "Entertainment", "Education", "Bills", "Other")
 
     fun save(category: String) {
         if (paise <= 0) return
         Haptics.confirm(view)
-        scope.launch {
+        // Everything the sheet knows, copied now, and saved on the app's own scope: the sheet closes straight away,
+        // which would otherwise cancel the split before it was written (that is why splits went missing from Owed).
+        val amountNow = paise; val label = what.ifBlank { category }; val incoming = moneyIn; val bucketNow = bucket
+        val shares = if (!incoming && sharing) owed.filter { it.second > 0 } else emptyList()
+        RuvoGraph.appScope.launch {
             val id = RuvoGraph.repository.addManual(
-                paise, what.ifBlank { category }, if (moneyIn) "Income" else category,
-                if (moneyIn) Bucket.FUEL else bucket, if (moneyIn) Direction.CREDIT else Direction.DEBIT,
+                amountNow, label, if (incoming) "Income" else category,
+                if (incoming) Bucket.FUEL else bucketNow, if (incoming) Direction.CREDIT else Direction.DEBIT,
             )
             // Shared on the way in: friends' parts go straight to Owed in Money.
-            if (!moneyIn && sharing && owed.isNotEmpty()) RuvoGraph.repository.splitByAmounts(id, owed)
+            if (shares.isNotEmpty()) RuvoGraph.repository.splitByAmounts(id, shares)
         }
         onDismiss()
     }
@@ -133,7 +139,23 @@ fun QuickAddSheet(onDismiss: () -> Unit) {
             Eyebrow("Tap a category to save")
             Spacer(Modifier.height(Space.xs))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.xs), verticalArrangement = Arrangement.spacedBy(Space.xs)) {
-                quick.forEach { cat -> Chip(cat, false, { save(cat) }) }
+                (quick + state.settings.customCategories.sorted()).forEach { cat -> Chip(cat, false, { save(cat) }) }
+                Chip(if (making) "Cancel" else "+ New category", making, { making = !making })
+            }
+            // Their own category: name it once, and it is offered every time from now on.
+            if (making) {
+                Spacer(Modifier.height(Space.sm))
+                RuvoField(newCategory, { newCategory = it.take(24) }, "Category name, e.g. Gym, Gifts, Travel")
+                Spacer(Modifier.height(Space.xs))
+                PrimaryButton(
+                    "Save in ${newCategory.trim().ifBlank { "new category" }}",
+                    {
+                        val n = newCategory.trim().replaceFirstChar { it.uppercase() }
+                        RuvoGraph.appScope.launch { RuvoGraph.repository.addCategory(n) }
+                        save(n)
+                    },
+                    Modifier.fillMaxWidth(), enabled = paise > 0 && newCategory.isNotBlank(),
+                )
             }
         }
     }
@@ -175,7 +197,7 @@ fun SettingsSheet(state: AppState, onDismiss: () -> Unit, onPersonas: () -> Unit
         Chip("Follow my phone", s.theme == ThemeChoice.SYSTEM.name, { scope.launch { repo.setTheme(ThemeChoice.SYSTEM.name) } })
 
         if (!state.isDemo) {
-            SectionTitle("Profile")
+            SectionTitle("Your name")
             RuvoField(name, { name = it }, "What should Ruvo call you?")
             Spacer(Modifier.height(Space.xs))
             GhostButton("Save name", { scope.launch { repo.setName(name) } }, Modifier.fillMaxWidth())
@@ -260,7 +282,7 @@ fun SettingsSheet(state: AppState, onDismiss: () -> Unit, onPersonas: () -> Unit
                 Spacer(Modifier.height(Space.sm))
                 Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
                     GhostButton("Keep my data", { confirmDelete = false }, Modifier.weight(1f))
-                    PrimaryButton("Delete", { scope.launch { repo.deleteEverything() }; onDismiss() }, Modifier.weight(1f))
+                    PrimaryButton("Delete", { RuvoGraph.appScope.launch { repo.deleteEverything() }; onDismiss() }, Modifier.weight(1f))
                 }
             }
         }

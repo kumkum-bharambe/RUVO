@@ -104,11 +104,6 @@ fun ProfileSheet(
                     Text(who, style = Ruvo.type.caption, color = c.inkSoft)
                     if (state.isDemo) Text("Sample student, none of this is real", style = Ruvo.type.caption, color = c.inkFaint)
                 }
-                if (!state.isDemo) {
-                    androidx.compose.material3.TextButton({ editing = !editing }) {
-                        Text(if (editing) "Close" else "Edit", style = Ruvo.type.label, color = c.ink)
-                    }
-                }
             }
             Spacer(Modifier.height(Space.md))
             Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(Radius.inner)).background(c.ink.copy(alpha = if (c.isDark) 0.08f else 0.05f)).padding(Space.sm)) {
@@ -118,13 +113,6 @@ fun ProfileSheet(
                 HeroStat("Books read", "$read of ${Library.all.size}", Modifier.weight(1f))
             }
         }
-        if (editing) {
-            Spacer(Modifier.height(Space.sm))
-            RuvoField(name, { name = it }, "What should Ruvo call you?")
-            Spacer(Modifier.height(Space.xs))
-            GhostButton("Save name", { scope.launch { RuvoGraph.repository.setName(name) }; editing = false }, Modifier.fillMaxWidth())
-        }
-
         // This month so far: what came in, what went out, what is protected.
         Spacer(Modifier.height(Space.md))
         val from = state.today.withDayOfMonth(1)
@@ -157,34 +145,15 @@ fun ProfileSheet(
             }
         }
 
-        // Mood, one tap away: a frosted track with a white pill on the chosen one.
-        Spacer(Modifier.height(Space.md))
-        val theme = state.settings.theme
-        Row(
-            Modifier.reveal(2).fillMaxWidth().clip(RoundedCornerShape(Radius.chip))
-                .background(if (c.isDark) androidx.compose.ui.graphics.Color.White.copy(alpha = 0.08f) else c.ink.copy(alpha = 0.07f))
-                .border(1.dp, if (c.isDark) androidx.compose.ui.graphics.Color.White.copy(alpha = 0.1f) else androidx.compose.ui.graphics.Color.White.copy(alpha = 0.7f), RoundedCornerShape(Radius.chip))
-                .padding(4.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            MoodPill("Daybreak", RuvoIcons.Sun, theme == ThemeChoice.DAYBREAK.name || (theme == ThemeChoice.SYSTEM.name && !c.isDark), Modifier.weight(1f)) {
-                scope.launch { RuvoGraph.repository.setTheme(ThemeChoice.DAYBREAK.name) }
-            }
-            MoodPill("Night swim", RuvoIcons.Moon, theme == ThemeChoice.NIGHT_SWIM.name || (theme == ThemeChoice.SYSTEM.name && c.isDark), Modifier.weight(1f)) {
-                scope.launch { RuvoGraph.repository.setTheme(ThemeChoice.NIGHT_SWIM.name) }
-            }
-        }
-
+        // Everything else lives in one place each: name, mood, sample students and privacy are in Settings.
         Spacer(Modifier.height(Space.md))
         BigTile("Marketplace", MARKETPLACE_LINE, RuvoIcons.Store, Modifier.reveal(3)) { onDismiss(); onMarketplace() }
         Spacer(Modifier.height(Space.sm))
-        BigTile("Settings", "Mood, tracking, notifications, your data, help.", RuvoIcons.Settings, Modifier.reveal(4), style = com.ruvo.design.TileStyle.GLASS) { onDismiss(); onSettings() }
+        BigTile("Settings", "Your name, mood, tracking, notifications, sample students, your data and help.", RuvoIcons.Settings, Modifier.reveal(4), style = com.ruvo.design.TileStyle.GLASS) { onDismiss(); onSettings() }
 
         Spacer(Modifier.height(Space.md))
         RuvoCard(Modifier.fillMaxWidth().reveal(5), padding = PaddingValues(horizontal = Space.md, vertical = Space.xs)) {
-            Shortcut(RuvoIcons.User, if (state.isDemo) "Switch sample student" else "Try a sample student", "Five made-up students to explore") { onDismiss(); onPersonas() }
             Shortcut(RuvoIcons.Lock, "Change PIN", "The 4-digit PIN you open Ruvo with") { changingPin = true }
-            Shortcut(RuvoIcons.Shield, "Private by design", "Your account and data stay on this phone, encrypted", onClick = null)
         }
 
         Spacer(Modifier.height(Space.md))

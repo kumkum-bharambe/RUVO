@@ -126,7 +126,6 @@ fun RuvoRoot(state: AppState, request: LaunchRequest?, consumed: () -> Unit) {
         AnimatedVisibility(!showApp, enter = fadeIn(), exit = fadeOut(Motion.gentle())) {
             com.ruvo.design.RuvoSplash(
                 onSkip = { splashDone = true },
-                mascot = { m, cheer -> com.ruvo.feature.orb.RuvoPet(com.ruvo.feature.orb.PetMood.HAPPY, m, joy = cheer, tricks = false) },
             )
         }
     }

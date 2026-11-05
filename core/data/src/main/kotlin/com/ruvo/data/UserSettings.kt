@@ -48,6 +48,8 @@ data class UserSettings(
     val savedIdeas: Set<String> = emptySet(),
     /** Marketplace offers the user saved, by listing id. */
     val savedOffers: Set<String> = emptySet(),
+    /** Spending categories the user made themselves. */
+    val customCategories: Set<String> = emptySet(),
     /** Weekly review answers, as "txnId:WORTH|NOT|UNSURE". */
     val purchaseReviews: Set<String> = emptySet(),
     /** Shows •••• instead of the balance on Money. */
@@ -100,6 +102,7 @@ class SettingsStore(private val context: Context) {
         val read = stringSetPreferencesKey("read_books")
         val ideas = stringSetPreferencesKey("saved_ideas")
         val offers = stringSetPreferencesKey("saved_offers")
+        val categories = stringSetPreferencesKey("custom_categories")
         val reviews = stringSetPreferencesKey("purchase_reviews")
         val hide = booleanPreferencesKey("hide_balance")
         val nCapture = booleanPreferencesKey("notify_capture")
@@ -140,6 +143,7 @@ class SettingsStore(private val context: Context) {
             p[K.read] = s.readBooks
             p[K.ideas] = s.savedIdeas
             p[K.offers] = s.savedOffers
+            p[K.categories] = s.customCategories
             p[K.reviews] = s.purchaseReviews
             p[K.hide] = s.hideBalance
             p[K.nCapture] = s.notifyCapture
@@ -175,6 +179,7 @@ class SettingsStore(private val context: Context) {
         readBooks = p[K.read] ?: emptySet(),
         savedIdeas = p[K.ideas] ?: emptySet(),
         savedOffers = p[K.offers] ?: emptySet(),
+        customCategories = p[K.categories] ?: emptySet(),
         purchaseReviews = p[K.reviews] ?: emptySet(),
         hideBalance = p[K.hide] ?: false,
         notifyCapture = p[K.nCapture] ?: true,

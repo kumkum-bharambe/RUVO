@@ -3,8 +3,6 @@ package com.ruvo.feature.today
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import com.ruvo.design.REVIEW_LINE
-import com.ruvo.design.REVIEW_TITLE
 import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -172,14 +170,8 @@ fun TodayContent(state: AppState, a: TodayActions) {
                 }
             }
         }
-        // Before you buy in brand blue, then the review in its pearly colours: the same tiles as everywhere else.
+        // Before you buy, in brand blue like everywhere else.
         item { BuyCard(a.openBuy, Modifier.padding(top = Space.md).reveal(8)) }
-        item {
-            com.ruvo.design.BigTile(
-                REVIEW_TITLE, REVIEW_LINE, RuvoIcons.Chart,
-                Modifier.padding(horizontal = Space.gutter).padding(top = Space.sm).reveal(9), style = com.ruvo.design.TileStyle.IRIS, onClick = a.openWeekly,
-            )
-        }
         item {
             val lesson = Lessons.forNow(state.input, r)
             RuvoCard(Modifier.padding(horizontal = Space.gutter).padding(top = Space.sm).reveal(10), onClick = { a.openLesson(lesson.id) }, onClickLabel = "Read ${lesson.title}") {

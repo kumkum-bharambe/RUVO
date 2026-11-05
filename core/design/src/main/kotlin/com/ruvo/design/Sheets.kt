@@ -62,24 +62,28 @@ fun RuvoSheet(
         },
     ) {
         val scroll = rememberScrollState()
-        Column(
-            Modifier.fillMaxWidth()
-                // The same glowing sky as the screens, held still, so glass cards look the same in a sheet.
-                .drawBehind { drawSky(c, 0.15f, 0.55f) }
-                .let { if (scrollable) it.verticalScroll(scroll) else it }
-                .padding(horizontal = Space.gutter)
-                .navigationBarsPadding()
-                .padding(bottom = Space.lg),
-        ) {
-            Row(Modifier.fillMaxWidth().padding(top = Space.sm), verticalAlignment = Alignment.CenterVertically) {
+        // The same glowing sky as the screens, held still, so glass cards look the same in a sheet.
+        Column(Modifier.fillMaxWidth().drawBehind { drawSky(c, 0.15f, 0.55f) }) {
+            // The title and the close button stay put while the content scrolls underneath.
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = Space.gutter).padding(top = Space.sm, bottom = Space.sm),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Column(Modifier.weight(1f)) {
                     if (eyebrow != null) Eyebrow(eyebrow)
                     Text(title, Modifier.semantics { heading() }, style = Ruvo.type.headline, color = c.ink)
                 }
                 IconCircle(RuvoIcons.Close, "Close", onDismiss)
             }
-            Spacer(Modifier.height(Space.md))
-            content()
+            Column(
+                Modifier.fillMaxWidth()
+                    .let { if (scrollable) it.verticalScroll(scroll) else it }
+                    .padding(horizontal = Space.gutter)
+                    .padding(top = Space.xs)
+                    .navigationBarsPadding()
+                    .padding(bottom = Space.lg),
+                content = content,
+            )
         }
     }
 }

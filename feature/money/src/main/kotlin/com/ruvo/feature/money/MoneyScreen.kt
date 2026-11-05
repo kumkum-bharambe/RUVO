@@ -269,7 +269,7 @@ private fun MonthEditSheet(state: AppState, month: java.time.YearMonth, onDismis
         }, Modifier.fillMaxWidth())
         if (edit != null) {
             Spacer(Modifier.height(Space.sm))
-            GhostButton("Go back to what Ruvo recorded", { scope.launch { RuvoGraph.repository.clearMonthTotals(month) }; onDismiss() }, Modifier.fillMaxWidth())
+            GhostButton("Go back to what Ruvo recorded", { RuvoGraph.appScope.launch { RuvoGraph.repository.clearMonthTotals(month) }; onDismiss() }, Modifier.fillMaxWidth())
         }
     }
 }
@@ -328,12 +328,8 @@ private fun WhereItWent(state: AppState, modifier: Modifier, onCategory: (String
         }
         cats.take(6).forEachIndexed { i, (cat, v) ->
             Spacer(Modifier.height(Space.sm))
-            // Each category opens its transactions for this month.
-            Row(
-                Modifier.clip(RoundedCornerShape(Radius.inner)).clickable(role = androidx.compose.ui.semantics.Role.Button, onClickLabel = "See $cat transactions") { onCategory(cat) }
-                    .padding(vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
+            // A plain summary to read, not a list to tap.
+            Row(Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(cat, Modifier.width(104.dp), style = Ruvo.type.label, color = c.ink, maxLines = 1)
                 FillBar(v / top, palette[i % palette.size], Modifier.weight(1f))
                 Spacer(Modifier.width(Space.sm))
@@ -516,10 +512,9 @@ private fun Buckets(state: AppState) {
                                 )
                             }
                             Amount(cm.amount, style = Ruvo.type.label)
-                            if (due != null) {
-                                Spacer(Modifier.width(Space.xs))
-                                Chip("Paid", false, { scope.launch { RuvoGraph.repository.payCommitment(cm) } })
-                            }
+                            Spacer(Modifier.width(Space.xs))
+                            // Its status for this cycle: Paid with a tick, or Unpaid, which you tap once it is paid.
+                            PaidStatus(paid = due == null, name = cm.name) { scope.launch { RuvoGraph.repository.payCommitment(cm) } }
                             Spacer(Modifier.width(Space.xxs))
                             Icon(RuvoIcons.Forward, null, Modifier.size(16.dp), tint = c.inkFaint)
                         }
@@ -532,6 +527,32 @@ private fun Buckets(state: AppState) {
                 }
             }
         }
+    }
+}
+
+/** "Paid" with a tick when this cycle's payment is done; "Unpaid" otherwise, which marks it paid when tapped. */
+@Composable
+private fun PaidStatus(paid: Boolean, name: String, onMarkPaid: () -> Unit) {
+    val c = Ruvo.colors
+    val shape = RoundedCornerShape(Radius.chip)
+    if (paid) {
+        Row(
+            Modifier.heightIn(min = 36.dp).clip(shape).background(c.brandTint).padding(horizontal = 10.dp, vertical = 6.dp)
+                .semantics(mergeDescendants = true) { contentDescription = "$name is paid for this cycle" },
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(RuvoIcons.Check, null, Modifier.size(14.dp), tint = c.brandInk)
+            Spacer(Modifier.width(4.dp))
+            Text("Paid", style = Ruvo.type.label, color = c.brandInk)
+        }
+    } else {
+        Text(
+            "Unpaid",
+            Modifier.heightIn(min = 36.dp).clip(shape).border(1.dp, c.warning, shape)
+                .clickable(role = Role.Button, onClickLabel = "Mark $name as paid", onClick = onMarkPaid)
+                .padding(horizontal = 10.dp, vertical = 8.dp),
+            style = Ruvo.type.label, color = c.warning,
+        )
     }
 }
 
@@ -586,7 +607,7 @@ private fun CommitmentSheet(cm: com.ruvo.engine.Commitment?, onDismiss: () -> Un
                     Spacer(Modifier.height(Space.sm))
                     Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
                         GhostButton("Keep it", { removing = false }, Modifier.weight(1f))
-                        com.ruvo.design.AccentButton("Remove", { scope.launch { repo.removeCommitment(cm.id) }; onDismiss() }, Modifier.weight(1f), accent = c.warning)
+                        com.ruvo.design.AccentButton("Remove", { RuvoGraph.appScope.launch { repo.removeCommitment(cm.id) }; onDismiss() }, Modifier.weight(1f), accent = c.warning)
                     }
                 }
             }
@@ -659,7 +680,11 @@ fun TxnSheet(id: String, startWithSplit: Boolean, onDismiss: () -> Unit) {
     val repo = RuvoGraph.repository
     var name by remember(id) { mutableStateOf(t.merchant) }
     var splitOpen by remember(id) { mutableStateOf(startWithSplit) }
-    val categories = listOf("Food", "Groceries", "Transport", "Shopping", "Entertainment", "Subscriptions", "Bills", "Education", "Health", "Other")
+    // The usual categories, then any the user made, then this payment's own if it is something else again.
+    val categories = (listOf("Food", "Groceries", "Transport", "Shopping", "Entertainment", "Subscriptions", "Bills", "Education", "Health", "Other") +
+        state.settings.customCategories.sorted() + t.category).distinct()
+    var making by remember(id) { mutableStateOf(false) }
+    var newCategory by remember(id) { mutableStateOf("") }
 
     RuvoSheet(IndianFormat.rupees(t.amount), onDismiss, eyebrow = "${IndianFormat.relativeDay(t.date, state.today)} · ${if (t.direction == Direction.CREDIT) "money in" else "payment"}") {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -674,6 +699,20 @@ fun TxnSheet(id: String, startWithSplit: Boolean, onDismiss: () -> Unit) {
             categories.forEach { cat ->
                 Chip(cat, t.category == cat, { scope.launch { repo.recategorise(id, name.ifBlank { t.merchant }, cat) } })
             }
+            Chip(if (making) "Cancel" else "+ New category", making, { making = !making })
+        }
+        if (making) {
+            Spacer(Modifier.height(Space.sm))
+            RuvoField(newCategory, { newCategory = it.take(24) }, "Category name, e.g. Gym, Gifts, Travel")
+            Spacer(Modifier.height(Space.xs))
+            GhostButton("Use this category", {
+                val n = newCategory.trim().replaceFirstChar { it.uppercase() }
+                if (n.isNotBlank()) scope.launch {
+                    repo.addCategory(n)
+                    repo.recategorise(id, name.ifBlank { t.merchant }, n)
+                    making = false; newCategory = ""
+                }
+            }, Modifier.fillMaxWidth())
         }
         if (t.direction == Direction.DEBIT) {
             Spacer(Modifier.height(Space.md))
@@ -704,7 +743,7 @@ fun TxnSheet(id: String, startWithSplit: Boolean, onDismiss: () -> Unit) {
         Spacer(Modifier.height(Space.lg))
         Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
             if (t.status == TxnStatus.IGNORED) GhostButton("Count it again", { scope.launch { repo.restore(id) } }, Modifier.weight(1f))
-            else GhostButton("Ignore", { scope.launch { repo.ignore(id) }; onDismiss() }, Modifier.weight(1f))
+            else GhostButton("Ignore", { RuvoGraph.appScope.launch { repo.ignore(id) }; onDismiss() }, Modifier.weight(1f))
             PrimaryButton("Done", {
                 if (name != t.merchant && name.isNotBlank()) scope.launch { repo.recategorise(id, name, t.category) }
                 if (t.status == TxnStatus.TO_SORT) scope.launch { repo.confirm(id) }
@@ -712,7 +751,7 @@ fun TxnSheet(id: String, startWithSplit: Boolean, onDismiss: () -> Unit) {
             }, Modifier.weight(1f))
         }
         Spacer(Modifier.height(Space.xs))
-        GhostButton("Delete", { scope.launch { repo.delete(id) }; onDismiss() }, Modifier.fillMaxWidth())
+        GhostButton("Delete", { RuvoGraph.appScope.launch { repo.delete(id) }; onDismiss() }, Modifier.fillMaxWidth())
         if (item.source == com.ruvo.data.db.Source.SMS) {
             Text("Read from a bank SMS on this phone. The message itself is never uploaded.", Modifier.padding(top = Space.xs), style = Ruvo.type.caption, color = c.inkFaint)
         }

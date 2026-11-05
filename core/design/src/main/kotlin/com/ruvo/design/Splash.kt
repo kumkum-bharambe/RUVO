@@ -78,11 +78,10 @@ private val Drops = listOf(Sun, Tangerine, Violet, Sky)
  *  2. A blue rupee coin drops in spinning and bounces twice on an invisible floor, its shadow growing as it falls.
  *  3. On the last landing it squashes, then pops open into the white logo tile, which springs up while the R
  *     builds itself inside.
- *  5. The tile does a happy hop; a rainbow ring, coloured rays and confetti fly out, and the pet pops up beside it.
- *  6. "RUVO" jumps in letter by letter, each in its drop's colour, settles to white, and a little wave runs
- *     through it over a four-colour bar; the line fades up.
+ *  5. The tile does a happy hop; a golden ring, soft rays and gold and white confetti fly out.
+ *  6. "RUVO" jumps in letter by letter in white, a little wave runs through it, and the line fades up.
  * A tap skips it. Always dark, so it reads as a cover. Reduced motion shows the finished picture at once.
- * [mascot] draws the pet; it is given a 0..1 cheer that rises as it arrives and fades away.
+ * [mascot] can draw a character beside the tile; the app leaves it empty.
  */
 @Composable
 fun RuvoSplash(
@@ -152,7 +151,8 @@ fun RuvoSplash(
         launch { delay(2660); wave.animateTo(1f, tween(650, easing = LinearEasing)) }
         launch { delay(2580); line.animateTo(1f, Motion.gentle()) }
     }
-    val confetti = listOf(Sun, Tangerine, Violet, Sky, Pink, Paper)
+    // Gold, white and a little blue: the coin's colours, nothing more.
+    val confetti = listOf(Sun, Paper, Sky)
     val loop = rememberInfiniteTransition(label = "splash")
     val turn by loop.animateFloat(0f, 360f, infiniteRepeatable(tween(24_000, easing = LinearEasing)), label = "turn")
     val swirl by loop.animateFloat(0f, 360f, infiniteRepeatable(tween(1600, easing = LinearEasing)), label = "swirl")
@@ -174,7 +174,7 @@ fun RuvoSplash(
                     for (i in 0 until 12) {
                         val a = i / 12f * 2f * PI.toFloat()
                         val w = 0.08f
-                        val col = listOf(Sky, Sun, Pink, Violet)[i % 4]
+                        val col = if (i % 2 == 0) Sun else Sky
                         drawPath(
                             Path().apply {
                                 moveTo(centre.x, centre.y)
@@ -195,9 +195,9 @@ fun RuvoSplash(
             }
             val bu = burst.value
             if (bu > 0f && bu < 1f) {
-                // A rainbow ring and confetti thrown outward, slowing, falling and fading.
+                // A golden ring and confetti thrown outward, slowing, falling and fading.
                 val ringR = 34.dp.toPx() + 120.dp.toPx() * bu
-                drawCircle(Brush.sweepGradient(Drops + Drops.first(), centre), ringR, centre, alpha = (1f - bu) * 0.9f, style = Stroke(5.dp.toPx() * (1f - bu) + 0.5f))
+                drawCircle(Sun, ringR, centre, alpha = (1f - bu) * 0.85f, style = Stroke(5.dp.toPx() * (1f - bu) + 0.5f))
                 for (i in 0 until 22) {
                     val ang = i / 22f * 2f * PI.toFloat() + 0.2f
                     val dist = 44.dp.toPx() + 140.dp.toPx() * bu * (0.62f + (i % 3) * 0.18f)
@@ -248,11 +248,13 @@ fun RuvoSplash(
                     contentAlignment = Alignment.Center,
                 ) {
                     Canvas(Modifier.matchParentSize()) {
-                        drawCircle(Brush.linearGradient(listOf(Color(0xFF6E8CFF), Color(0xFF1F35B8)), Offset.Zero, Offset(size.width, size.height)))
+                        // A golden coin: bright at the top left, deeper gold at the bottom right, with a darker rim.
+                        drawCircle(Brush.linearGradient(listOf(Color(0xFFFFE795), Color(0xFFF2A516)), Offset.Zero, Offset(size.width, size.height)))
+                        drawCircle(Color(0xFFB8740A), size.minDimension / 2 - 1.dp.toPx(), style = Stroke(2.dp.toPx()))
                         drawCircle(Paper.copy(alpha = 0.35f), size.minDimension / 2 - 4.dp.toPx(), style = Stroke(2.dp.toPx()))
                         drawCircle(Paper.copy(alpha = 0.25f), size.minDimension * 0.12f, Offset(size.width * 0.32f, size.height * 0.3f))
                     }
-                    Text("₹", style = Ruvo.type.display.copy(fontWeight = FontWeight(800)), color = Paper)
+                    Text("₹", style = Ruvo.type.display.copy(fontWeight = FontWeight(800)), color = Color(0xFF8A5A00))
                 }
                 // The pet pops up at the tile's corner and cheers.
                 if (mascot != null) {
@@ -285,18 +287,11 @@ fun RuvoSplash(
                             rotationZ = (1f - p) * (if (i % 2 == 0) -18f else 18f)
                         },
                         style = Ruvo.type.display.copy(fontSize = Ruvo.type.display.fontSize * 1.2f, fontWeight = FontWeight(800)),
-                        color = lerp(Drops[i], Paper, whiten[i].value),
+                        color = Paper,
                     )
                 }
             }
             Spacer(Modifier.height(6.dp))
-            // Four little bars, one per drop: the colours Ruvo is made of.
-            Row(
-                Modifier.graphicsLayer { scaleX = bar.value; alpha = bar.value.coerceIn(0f, 1f) },
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                Drops.forEach { col -> Box(Modifier.width(22.dp).height(5.dp).clip(RoundedCornerShape(Radius.chip)).background(col)) }
-            }
             Spacer(Modifier.height(Space.sm))
             Text(
                 "Your money, without the mental load.",
@@ -312,7 +307,7 @@ fun RuvoSplash(
     }
 }
 
-/** Soft blue, pink, purple and yellow lights drifting in the night sky behind the opening. */
+/** One soft blue light drifting behind the opening, and a quieter one low down. Nothing else. */
 private fun DrawScope.drawNightGlows(strength: Float, t: Float) {
     if (strength <= 0f) return
     val a = 2f * PI.toFloat() * t
@@ -322,17 +317,5 @@ private fun DrawScope.drawNightGlows(strength: Float, t: Float) {
         drawCircle(Brush.radialGradient(listOf(col.copy(alpha = col.alpha * strength), Color.Transparent), at, rr), rr, at)
     }
     glow(Color(0x803550D6), 0.9f + 0.06f * cos(a), 0.12f + 0.03f * sin(a), 1.0f)
-    glow(Color(0x40FF6FA8), 0.05f + 0.05f * sin(a), 0.72f + 0.04f * cos(a), 0.85f)
-    glow(Color(0x4D8B6CFF), 0.95f, 0.88f + 0.03f * sin(a), 0.8f)
-    glow(Color(0x26FFC23D), 0.1f + 0.04f * cos(a), 0.3f, 0.6f)
-}
-
-/** One glossy drop: its colour with a lighter top, a soft highlight and a bright glint. */
-private fun DrawScope.drawDrop(col: Color, at: Offset, rx: Float, ry: Float) {
-    drawOval(
-        Brush.radialGradient(listOf(col.lighten(0.35f), col, col.copy(red = col.red * 0.85f, green = col.green * 0.85f, blue = col.blue * 0.85f)), Offset(at.x - rx * 0.3f, at.y - ry * 0.4f), maxOf(rx, ry) * 1.4f),
-        Offset(at.x - rx, at.y - ry), Size(rx * 2, ry * 2),
-    )
-    drawOval(Paper.copy(alpha = 0.55f), Offset(at.x - rx * 0.55f, at.y - ry * 0.62f), Size(rx * 0.5f, ry * 0.32f))
-    drawCircle(Paper.copy(alpha = 0.9f), rx * 0.1f, Offset(at.x + rx * 0.35f, at.y - ry * 0.3f))
+    glow(Color(0x402338A8), 0.08f, 0.85f + 0.03f * sin(a), 0.8f)
 }

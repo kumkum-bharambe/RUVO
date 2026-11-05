@@ -179,10 +179,8 @@ fun BeforeYouBuySheet(onDismiss: () -> Unit, onBought: (Long) -> Unit) {
                 )
             }
             Spacer(Modifier.height(Space.md))
-            Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
-                GhostButton("Skip it", onDismiss, Modifier.weight(1f))
-                PrimaryButton("I bought it", { onBought(price); onDismiss() }, Modifier.weight(1f))
-            }
+            // One clear way out: the answer is the point, and nothing is recorded unless they add it themselves.
+            PrimaryButton("Got it", onDismiss, Modifier.fillMaxWidth())
             Spacer(Modifier.height(Space.xs))
             Text("Ruvo never blocks a purchase. The choice is yours.", style = Ruvo.type.caption, color = c.inkFaint)
         } else {

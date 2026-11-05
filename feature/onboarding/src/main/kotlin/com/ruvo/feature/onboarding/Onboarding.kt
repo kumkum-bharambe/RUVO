@@ -111,22 +111,34 @@ fun OnboardingFlow(onDone: () -> Unit) {
     var balance by remember { mutableStateOf("") }
     var expected by remember { mutableStateOf("") }
     var nextIn by remember { mutableIntStateOf(-1) }
+    // A date picked on the calendar wins over the quick choices.
+    var pickedDate by remember { mutableStateOf<LocalDate?>(null) }
+    var choosingNext by remember { mutableStateOf(false) }
     val chosen = remember { mutableStateListOf<Promise>() }
+    // Their own promises: what it is for, how much, and the day of the month it is due.
+    var ownName by remember { mutableStateOf("") }
+    var ownAmount by remember { mutableStateOf("") }
+    var ownDay by remember { mutableStateOf("") }
     var personaPicker by remember { mutableStateOf(false) }
     var goalName by remember { mutableStateOf("") }
     var goalTarget by remember { mutableStateOf("") }
+    var goalDate by remember { mutableStateOf<LocalDate?>(null) }
+    var choosingGoalDate by remember { mutableStateOf(false) }
     val today = LocalDate.now()
     val context = LocalContext.current
 
     fun nextDate(): LocalDate? = when {
         cadence == Cadence.IRREGULAR -> null
+        pickedDate != null -> pickedDate
         nextIn > 0 -> today.plusDays(nextIn.toLong())
         else -> DemoPersonas.nextDayOfMonth(today, 1)
     }
-    fun answers() = OnboardingAnswers(
+    fun answers(trackSms: Boolean = false) = OnboardingAnswers(
         name = name, cadence = cadence, balance = parseRupees(balance) ?: 0, expectedIncome = parseRupees(expected) ?: 0,
         nextIncome = nextDate(),
         commitments = chosen.map { Commitment(UUID.randomUUID().toString(), it.name, it.rupees * 100L, dueDayOfMonth = it.day) },
+        goalName = goalName, goalTarget = parseRupees(goalTarget) ?: 0, goalDate = goalDate ?: today.plusMonths(6),
+        trackSms = trackSms,
     )
 
     AmbientBackdrop {
@@ -159,8 +171,6 @@ fun OnboardingFlow(onDone: () -> Unit) {
                         ).forEach { (cd, label) ->
                             OptionCard(label.first, label.second, cadence == cd) { cadence = cd }
                         }
-                        Spacer(Modifier.height(Space.md))
-                        RuvoField(name, { name = it }, "What should Ruvo call you? (optional)")
                     }
                     2 -> {
                         Title("How much do you have right now?", "Bank plus cash. A rough number is fine.")
@@ -170,25 +180,50 @@ fun OnboardingFlow(onDone: () -> Unit) {
                         if (cadence == Cadence.IRREGULAR) {
                             Title("No fixed payday. That is fine.", "Ruvo will show how long your money lasts at your pace, rather than a date to reach.")
                         } else {
-                            Title("When does the next money arrive?", "So Ruvo knows the finish line.")
+                            Title("When does the next money arrive?", "So Ruvo knows the finish line. Pick one, or choose the exact date.")
                             FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.xs), verticalArrangement = Arrangement.spacedBy(Space.xs)) {
                                 val first = DemoPersonas.nextDayOfMonth(today, 1)
-                                Chip("On the 1st (${IndianFormat.date(first)})", nextIn <= 0, { nextIn = -1 })
-                                listOf(7, 15, 30, 60, 120).forEach { d -> Chip("In $d days", nextIn == d, { nextIn = d }) }
+                                Chip("On the 1st (${IndianFormat.date(first)})", pickedDate == null && nextIn <= 0, { nextIn = -1; pickedDate = null })
+                                listOf(7, 15, 30, 60).forEach { d -> Chip("In $d days", pickedDate == null && nextIn == d, { nextIn = d; pickedDate = null }) }
+                                Chip(pickedDate?.let { "On ${IndianFormat.date(it)}" } ?: "Choose a date", pickedDate != null, { choosingNext = true })
                             }
                             Spacer(Modifier.height(Space.md))
-                            RuvoField(expected, { expected = it }, "Usually how much? (optional)", number = true, prefix = "₹ ")
+                            RuvoField(expected, { expected = it }, "How much will come?", number = true, prefix = "₹ ")
+                            Text("A rough amount is fine. You can change it later in Settings.", Modifier.padding(top = Space.xs), style = Ruvo.type.caption, color = c.inkFaint)
+                            if (choosingNext) com.ruvo.design.FutureDatePicker(pickedDate ?: nextDate(), { pickedDate = it }, { choosingNext = false })
                         }
                     }
                     4 -> {
                         Title("What is already promised?", "Ruvo sets these aside before showing what is free.")
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.xs), verticalArrangement = Arrangement.spacedBy(Space.xs)) {
-                            PROMISES.forEach { p ->
+                            // Common ones to tap, then anything they added themselves.
+                            (PROMISES + chosen.filter { it !in PROMISES }).forEach { p ->
                                 val on = p in chosen
                                 Chip("${p.name} ${IndianFormat.rupees(p.rupees * 100L)}", on, { if (on) chosen.remove(p) else chosen.add(p) }, accent = c.fixed)
                             }
                         }
-                        Text("You can change amounts later in Money.", Modifier.padding(top = Space.sm), style = Ruvo.type.caption, color = c.inkFaint)
+                        Spacer(Modifier.height(Space.lg))
+                        Text("Add your own", style = Ruvo.type.title, color = c.ink)
+                        Spacer(Modifier.height(Space.xs))
+                        RuvoField(ownName, { ownName = it }, "What is it for? e.g. Gym, tuition, EMI")
+                        Spacer(Modifier.height(Space.xs))
+                        Row(horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
+                            RuvoField(ownAmount, { ownAmount = it }, "Amount", Modifier.weight(1.4f), number = true, prefix = "₹ ")
+                            RuvoField(ownDay, { ownDay = it.filter { ch -> ch.isDigit() }.take(2) }, "Due day", Modifier.weight(1f), number = true)
+                        }
+                        Spacer(Modifier.height(Space.xs))
+                        val amount = parseRupees(ownAmount) ?: 0
+                        GhostButton("Add it", add@{
+                            if (ownName.isBlank() || amount <= 0) return@add
+                            val day = ownDay.toIntOrNull()?.coerceIn(1, 31) ?: 1
+                            chosen.add(Promise(ownName.trim(), (amount / 100).toInt(), day))
+                            ownName = ""; ownAmount = ""; ownDay = ""
+                        }, Modifier.fillMaxWidth())
+                        Text(
+                            if (ownName.isBlank() || amount <= 0) "Type what it is for and how much to add it." else "Due day is the date it is paid each month; 1 if you leave it empty.",
+                            Modifier.padding(top = Space.xs), style = Ruvo.type.caption, color = c.inkFaint,
+                        )
+                        Text("You can change these later in Money.", Modifier.padding(top = Space.sm), style = Ruvo.type.caption, color = c.inkFaint)
                     }
                     5 -> {
                         Title("Do you want to save for a goal?", "Money with a name is harder to spend by accident. You can skip this.")
@@ -199,21 +234,42 @@ fun OnboardingFlow(onDone: () -> Unit) {
                         RuvoField(goalName, { goalName = it }, "Goal name")
                         Spacer(Modifier.height(Space.sm))
                         RuvoField(goalTarget, { goalTarget = it }, "How much do you need?", number = true, prefix = "₹ ")
+                        Spacer(Modifier.height(Space.md))
+                        Text("By when?", style = Ruvo.type.label, color = c.inkSoft)
+                        Spacer(Modifier.height(Space.xxs))
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.xs), verticalArrangement = Arrangement.spacedBy(Space.xs)) {
+                            listOf(3L, 6L, 12L).forEach { m ->
+                                val d = today.plusMonths(m)
+                                Chip("In $m months", goalDate == d || (goalDate == null && m == 6L), { goalDate = d })
+                            }
+                            val preset = goalDate == null || listOf(3L, 6L, 12L).any { today.plusMonths(it) == goalDate }
+                            Chip(if (!preset) "On ${IndianFormat.date(goalDate!!)}" else "Choose a date", !preset, { choosingGoalDate = true })
+                        }
+                        // What it takes each month, so the goal feels real.
+                        val target = parseRupees(goalTarget) ?: 0
+                        if (target > 0) {
+                            val by = goalDate ?: today.plusMonths(6)
+                            val months = java.time.temporal.ChronoUnit.MONTHS.between(today.withDayOfMonth(1), by.withDayOfMonth(1)).coerceAtLeast(1)
+                            Text(
+                                "That's about ${IndianFormat.rupees(target / months)} a month until ${IndianFormat.date(by)}.",
+                                Modifier.padding(top = Space.sm), style = Ruvo.type.bodyStrong, color = c.ink,
+                            )
+                        }
                         Text("Ruvo never counts goal money as spendable.", Modifier.padding(top = Space.sm), style = Ruvo.type.caption, color = c.inkFaint)
+                        if (choosingGoalDate) com.ruvo.design.FutureDatePicker(goalDate ?: today.plusMonths(6), { goalDate = it }, { choosingGoalDate = false })
                     }
                     6 -> Reveal(answers(), today)
                     else -> Tracking(onFinish = { withSms ->
-                        scope.launch {
-                            // Save the answers first; the inbox scan then adds to the fresh data.
-                            RuvoGraph.repository.completeOnboarding(answers())
-                            val target = parseRupees(goalTarget) ?: 0
-                            if (target > 0) RuvoGraph.repository.addGoal(goalName.ifBlank { "My goal" }, target, today.plusMonths(6), target / 6)
-                            if (withSms) {
-                                RuvoGraph.repository.setRealSms(true)
-                                SmsInboxScanner.scan(context)
-                            }
-                            onDone()
+                        // On the app's own scope, not this screen's: saving flips "onboarded" and this screen goes
+                        // away, which would cancel anything still waiting here. Answers, the first goal and the SMS
+                        // choice are saved together; the inbox scan then adds to the fresh data.
+                        val app = context.applicationContext
+                        val a = answers(trackSms = withSms)
+                        RuvoGraph.appScope.launch {
+                            RuvoGraph.repository.completeOnboarding(a)
+                            if (withSms) SmsInboxScanner.scan(app)
                         }
+                        onDone()
                     })
                 }
             }
@@ -230,7 +286,7 @@ fun OnboardingFlow(onDone: () -> Unit) {
                 }
                 5 -> Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
                     GhostButton("Not right now", { goalTarget = ""; step = 6 }, Modifier.weight(1f))
-                    PrimaryButton("Show my runway", { step = 6 }, Modifier.weight(1.4f))
+                    PrimaryButton("Next", { step = 6 }, Modifier.weight(1.4f))
                 }
                 6 -> PrimaryButton("Continue", { step = 7 }, Modifier.fillMaxWidth())
                 else -> {}

@@ -84,6 +84,12 @@ data class OnboardingAnswers(
     val expectedIncome: Paise,
     val nextIncome: LocalDate?,
     val commitments: List<Commitment>,
+    /** A first goal, if they set one: name, amount and the date they want it by. */
+    val goalName: String = "",
+    val goalTarget: Paise = 0,
+    val goalDate: LocalDate? = null,
+    /** They allowed SMS tracking at the end of setup. */
+    val trackSms: Boolean = false,
 )
 
 class RuvoRepository(
@@ -348,6 +354,12 @@ class RuvoRepository(
         it.copy(savedIdeas = if (key in it.savedIdeas) it.savedIdeas - key else it.savedIdeas + key)
     }
 
+    /** Adds a spending category the user made. Blank names are ignored; case-insensitive duplicates are not added twice. */
+    suspend fun addCategory(name: String) = settingsStore.update { s ->
+        val n = name.trim().replaceFirstChar { it.uppercase() }
+        if (n.isBlank() || s.customCategories.any { it.equals(n, ignoreCase = true) }) s else s.copy(customCategories = s.customCategories + n)
+    }
+
     /** Saves or unsaves a Marketplace offer. */
     suspend fun toggleOffer(id: String) = settingsStore.update {
         it.copy(savedOffers = if (id in it.savedOffers) it.savedOffers - id else it.savedOffers + id)
@@ -397,15 +409,25 @@ class RuvoRepository(
 
     // --- First run and demo ---
 
+    /**
+     * Saves the whole first run in one go: promises, the first goal and the SMS choice, then marks setup done. It
+     * all happens before "onboarded" flips, because the screen that called this goes away the moment it does.
+     * The name from account creation is kept unless a new one was typed.
+     */
     suspend fun completeOnboarding(a: OnboardingAnswers) {
         dao.clearAll()
         dao.upsertCommitments(a.commitments.map { it.toEntity() })
+        if (a.goalTarget > 0) {
+            val months = a.goalDate?.let { java.time.temporal.ChronoUnit.MONTHS.between(LocalDate.now().withDayOfMonth(1), it.withDayOfMonth(1)) }?.coerceAtLeast(1) ?: 6
+            addGoal(a.goalName.ifBlank { "My goal" }, a.goalTarget, a.goalDate, a.goalTarget / months)
+        }
         val now = clock()
         settingsStore.update {
             it.copy(
-                onboarded = true, ageConfirmed = true, name = a.name.trim(), demoPersona = null, cadence = a.cadence,
+                onboarded = true, ageConfirmed = true, name = a.name.trim().ifBlank { it.name }, demoPersona = null, cadence = a.cadence,
                 expectedIncome = a.expectedIncome, nextIncomeEpochDay = a.nextIncome?.toEpochDay(),
                 cycleDays = IncomePlan.defaultCycleDays(a.cadence), anchorAmount = a.balance, anchorMillis = now,
+                realSms = a.trackSms || it.realSms,
             )
         }
     }
