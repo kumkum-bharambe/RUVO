@@ -1,15 +1,12 @@
 package com.ruvo.feature.guide
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.expandVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,22 +15,19 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -44,11 +38,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ruvo.data.RuvoGraph
@@ -58,21 +52,72 @@ import com.ruvo.design.GhostButton
 import com.ruvo.design.Haptics
 import com.ruvo.design.IconCircle
 import com.ruvo.design.Motion
-import com.ruvo.design.OutlineButton
 import com.ruvo.design.PrimaryButton
 import com.ruvo.design.Radius
 import com.ruvo.design.Ruvo
-import com.ruvo.design.RuvoCard
 import com.ruvo.design.RuvoIcons
 import com.ruvo.design.Space
-import com.ruvo.design.reveal
+import com.ruvo.engine.guide.Glossary
 import com.ruvo.engine.guide.Library
+import com.ruvo.engine.guide.Stories
+import com.ruvo.engine.guide.Tools
+import com.ruvo.feature.orb.OnDeviceTranslate
+import com.ruvo.feature.orb.RuvoSpeech
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 
+/** The kinds of page a book is made of, in reading order. */
+internal sealed interface BookPage {
+    data object Cover : BookPage
+    /** One of the book's own five text pages; [idea] is its number (1..5), which saved ideas are keyed by. */
+    data class Words(val idea: Int, val label: String, val text: String, val art: Art) : BookPage
+    data class Fact(val text: String) : BookPage
+    data class Rule(val text: String) : BookPage
+    data class Story(val story: Stories.Story) : BookPage
+    data class Tool(val tool: Tools.Tool) : BookPage
+    data object Quiz : BookPage
+    data object Takeaways : BookPage
+    data object Apply : BookPage
+}
+
+/** Which picture heads a text page. */
+internal enum class Art { IDEA, SITUATION, WHY, REFLECT, TRY }
+
+internal fun pagesOf(b: Library.Book): List<BookPage> = buildList {
+    add(BookPage.Cover)
+    add(BookPage.Words(1, "The idea", b.idea, Art.IDEA))
+    add(BookPage.Words(2, "A real student situation", b.situation, Art.SITUATION))
+    add(BookPage.Words(3, "Why it matters", b.why, Art.WHY))
+    b.fact?.let { add(BookPage.Fact(it)) }
+    b.rule?.let { add(BookPage.Rule(it)) }
+    add(BookPage.Words(4, "Reflect", b.reflect, Art.REFLECT))
+    b.story?.let { Stories.byId(it) }?.let { add(BookPage.Story(it)) }
+    b.tool?.let { add(BookPage.Tool(it)) }
+    add(BookPage.Words(5, "Try it this week", b.tryIt, Art.TRY))
+    add(BookPage.Quiz)
+    add(BookPage.Takeaways)
+    add(BookPage.Apply)
+}
+
+/** Every piece of text a page shows, for translation and for reading aloud (the first entries are read). */
+internal fun textsOf(page: BookPage, b: Library.Book): List<String> = when (page) {
+    BookPage.Cover -> listOf(b.title, b.shelf.title)
+    is BookPage.Words -> listOf(page.text, page.label)
+    is BookPage.Fact -> listOf(page.text, "Did you know?")
+    is BookPage.Rule -> listOf(page.text, "Rule of thumb")
+    is BookPage.Story -> page.story.scenes.flatMap { s -> listOfNotNull(s.text, s.lesson) + s.choices.map { it.label } } + page.story.title
+    is BookPage.Tool -> listOf(page.tool.title, page.tool.line)
+    BookPage.Quiz -> b.quiz.flatMap { listOf(it.question) + it.options + it.because }
+    BookPage.Takeaways -> b.keyPoints + listOfNotNull(b.rule) + "Key takeaways"
+    BookPage.Apply -> listOf(b.applyLabel, "Put it to work in Ruvo")
+}
+
 /**
- * Reads one book, page by page. Pages turn on a soft 3D hinge; the cover opens the book. The check page gives
- * gentle feedback; the last page offers one way to use the idea in Ruvo. Finishing marks the book read.
+ * Reads one book, page by page, like a small illustrated paperback. Pages turn on a soft 3D hinge. Along the way
+ * there is a "did you know", a rule of thumb, a choose-your-path story and a calculator where the book has them,
+ * then a three-question quiz, the key takeaways and one way to use the idea in Ruvo. Money words are underlined;
+ * tapping one explains it. The top bar can read the page aloud and switch the book to Hindi, both on the phone.
+ * Finishing marks the book read.
  */
 @Composable
 fun BookReader(bookId: String, onClose: () -> Unit, onApply: (Library.Apply) -> Unit, onAsk: (String) -> Unit) {
@@ -81,11 +126,38 @@ fun BookReader(bookId: String, onClose: () -> Unit, onApply: (Library.Apply) -> 
     val c = Ruvo.colors
     val reduced = Ruvo.reducedMotion
     val view = LocalView.current
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val pageCount = book.pages.size + 1
-    val pager = rememberPagerState { pageCount }
-    var answer by rememberSaveable(bookId) { mutableStateOf<Int?>(null) }
+    val pages = remember(bookId) { pagesOf(book) }
+    val pager = rememberPagerState { pages.size }
+    var term by remember { mutableStateOf<Glossary.Term?>(null) }
     BackHandler(onBack = onClose)
+
+    // Read aloud, with the phone's own voice.
+    val speech = remember { RuvoSpeech(context) }
+    DisposableEffect(Unit) { onDispose { speech.shutdown() } }
+    LaunchedEffect(pager.currentPage) { speech.stop() }
+
+    // Hindi, translated on the phone and cached for this book. English stays underneath if anything fails.
+    var hindi by rememberSaveable { mutableStateOf(false) }
+    var hindiNote by remember { mutableStateOf<String?>(null) }
+    val translated = remember { mutableStateMapOf<String, String>() }
+    val tr: (String) -> String = { s -> if (hindi) translated[s] ?: s else s }
+    LaunchedEffect(hindi, pager.currentPage) {
+        if (!hindi) return@LaunchedEffect
+        if (!OnDeviceTranslate.prepare("hi-IN")) {
+            hindiNote = "Hindi isn't on this phone yet. Connect to the internet once to download it."
+            hindi = false
+            return@LaunchedEffect
+        }
+        hindiNote = null
+        // This page first, then the next one, so turning a page is instant.
+        listOfNotNull(pages.getOrNull(pager.currentPage), pages.getOrNull(pager.currentPage + 1)).forEach { p ->
+            textsOf(p, book).forEach { s ->
+                if (s !in translated) OnDeviceTranslate.fromEnglish(s, "hi-IN")?.let { translated[s] = it }
+            }
+        }
+    }
 
     fun finish(apply: Library.Apply?) {
         scope.launch { RuvoGraph.repository.markBookRead(book.id) }
@@ -100,22 +172,40 @@ fun BookReader(bookId: String, onClose: () -> Unit, onApply: (Library.Apply) -> 
                 IconCircle(RuvoIcons.Close, "Close book", onClose)
                 Spacer(Modifier.width(Space.sm))
                 // Progress: one segment per page, filling as you read.
-                Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    repeat(pageCount) { i ->
+                Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                    repeat(pages.size) { i ->
                         val on by animateColorAsState(if (i <= pager.currentPage) c.brand else c.ink.copy(alpha = 0.12f), label = "seg$i")
                         Box(Modifier.weight(1f).height(5.dp).clip(RoundedCornerShape(Radius.chip)).background(on))
                     }
                 }
-                Spacer(Modifier.width(Space.sm))
-                val ideaKey = "${book.id}:${pager.currentPage}"
-                val saved = ideaKey in state.settings.savedIdeas
-                val canSave = pager.currentPage in 1..5
+                Spacer(Modifier.width(Space.xs))
+                // Hindi on and off: the button shows the language it switches to.
+                Box(
+                    Modifier.size(48.dp).clip(androidx.compose.foundation.shape.CircleShape)
+                        .background(if (hindi) c.brand else c.glass)
+                        .border(1.dp, c.glassEdge, androidx.compose.foundation.shape.CircleShape)
+                        .clickable(role = androidx.compose.ui.semantics.Role.Button, onClickLabel = if (hindi) "Read in English" else "Read in Hindi") { hindi = !hindi; Haptics.tick(view) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(if (hindi) "EN" else "हिं", style = Ruvo.type.bodyStrong, color = if (hindi) c.onBrand else c.ink)
+                }
+                Spacer(Modifier.width(Space.xs))
+                // Read this page aloud; tap again to stop.
+                val pageId = "page${pager.currentPage}"
+                val speaking = speech.speakingId == pageId
                 IconCircle(
-                    if (saved) RuvoIcons.BookmarkFilled else RuvoIcons.Bookmark,
-                    if (saved) "Saved. Tap to remove" else "Save this idea",
-                    { if (canSave) scope.launch { RuvoGraph.repository.toggleIdea(ideaKey); Haptics.tick(view) } },
-                    tint = if (saved) c.brandInk else if (canSave) c.ink else c.inkFaint,
+                    RuvoIcons.Speaker, if (speaking) "Stop reading" else "Read this page aloud",
+                    {
+                        val p = pages[pager.currentPage]
+                        val words = textsOf(p, book).let { if (p is BookPage.Quiz || p is BookPage.Takeaways || p is BookPage.Story) it else it.take(1) }
+                        val ok = speech.toggle(words.joinToString(". ") { tr(it) }, if (hindi) "hi-IN" else "en-IN", pageId)
+                        if (!ok) hindiNote = "This phone has no voice for reading aloud. You can add one in Settings › Text-to-speech."
+                    },
+                    tint = if (speaking) c.onBrand else c.ink, background = if (speaking) c.brand else c.glass,
                 )
+            }
+            hindiNote?.let {
+                Text(it, Modifier.fillMaxWidth().padding(horizontal = Space.gutter), style = Ruvo.type.caption, color = c.warning, textAlign = TextAlign.Center)
             }
 
             HorizontalPager(
@@ -123,8 +213,8 @@ fun BookReader(bookId: String, onClose: () -> Unit, onApply: (Library.Apply) -> 
                 Modifier.weight(1f).fillMaxWidth(),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = Space.gutter),
                 pageSpacing = Space.md,
-            ) { page ->
-                val offset = (pager.currentPage - page) + pager.currentPageOffsetFraction
+            ) { index ->
+                val offset = (pager.currentPage - index) + pager.currentPageOffsetFraction
                 Box(
                     Modifier.fillMaxSize().padding(vertical = Space.md).graphicsLayer {
                         if (!reduced) {
@@ -139,19 +229,21 @@ fun BookReader(bookId: String, onClose: () -> Unit, onApply: (Library.Apply) -> 
                         }
                     },
                 ) {
-                    if (page == 0) CoverPage(book, book.id in state.settings.readBooks)
-                    else {
-                        val (label, text) = book.pages[page - 1]
-                        when (page) {
-                            6 -> CheckPage(label, book.check, answer) { answer = it; Haptics.tick(view) }
-                            7 -> ApplyPage(label, text, onApply = { finish(book.apply) }, onAsk = { onClose(); onAsk("Explain \"${book.title}\" in simple words") })
-                            else -> {
-                                val key = "${book.id}:$page"
-                                TextPage(page, label, text, saved = key in state.settings.savedIdeas) {
-                                    scope.launch { RuvoGraph.repository.toggleIdea(key); Haptics.tick(view) }
-                                }
+                    when (val p = pages[index]) {
+                        BookPage.Cover -> CoverPage(book, book.id in state.settings.readBooks, pages.size - 1, tr)
+                        is BookPage.Words -> {
+                            val key = "${book.id}:${p.idea}"
+                            WordsPage(book, p, read = book.id in state.settings.readBooks, glossary = !hindi, tr = tr, onTerm = { term = it }, saved = key in state.settings.savedIdeas) {
+                                scope.launch { RuvoGraph.repository.toggleIdea(key); Haptics.tick(view) }
                             }
                         }
+                        is BookPage.Fact -> NotePage(fact = true, text = p.text, glossary = !hindi, tr = tr, onTerm = { term = it })
+                        is BookPage.Rule -> NotePage(fact = false, text = p.text, glossary = !hindi, tr = tr, onTerm = { term = it })
+                        is BookPage.Story -> StoryPage(p.story, tr) { Haptics.tick(view) }
+                        is BookPage.Tool -> ToolPage(p.tool, state.runway.dailySpend)
+                        BookPage.Quiz -> QuizPage(book, tr) { Haptics.tick(view) }
+                        BookPage.Takeaways -> TakeawaysPage(book, tr, onTerm = { term = it })
+                        BookPage.Apply -> ApplyPage(tr(book.applyLabel), onApply = { finish(book.apply) }, onAsk = { onClose(); onAsk("Explain \"${book.title}\" in simple words") })
                     }
                 }
             }
@@ -160,7 +252,7 @@ fun BookReader(bookId: String, onClose: () -> Unit, onApply: (Library.Apply) -> 
                 if (pager.currentPage > 0) {
                     GhostButton("Back", { scope.launch { pager.animateScrollToPage(pager.currentPage - 1) } }, Modifier.weight(1f))
                 }
-                val last = pager.currentPage == pageCount - 1
+                val last = pager.currentPage == pages.size - 1
                 PrimaryButton(
                     when {
                         pager.currentPage == 0 -> "Open the book"
@@ -173,13 +265,14 @@ fun BookReader(bookId: String, onClose: () -> Unit, onApply: (Library.Apply) -> 
             }
         }
     }
+    term?.let { t -> TermSheet(t) { term = null } }
 }
 
 @Composable
-private fun CoverPage(book: Library.Book, read: Boolean) {
+private fun CoverPage(book: Library.Book, read: Boolean, pageCount: Int, tr: (String) -> String) {
     val c = Ruvo.colors
     val lift = remember { Animatable(0f) }
-    androidx.compose.runtime.LaunchedEffect(Unit) { lift.animateTo(1f, Motion.gentle()) }
+    LaunchedEffect(Unit) { lift.animateTo(1f, Motion.gentle()) }
     Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
         BookCover(
             book, read, width = 200.dp, showLabel = false,
@@ -189,126 +282,32 @@ private fun CoverPage(book: Library.Book, read: Boolean) {
             },
         )
         Spacer(Modifier.height(Space.xl))
-        Eyebrow(book.shelf.title, color = c.brandInk)
+        Eyebrow(tr(book.shelf.title))
         Spacer(Modifier.height(Space.xs))
-        Text(book.title, Modifier.semantics { heading() }, style = Ruvo.type.headline, color = c.ink, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+        Text(tr(book.title), Modifier.semantics { heading() }, style = Ruvo.type.headline, color = c.ink, textAlign = TextAlign.Center)
         Spacer(Modifier.height(Space.xs))
-        Text("${book.minutes} min read · ${book.pages.size} short pages", style = Ruvo.type.caption, color = c.inkSoft)
+        val extras = listOfNotNull(if (book.story != null) "a story" else null, if (book.tool != null) "a calculator" else null, "a quiz")
+        Text("${book.minutes} min read · $pageCount pages · ${extras.joinToString(", ")}", style = Ruvo.type.caption, color = c.inkSoft, textAlign = TextAlign.Center)
         if (read) {
             Spacer(Modifier.height(Space.sm))
-            com.ruvo.design.Tag("You've read this", color = c.future.copy(alpha = 0.18f), content = c.futureInk)
+            com.ruvo.design.StatusTag("You've read this", c.future)
         }
     }
 }
 
 @Composable
-private fun TextPage(page: Int, label: String, text: String, saved: Boolean, onSave: () -> Unit) {
+private fun ApplyPage(text: String, onApply: () -> Unit, onAsk: () -> Unit) {
     val c = Ruvo.colors
-    RuvoCard(Modifier.fillMaxSize(), padding = androidx.compose.foundation.layout.PaddingValues(Space.xl)) {
-        Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
-            Text("$page", style = Ruvo.type.display, color = c.fuel)
-            Spacer(Modifier.height(Space.xs))
-            Eyebrow(label, color = c.inkSoft)
-            Spacer(Modifier.height(Space.md))
-            Text(text, Modifier.reveal(1), style = Ruvo.type.headline.copy(fontWeight = androidx.compose.ui.text.font.FontWeight(500), lineHeight = Ruvo.type.headline.lineHeight * 1.15f), color = c.ink)
-            if (page == 4) {
-                Spacer(Modifier.height(Space.lg))
-                Text("Take a moment. There's no right answer here.", style = Ruvo.type.caption, color = c.inkFaint)
-            }
-        }
-        Spacer(Modifier.height(Space.md))
-        SaveIdeaButton(saved, onSave)
-    }
-}
-
-/** Keeps the idea on this page in Profile > Saved ideas. The ribbon fills and the pill turns amber when saved. */
-@Composable
-private fun SaveIdeaButton(saved: Boolean, onSave: () -> Unit) {
-    val c = Ruvo.colors
-    val fill by animateColorAsState(if (saved) c.brand else c.ink.copy(alpha = 0.06f), label = "saveFill")
-    val pop = remember { Animatable(1f) }
-    androidx.compose.runtime.LaunchedEffect(saved) { if (saved) { pop.snapTo(0.92f); pop.animateTo(1f, Motion.bouncy()) } }
-    Row(
-        Modifier.graphicsLayer { scaleX = pop.value; scaleY = pop.value }
-            .heightIn(min = 48.dp).clip(RoundedCornerShape(Radius.chip)).background(fill)
-            .border(1.dp, if (saved) c.brand else c.hairline, RoundedCornerShape(Radius.chip))
-            .clickable(role = Role.Button, onClickLabel = if (saved) "Remove from saved ideas" else "Save this idea", onClick = onSave)
-            .padding(horizontal = Space.md, vertical = Space.sm),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(if (saved) RuvoIcons.BookmarkFilled else RuvoIcons.Bookmark, null, Modifier.size(18.dp), tint = if (saved) c.onBrand else c.ink)
-        Spacer(Modifier.width(Space.xs))
-        Text(if (saved) "Saved to your ideas" else "Save this idea", style = Ruvo.type.label, color = if (saved) c.onBrand else c.ink)
-    }
-}
-
-@Composable
-private fun CheckPage(label: String, check: Library.Check, answer: Int?, onAnswer: (Int) -> Unit) {
-    val c = Ruvo.colors
-    RuvoCard(Modifier.fillMaxSize(), padding = androidx.compose.foundation.layout.PaddingValues(Space.xl)) {
-        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-            Eyebrow(label, color = c.inkSoft)
-            Spacer(Modifier.height(Space.md))
-            Text(check.question, style = Ruvo.type.headline, color = c.ink)
-            Spacer(Modifier.height(Space.lg))
-            check.options.forEachIndexed { i, opt ->
-                val chosen = answer == i
-                val right = i == check.correct
-                val fill by animateColorAsState(
-                    when {
-                        answer == null -> c.glass
-                        right -> c.future.copy(alpha = 0.22f)
-                        chosen -> c.warning.copy(alpha = 0.14f)
-                        else -> c.glass
-                    },
-                    label = "opt$i",
-                )
-                val scale by animateFloatAsState(if (chosen) 1.02f else 1f, Motion.snappy(), label = "optScale$i")
-                Row(
-                    Modifier.fillMaxWidth().padding(bottom = Space.sm).graphicsLayer { scaleX = scale; scaleY = scale }
-                        .heightIn(min = 56.dp).clip(RoundedCornerShape(Radius.inner)).background(fill)
-                        .border(1.dp, if (answer != null && right) c.future else c.hairline, RoundedCornerShape(Radius.inner))
-                        .clickable(enabled = answer == null, role = Role.RadioButton) { onAnswer(i) }
-                        .padding(horizontal = Space.md, vertical = Space.sm),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Box(
-                        Modifier.size(28.dp).clip(CircleShape).background(if (answer != null && right) c.future else c.ink.copy(alpha = 0.08f)),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        if (answer != null && right) Icon(RuvoIcons.Check, null, Modifier.size(16.dp), tint = c.onAccent)
-                        else Text(('A' + i).toString(), style = Ruvo.type.label, color = c.ink)
-                    }
-                    Spacer(Modifier.width(Space.sm))
-                    Text(opt, style = Ruvo.type.bodyStrong, color = c.ink)
-                }
-            }
-            AnimatedVisibility(answer != null, enter = fadeIn() + expandVertically()) {
-                val right = answer == check.correct
-                Column(Modifier.padding(top = Space.sm).semantics { contentDescription = (if (right) "Correct. " else "Not quite. ") + check.because }) {
-                    Text(if (right) "That's it." else "Not quite, and that's how learning works.", style = Ruvo.type.title, color = if (right) c.futureInk else c.ink)
-                    Spacer(Modifier.height(Space.xxs))
-                    Text(check.because, style = Ruvo.type.body, color = c.inkSoft)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ApplyPage(label: String, text: String, onApply: () -> Unit, onAsk: () -> Unit) {
-    val c = Ruvo.colors
-    RuvoCard(Modifier.fillMaxSize(), brush = c.heroBrush, border = null, padding = androidx.compose.foundation.layout.PaddingValues(Space.xl)) {
+    com.ruvo.design.RuvoCard(Modifier.fillMaxSize(), brush = c.heroBrush, border = null, padding = androidx.compose.foundation.layout.PaddingValues(Space.xl)) {
         Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center) {
-            Icon(RuvoIcons.Bulb, null, Modifier.size(40.dp), tint = c.fuel)
-            Spacer(Modifier.height(Space.md))
-            Eyebrow(label, color = c.onHero.copy(alpha = 0.7f))
+            androidx.compose.material3.Icon(RuvoIcons.Bulb, null, Modifier.padding(bottom = Space.md).height(40.dp).width(40.dp), tint = c.fuel)
+            Eyebrow("Put it to work in Ruvo", color = c.onHero.copy(alpha = 0.7f))
             Spacer(Modifier.height(Space.xs))
             Text(text, style = Ruvo.type.headline, color = c.onHero)
             Spacer(Modifier.height(Space.xl))
             PrimaryButton("Do it now", onApply, Modifier.fillMaxWidth())
             Spacer(Modifier.height(Space.sm))
-            OutlineButton("Ask Ruvo about this", onAsk, Modifier.fillMaxWidth())
+            com.ruvo.design.OutlineButton("Ask Ruvo about this", onAsk, Modifier.fillMaxWidth())
             Spacer(Modifier.height(Space.md))
             Text("Skipping is fine. No streaks, no pressure.", style = Ruvo.type.caption, color = c.onHero.copy(alpha = 0.65f))
         }

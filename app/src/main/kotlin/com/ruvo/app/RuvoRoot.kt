@@ -109,7 +109,7 @@ fun RuvoRoot(state: AppState, request: LaunchRequest?, consumed: () -> Unit) {
     // The opening plays on every cold start, until it finishes or is tapped, and until the data is ready.
     val reduced = Ruvo.reducedMotion
     var splashDone by rememberSaveable { mutableStateOf(false) }
-    LaunchedEffect(Unit) { kotlinx.coroutines.delay(if (reduced) 500 else 4_000); splashDone = true }
+    LaunchedEffect(Unit) { kotlinx.coroutines.delay(if (reduced) 500 else 3_600); splashDone = true }
     val showApp = state.ready && splashDone
     val unlocked by com.ruvo.data.Session.unlocked.collectAsStateWithLifecycle()
     Box(Modifier.fillMaxSize()) {

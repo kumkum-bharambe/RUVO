@@ -82,7 +82,7 @@ fun BookCover(
             if (dark) drawRect(Color.Black.copy(alpha = 0.22f))
         }
         if (width >= 100.dp) Text(
-            if (read) "Read" else "${book.pages.size} pages",
+            if (read) "Read" else "${pagesOf(book).size - 1} pages",
             Modifier.align(Alignment.TopEnd).padding(8.dp).clip(RoundedCornerShape(99.dp)).background(Covers.labelInk).padding(horizontal = 8.dp, vertical = 3.dp),
             style = Ruvo.type.eyebrow, color = Covers.label,
         )
@@ -120,6 +120,8 @@ private fun backgroundFor(id: String): Color = when (id) {
     "small" -> O; "pause" -> C; "purpose" -> N; "irregular" -> L
     "split" -> Y; "discounts" -> PK; "college" -> O; "invest" -> P
     "saveinvest" -> W; "risk" -> N; "emergency" -> Y; "beforeinvest" -> O
+    "refunds" -> PK; "otp" -> N; "loanapps" -> Y; "card" -> P; "emi" -> C; "score" -> O
+    "payslip" -> L; "pan" -> W; "freelance" -> DP; "inflation" -> Y; "compound" -> N; "options" -> PK
     else -> Covers.palettes[hashOf(id) % Covers.palettes.size].first
 }
 
@@ -303,6 +305,69 @@ private fun DrawScope.drawIllustration(id: String) {
                 stroke(N, 0.45f, y + 0.03f, 0.68f, y + 0.03f, 0.025f)
                 if (i < 2) { stroke(W, 0.325f, y + 0.03f, 0.345f, y + 0.045f, 0.015f); stroke(W, 0.345f, y + 0.045f, 0.38f, y + 0.012f, 0.015f) }
             }
+        }
+        "refunds" -> { // A phone ringing with a warning triangle: the fake refund call.
+            box(N, 0.3f, 0.12f, 0.4f, 0.44f, 0.06f); box(W, 0.34f, 0.17f, 0.32f, 0.33f, 0.03f)
+            poly(O, 0.5f, 0.21f, 0.62f, 0.42f, 0.38f, 0.42f); stroke(N, 0.5f, 0.28f, 0.5f, 0.35f, 0.025f); dot(N, 0.015f, 0.5f, 0.39f)
+            drawArc(N, -60f, 120f, false, Offset(w * 0.68f, h * 0.14f), Size(w * 0.16f, w * 0.16f), style = Stroke(w * 0.025f))
+            drawArc(N, 120f, 120f, false, Offset(w * 0.16f, h * 0.14f), Size(w * 0.16f, w * 0.16f), style = Stroke(w * 0.025f))
+        }
+        "otp" -> { // A padlock with a six-digit code under it.
+            drawArc(W, 180f, 180f, false, Offset(w * 0.34f, h * 0.1f), Size(w * 0.32f, w * 0.3f), style = Stroke(w * 0.05f))
+            box(Y, 0.28f, 0.2f, 0.44f, 0.24f, 0.05f); dot(N, 0.04f, 0.5f, 0.3f); stroke(N, 0.5f, 0.3f, 0.5f, 0.36f, 0.025f)
+            repeat(6) { i -> box(W, 0.14f + i * 0.125f, 0.49f, 0.095f, 0.07f, 0.02f) }
+        }
+        "loanapps" -> { // A fishing hook dangling a rupee coin: a too-good offer.
+            stroke(N, 0.5f, 0.02f, 0.5f, 0.3f, 0.025f)
+            drawArc(N, 0f, 180f, false, Offset(w * 0.38f, h * 0.24f), Size(w * 0.24f, w * 0.24f), style = Stroke(w * 0.035f))
+            poly(N, 0.36f, 0.33f, 0.4f, 0.26f, 0.43f, 0.33f)
+            coin(0.62f, 0.46f, 0.1f); box(O, 0.12f, 0.1f, 0.24f, 0.08f, 0.04f)
+        }
+        "card" -> { // A credit card with its chip, and a small clock for the due date.
+            card(N, -10f, 0.14f, 0.2f); card(W, 6f, 0.3f, 0.26f)
+            dot(Y, 0.1f, 0.78f, 0.14f); stroke(N, 0.78f, 0.14f, 0.78f, 0.09f, 0.02f); stroke(N, 0.78f, 0.14f, 0.82f, 0.16f, 0.02f)
+        }
+        "emi" -> { // One big price block cut into equal monthly slices.
+            box(P, 0.14f, 0.12f, 0.72f, 0.12f, 0.03f)
+            repeat(6) { i -> box(listOf(O, Y, PK)[i % 3], 0.14f + i * 0.125f, 0.32f + (i % 2) * 0.02f, 0.1f, 0.2f, 0.025f) }
+            poly(N, 0.46f, 0.25f, 0.54f, 0.25f, 0.5f, 0.3f)
+        }
+        "score" -> { // A half-dial gauge from 300 to 900 with the needle near the top.
+            val d = w * 0.62f
+            val tl = Offset(w * 0.5f - d / 2, h * 0.14f)
+            drawArc(PK, 180f, 60f, false, tl, Size(d, d), style = Stroke(w * 0.08f))
+            drawArc(Y, 240f, 60f, false, tl, Size(d, d), style = Stroke(w * 0.08f))
+            drawArc(W, 300f, 60f, false, tl, Size(d, d), style = Stroke(w * 0.08f))
+            stroke(N, 0.5f, 0.36f, 0.68f, 0.22f, 0.03f); dot(N, 0.04f, 0.5f, 0.36f)
+        }
+        "payslip" -> { // A payslip with lines and a big total.
+            box(W, 0.22f, 0.08f, 0.56f, 0.5f, 0.03f); box(P, 0.22f, 0.08f, 0.56f, 0.08f, 0.03f)
+            repeat(3) { i -> stroke(L, 0.3f, 0.24f + i * 0.08f, 0.62f, 0.24f + i * 0.08f, 0.025f) }
+            stroke(N, 0.3f, 0.5f, 0.5f, 0.5f, 0.035f); coin(0.66f, 0.5f, 0.06f)
+        }
+        "pan" -> { // An ID card with a photo and a folder behind it.
+            box(O, 0.12f, 0.1f, 0.6f, 0.36f, 0.04f); box(Y, 0.12f, 0.06f, 0.24f, 0.08f, 0.03f)
+            box(N, 0.26f, 0.2f, 0.62f, 0.32f, 0.04f); dot(L, 0.07f, 0.38f, 0.33f)
+            stroke(W, 0.52f, 0.3f, 0.8f, 0.3f, 0.025f); stroke(W, 0.52f, 0.38f, 0.74f, 0.38f, 0.025f)
+        }
+        "freelance" -> { // A laptop with coins arriving one at a time.
+            box(L, 0.18f, 0.24f, 0.64f, 0.26f, 0.03f); box(W, 0.22f, 0.27f, 0.56f, 0.2f, 0.02f); box(L, 0.1f, 0.5f, 0.8f, 0.05f, 0.02f)
+            coin(0.32f, 0.12f, 0.06f); coin(0.52f, 0.08f, 0.07f); coin(0.72f, 0.13f, 0.06f)
+        }
+        "inflation" -> { // A cup of chai with a price tag climbing.
+            box(W, 0.18f, 0.28f, 0.3f, 0.26f, 0.05f); drawArc(W, -90f, 180f, false, Offset(w * 0.44f, h * 0.32f), Size(w * 0.12f, w * 0.14f), style = Stroke(w * 0.03f))
+            stroke(O, 0.26f, 0.14f, 0.28f, 0.24f, 0.02f); stroke(O, 0.36f, 0.12f, 0.38f, 0.24f, 0.02f)
+            stroke(N, 0.62f, 0.5f, 0.86f, 0.14f, 0.04f); poly(N, 0.8f, 0.12f, 0.92f, 0.08f, 0.9f, 0.2f)
+        }
+        "compound" -> { // A snowball of coins growing as it rolls downhill.
+            poly(DP, 0f, 0.58f, 1f, 0.36f, 1f, 0.6f, 0f, 0.6f)
+            coin(0.2f, 0.47f, 0.04f); coin(0.42f, 0.41f, 0.07f); coin(0.72f, 0.3f, 0.12f)
+        }
+        "options" -> { // Four jars of different shapes on a shelf, from steady to bumpy.
+            box(N, 0.06f, 0.52f, 0.88f, 0.04f, 0.01f)
+            box(W, 0.08f, 0.3f, 0.18f, 0.22f, 0.04f); box(L, 0.3f, 0.26f, 0.18f, 0.26f, 0.04f)
+            box(Y, 0.52f, 0.22f, 0.18f, 0.3f, 0.04f); box(P, 0.74f, 0.16f, 0.18f, 0.36f, 0.04f)
+            stroke(N, 0.78f, 0.3f, 0.82f, 0.24f, 0.02f); stroke(N, 0.82f, 0.24f, 0.86f, 0.28f, 0.02f)
         }
         else -> coin(0.5f, 0.3f, 0.16f)
     }

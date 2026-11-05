@@ -21,6 +21,9 @@ object Library {
         SAVE("Save better", "Ways to keep money for what matters."),
         SPEND("Spend better", "Spend on what you value, without the guilt."),
         STUDENT("Student money", "Hostels, stipends, splits and semester fees."),
+        SAFETY("Stay safe on UPI", "Fake refunds, OTP tricks and loan-app traps, and what to do if it happens."),
+        CREDIT("Credit and borrowing", "Credit cards, EMIs, pay-later and your credit score, in plain words."),
+        WORK("First salary and tax", "Payslips, PAN, PF and tax, before your first job or stipend."),
         INVEST("Investing basics", "Ideas to know before you ever invest. No pressure, no deadline."),
     }
 
@@ -42,7 +45,26 @@ object Library {
         val check: Check,
         val applyLabel: String,
         val apply: Apply,
+        /** A rule of thumb, like the boxed tips in a real book. */
+        val rule: String? = null,
+        /** A "did you know" fact. */
+        val fact: String? = null,
+        /** Key takeaways for the summary page. When empty they are drawn from the book's own pages. */
+        val takeaways: List<String> = emptyList(),
+        /** Two more quiz questions after [check]. When empty, the original books' extra questions are used. */
+        val more: List<Check> = emptyList(),
+        /** A calculator that turns the idea into the reader's own numbers. */
+        val tool: Tools.Tool? = null,
+        /** A choose-your-path story, by id. */
+        val story: String? = null,
     ) {
+        /** The end-of-book quiz: the check first, then the extra questions. */
+        val quiz: List<Check> get() = listOf(check) + more.ifEmpty { Quizzes.extra[id].orEmpty() }
+
+        /** What to remember, as short lines. */
+        val keyPoints: List<String>
+            get() = takeaways.ifEmpty { listOf(idea.substringBefore(". ").trimEnd('.') + ".", tryIt, check.because) }
+
         /** The seven pages in reading order, as (label, text). The check is shown as its question. */
         val pages: List<Pair<String, String>>
             get() = listOf(
@@ -56,7 +78,7 @@ object Library {
             )
     }
 
-    val all: List<Book> = listOf(
+    private val original: List<Book> = listOf(
         // New this week
         Book(
             "upi", Shelf.NEW, "Needs vs wants on UPI", 4,
@@ -309,6 +331,9 @@ object Library {
             applyLabel = "Ask Ruvo your questions.", apply = Apply.ASK_RUVO,
         ),
     )
+
+    /** Every book: the originals, then the newer shelves. */
+    val all: List<Book> = original.map(MoreBooks::enrich) + MoreBooks.all
 
     fun byId(id: String): Book? = all.firstOrNull { it.id == id }
 

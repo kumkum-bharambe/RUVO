@@ -73,12 +73,11 @@ private val Pink = Color(0xFFFF6FA8)
 private val Drops = listOf(Sun, Tangerine, Violet, Sky)
 
 /**
- * The opening, a tiny colourful story in under four seconds:
+ * The opening, a tiny colourful story in about three and a half seconds:
  *  1. The night sky lights up with soft colour glows.
- *  2. Four glossy drops (yellow, orange, purple, blue: Fuel, Future, Fixed and Ruvo) fall one after another and
- *     bounce on an invisible floor, each with its own shadow.
- *  3. One by one they hop into the middle and merge into a single swirling ball of all four colours.
- *  4. The ball squashes and pops into the white logo tile, which springs up while the R builds itself inside.
+ *  2. A blue rupee coin drops in spinning and bounces twice on an invisible floor, its shadow growing as it falls.
+ *  3. On the last landing it squashes, then pops open into the white logo tile, which springs up while the R
+ *     builds itself inside.
  *  5. The tile does a happy hop; a rainbow ring, coloured rays and confetti fly out, and the pet pops up beside it.
  *  6. "RUVO" jumps in letter by letter, each in its drop's colour, settles to white, and a little wave runs
  *     through it over a four-colour bar; the line fades up.
@@ -94,14 +93,11 @@ fun RuvoSplash(
     val reduced = Ruvo.reducedMotion
     val start = if (reduced) 1f else 0f
     val glowIn = remember { Animatable(start) }
-    // The drops: height above the floor in dp, a squash on landing, and how far each has travelled into the ball.
-    val fall = remember { List(4) { Animatable(if (reduced) 0f else -560f) } }
-    val landed = remember { List(4) { Animatable(0f) } }
-    val merge = remember { List(4) { Animatable(start) } }
-    // The merged ball: how big it has grown, its squash before popping, and the pop itself.
-    val ball = remember { Animatable(0f) }
+    // The rupee coin: height above its resting place in dp, turns of spin, a squash on landing, and pop-and-fade.
+    val drop = remember { Animatable(if (reduced) 0f else -440f) }
+    val spin = remember { Animatable(if (reduced) 3f else 0f) }
     val squash = remember { Animatable(0f) }
-    val pop = remember { Animatable(start) }
+    val coinGone = remember { Animatable(start) }
     // The tile, the mark inside it, and the celebration.
     val tile = remember { Animatable(start) }
     val build = remember { Animatable(start) }
@@ -121,49 +117,40 @@ fun RuvoSplash(
     LaunchedEffect(Unit) {
         if (reduced) return@LaunchedEffect
         launch { glowIn.animateTo(1f, tween(900)) }
-        Drops.indices.forEach { i ->
-            val at = 80L + i * 110L
-            launch {
-                delay(at)
-                // Falls, bounces, bounces smaller, settles: like a ball of jelly dropped on a table.
-                fall[i].animateTo(
-                    0f,
-                    keyframes {
-                        durationMillis = 640
-                        -560f at 0 using FastOutLinearInEasing
-                        0f at 380 using LinearOutSlowInEasing
-                        -64f at 490 using FastOutLinearInEasing
-                        0f at 590 using LinearOutSlowInEasing
-                        -12f at 615
-                        0f at 640
-                    },
-                )
-            }
-            launch { delay(at + 380); landed[i].animateTo(1f, tween(70)); landed[i].animateTo(0f, tween(150)) }
-            launch {
-                delay(1000L + i * 80L)
-                merge[i].animateTo(1f, tween(330, easing = FastOutSlowInEasing))
-                ball.animateTo((i + 1) / 4f, spring(dampingRatio = 0.5f, stiffness = 600f))
-            }
-        }
-        launch { delay(1540); squash.animateTo(1f, tween(110)); squash.animateTo(0f, tween(90)); }
-        launch { delay(1650); pop.animateTo(1f, tween(240, easing = FastOutSlowInEasing)) }
-        launch { delay(1660); tile.animateTo(1f, springy) }
-        launch { delay(1780); build.animateTo(1f, tween(760, easing = FastOutSlowInEasing)) }
+        // The rupee coin falls spinning, bounces twice like a coin dropped on a table, squashes and pops.
         launch {
-            delay(2540)
+            drop.animateTo(
+                0f,
+                keyframes {
+                    durationMillis = 880
+                    -440f at 0 using FastOutLinearInEasing
+                    0f at 430 using LinearOutSlowInEasing
+                    -120f at 580 using FastOutLinearInEasing
+                    0f at 720 using LinearOutSlowInEasing
+                    -36f at 800 using FastOutLinearInEasing
+                    0f at 880
+                },
+            )
+        }
+        launch { spin.animateTo(3f, tween(880, easing = FastOutSlowInEasing)) }
+        launch { delay(860); squash.animateTo(1f, tween(90)); squash.animateTo(0f, tween(110)) }
+        launch { delay(960); coinGone.animateTo(1f, tween(220)) }
+        launch { delay(980); tile.animateTo(1f, springy) }
+        launch { delay(1120); build.animateTo(1f, tween(800, easing = FastOutSlowInEasing)) }
+        launch {
+            delay(1940)
             hop.animateTo(1f, tween(170, easing = LinearOutSlowInEasing))
             hop.animateTo(0f, jump)
         }
-        launch { delay(2560); burst.animateTo(1f, tween(1150, easing = FastOutSlowInEasing)) }
-        launch { delay(2560); rays.animateTo(1f, tween(600)) }
-        launch { delay(2700); pet.animateTo(1f, spring(dampingRatio = 0.45f, stiffness = 380f)) }
-        launch { delay(2860); cheer.snapTo(1f); cheer.animateTo(0f, tween(1700)) }
-        letters.forEachIndexed { i, l -> launch { delay(2740L + i * 85L); l.animateTo(1f, jump) } }
-        whiten.forEachIndexed { i, w -> launch { delay(3020L + i * 85L); w.animateTo(1f, tween(450)) } }
-        launch { delay(3120); bar.animateTo(1f, tween(520, easing = FastOutSlowInEasing)) }
-        launch { delay(3260); wave.animateTo(1f, tween(650, easing = LinearEasing)) }
-        launch { delay(3180); line.animateTo(1f, Motion.gentle()) }
+        launch { delay(1960); burst.animateTo(1f, tween(1150, easing = FastOutSlowInEasing)) }
+        launch { delay(1960); rays.animateTo(1f, tween(600)) }
+        launch { delay(2100); pet.animateTo(1f, spring(dampingRatio = 0.45f, stiffness = 380f)) }
+        launch { delay(2260); cheer.snapTo(1f); cheer.animateTo(0f, tween(1700)) }
+        letters.forEachIndexed { i, l -> launch { delay(2120L + i * 85L); l.animateTo(1f, jump) } }
+        whiten.forEachIndexed { i, w -> launch { delay(2420L + i * 85L); w.animateTo(1f, tween(450)) } }
+        launch { delay(2520); bar.animateTo(1f, tween(520, easing = FastOutSlowInEasing)) }
+        launch { delay(2660); wave.animateTo(1f, tween(650, easing = LinearEasing)) }
+        launch { delay(2580); line.animateTo(1f, Motion.gentle()) }
     }
     val confetti = listOf(Sun, Tangerine, Violet, Sky, Pink, Paper)
     val loop = rememberInfiniteTransition(label = "splash")
@@ -200,42 +187,11 @@ fun RuvoSplash(
                     }
                 }
             }
-            // The drops, falling, bouncing, then hopping into the middle.
-            val r = 15.dp.toPx()
-            val floor = centre.y + 26.dp.toPx()
-            Drops.forEachIndexed { i, col ->
-                val e = merge[i].value
-                if (e >= 1f) return@forEachIndexed
-                val colX = centre.x + (i - 1.5f) * 56.dp.toPx()
-                val restY = floor - r
-                val dropY = restY + fall[i].value * density
-                val x = colX + (centre.x - colX) * e
-                val y = dropY + (centre.y - dropY) * e - 54.dp.toPx() * sin(PI.toFloat() * e)
-                val k = 1f - 0.45f * e
-                // Its shadow on the floor: bigger and darker the lower it is.
-                val height = ((restY - y) / (560.dp.toPx())).coerceIn(0f, 1f)
-                val sw = r * 2.2f * (1f - 0.6f * height) * k
-                drawOval(Color.Black.copy(alpha = 0.4f * (1f - height) * (1f - e)), Offset(x - sw / 2, floor + 3.dp.toPx()), Size(sw, sw * 0.24f))
-                val sq = landed[i].value
-                drawDrop(col, Offset(x, y + sq * r * 0.2f), r * k * (1f + 0.22f * sq), r * k * (1f - 0.24f * sq))
-            }
-            // The merged ball: all four colours swirling, growing as each drop joins, then squashing and popping.
-            val b = ball.value
-            if (b > 0f && pop.value < 1f) {
-                val br = 34.dp.toPx() * b * (1f + 0.7f * pop.value)
-                val alpha = 1f - pop.value
-                val sx = 1f + 0.26f * squash.value
-                val sy = 1f - 0.26f * squash.value
-                rotate(if (reduced) 0f else swirl, centre) {
-                    drawOval(
-                        Brush.sweepGradient(Drops + Drops.first(), centre),
-                        Offset(centre.x - br * sx, centre.y - br * sy), Size(br * 2 * sx, br * 2 * sy), alpha = alpha,
-                    )
-                }
-                drawOval(
-                    Brush.radialGradient(listOf(Paper.copy(alpha = 0.55f * alpha), Color.Transparent), Offset(centre.x - br * 0.35f, centre.y - br * 0.4f), br * 0.7f),
-                    Offset(centre.x - br * sx, centre.y - br * sy), Size(br * 2 * sx, br * 2 * sy),
-                )
+            // The coin's shadow on the floor: bigger and darker the closer the coin gets.
+            if (coinGone.value < 1f) {
+                val h = (-drop.value / 440f).coerceIn(0f, 1f)
+                val sw = 46.dp.toPx() * (1f - 0.6f * h)
+                drawOval(Color.Black.copy(alpha = 0.4f * (1f - h) * (1f - coinGone.value)), Offset(centre.x - sw / 2, centre.y + 34.dp.toPx()), Size(sw, sw * 0.22f))
             }
             val bu = burst.value
             if (bu > 0f && bu < 1f) {
@@ -277,6 +233,27 @@ fun RuvoSplash(
                     },
                     size = 112.dp, build = build.value,
                 )
+                // The rupee coin: its width follows the spin, it squashes on the last landing, then pops open and fades
+                // as the tile springs up in its place.
+                if (coinGone.value < 1f) Box(
+                    Modifier.size(64.dp).graphicsLayer {
+                        translationY = drop.value * density
+                        val turnX = kotlin.math.abs(cos(spin.value * PI.toFloat())).coerceAtLeast(0.12f)
+                        val grow = 1f + 0.6f * coinGone.value
+                        scaleX = turnX * (1f + 0.22f * squash.value) * grow
+                        scaleY = (1f - 0.24f * squash.value) * grow
+                        alpha = 1f - coinGone.value
+                        transformOrigin = TransformOrigin(0.5f, 1f)
+                    },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Canvas(Modifier.matchParentSize()) {
+                        drawCircle(Brush.linearGradient(listOf(Color(0xFF6E8CFF), Color(0xFF1F35B8)), Offset.Zero, Offset(size.width, size.height)))
+                        drawCircle(Paper.copy(alpha = 0.35f), size.minDimension / 2 - 4.dp.toPx(), style = Stroke(2.dp.toPx()))
+                        drawCircle(Paper.copy(alpha = 0.25f), size.minDimension * 0.12f, Offset(size.width * 0.32f, size.height * 0.3f))
+                    }
+                    Text("₹", style = Ruvo.type.display.copy(fontWeight = FontWeight(800)), color = Paper)
+                }
                 // The pet pops up at the tile's corner and cheers.
                 if (mascot != null) {
                     mascot(

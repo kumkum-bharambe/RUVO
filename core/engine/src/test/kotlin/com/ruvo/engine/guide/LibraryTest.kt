@@ -37,14 +37,34 @@ class LibraryTest {
         Lessons.all.forEach { assertNotNull(Library.byId(it.id), "No book for lesson ${it.id}") }
     }
 
-    @Test fun neverShamesAndNeverNamesAnInvestment() {
+    @Test fun neverShamesAndNeverRecommendsAnInvestment() {
+        // Kinds of saving and investing may be explained in general (Kumkum, 5 Nov 2026). What stays banned is
+        // naming a specific market, coin or product, and anything that reads as advice or a promise.
         val shaming = listOf("waste", "stupid", "irresponsible", "bad with money", "lazy", "shame")
-        val products = listOf("mutual fund", "sip ", "stock", "crypto", "bitcoin", "nifty", "sensex", "fixed deposit", "gold")
+        val advice = listOf("crypto", "bitcoin", "nifty", "sensex", "you should invest in", "best fund", "best stock", "will double your money", "sure-shot", "tip:")
         Library.all.forEach { b ->
-            val text = (b.pages.map { it.second } + b.check.options + b.check.because).joinToString(" ").lowercase()
+            val text = (b.pages.map { it.second } + b.quiz.flatMap { it.options + it.because + it.question } + b.keyPoints + listOfNotNull(b.rule, b.fact))
+                .joinToString(" ").lowercase()
             shaming.forEach { assertFalse(it in text, "${b.id} says \"$it\"") }
-            if (b.shelf == Library.Shelf.INVEST) products.forEach { assertFalse(it in text, "${b.id} names \"$it\"") }
+            advice.forEach { assertFalse(it in text, "${b.id} says \"$it\"") }
         }
+    }
+
+    @Test fun everyBookEndsWithAThreeQuestionQuizAndTakeaways() {
+        Library.all.forEach { b ->
+            assertEquals(3, b.quiz.size, "${b.id} quiz")
+            b.quiz.forEach { q ->
+                assertTrue(q.options.size in 2..4 && q.correct in q.options.indices && q.because.isNotBlank(), "${b.id}: ${q.question}")
+            }
+            assertTrue(b.keyPoints.size in 2..4 && b.keyPoints.all { it.isNotBlank() }, "${b.id} takeaways")
+        }
+    }
+
+    @Test fun newShelvesAreFilledAndExtrasPointAtRealThings() {
+        listOf(Library.Shelf.SAFETY, Library.Shelf.CREDIT, Library.Shelf.WORK).forEach { assertEquals(3, Library.shelf(it).size, it.title) }
+        Library.all.forEach { b -> b.story?.let { assertNotNull(Stories.byId(it), "${b.id} story $it") } }
+        assertTrue(Library.all.count { it.tool != null } >= 5)
+        assertTrue(Library.all.count { it.rule != null } >= 20)
     }
 
     @Test fun forYouStartsWithTheTodayLessonAndPrefersUnread() {
