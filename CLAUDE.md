@@ -69,6 +69,7 @@ Kumkum's Windows PC (DESKTOP-73AVRJU). Project folder: `C:\dev\RUVO` (outside On
 .\gradlew.bat test                               # every unit test
 .\gradlew.bat assembleDebug                      # build the APK
 .\gradlew.bat installDebug                       # install on the running emulator
+.\gradlew.bat :app:assembleShare                 # shareable APK for GitHub Releases (no SMS, app ID com.ruvo.app.share); see docs/RELEASING.md
 .\gradlew.bat connectedCheck                     # UI tests on the emulator
 adb shell am start -n com.ruvo.app/.MainActivity # launch
 adb emu sms send 5554 "Rs.180.00 debited from a/c **1234 on 06-10-26 to VPA uber.india@axisbank"  # test SMS (turn on demo SMS in Settings first)

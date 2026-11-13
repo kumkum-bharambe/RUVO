@@ -55,6 +55,18 @@ class SmsReceiver : BroadcastReceiver() {
     }
 }
 
+/**
+ * Whether this build can read SMS at all. The shareable build (GitHub Releases) leaves the SMS permissions out of
+ * its manifest, so screens hide SMS tracking instead of asking for a permission that can never be granted.
+ */
+object SmsSupport {
+    fun available(context: Context): Boolean = runCatching {
+        @Suppress("DEPRECATION")
+        val info = context.packageManager.getPackageInfo(context.packageName, PackageManager.GET_PERMISSIONS)
+        info.requestedPermissions?.contains(Manifest.permission.READ_SMS) == true
+    }.getOrDefault(false)
+}
+
 /** One-time scan of the last 90 days of the inbox, run when the user turns on real SMS reading. */
 object SmsInboxScanner {
     suspend fun scan(context: Context, days: Int = 90): Int {

@@ -458,6 +458,12 @@ private fun Tracking(onFinish: (withSms: Boolean) -> Unit) {
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
         onFinish(granted[Manifest.permission.READ_SMS] == true)
     }
+    // The shareable build cannot read SMS; skip straight past this step instead of asking.
+    val context = androidx.compose.ui.platform.LocalContext.current
+    if (!androidx.compose.runtime.remember { com.ruvo.data.sms.SmsSupport.available(context) }) {
+        androidx.compose.runtime.LaunchedEffect(Unit) { onFinish(false) }
+        return
+    }
     Spacer(Modifier.height(Space.xxl))
     Eyebrow("Optional")
     Text("Let Ruvo read payment SMS?", Modifier.semantics { heading() }, style = Ruvo.type.display, color = c.ink)

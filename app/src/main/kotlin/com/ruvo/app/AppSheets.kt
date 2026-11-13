@@ -216,7 +216,14 @@ fun SettingsSheet(state: AppState, onDismiss: () -> Unit, onPersonas: () -> Unit
         }
 
         SectionTitle("Tracking")
-        Toggle("Read payment SMS", "Bank and UPI senders only, read on this phone", s.realSms) { on ->
+        val smsAvailable = remember { com.ruvo.data.sms.SmsSupport.available(context) }
+        if (!smsAvailable) {
+            Text(
+                "This shared version does not read SMS. Sample students show sample bank messages, and you can add spends with + or by pulling Ruvo's pet down.",
+                style = Ruvo.type.caption, color = c.inkSoft,
+            )
+        }
+        if (smsAvailable) Toggle("Read payment SMS", "Bank and UPI senders only, read on this phone", s.realSms) { on ->
             if (on) {
                 val perms = buildList {
                     add(Manifest.permission.READ_SMS); add(Manifest.permission.RECEIVE_SMS)
@@ -226,7 +233,7 @@ fun SettingsSheet(state: AppState, onDismiss: () -> Unit, onPersonas: () -> Unit
             } else scope.launch { repo.setRealSms(false) }
         }
         scanned?.let { Text("Found $it new payments in the last 90 days. They are waiting in your weekly sort.", style = Ruvo.type.caption, color = c.fuel) }
-        Toggle("Demo SMS", "Accept test messages from any sender, for emulator demos", s.demoSms) { on -> scope.launch { repo.setDemoSms(on) } }
+        if (smsAvailable) Toggle("Demo SMS", "Accept test messages from any sender, for emulator demos", s.demoSms) { on -> scope.launch { repo.setDemoSms(on) } }
         Toggle("Spoken replies", "Ruvo reads answers aloud in your chat language", s.spokenReplies) { on -> scope.launch { repo.setSpokenReplies(on) } }
 
         SectionTitle("Notifications")
