@@ -125,3 +125,16 @@ navy and amber, Outfit and glass with paper and ink, Fraunces and Space Grotesk,
 - Commit after each passing step with a short message saying what changed.
 - At the end of each milestone, take emulator screenshots in both themes into `artifacts/` and stop for
   Kumkum's approval before starting the next milestone.
+
+## Two versions: the app we work on, and the published release
+
+- **The app we work on** is the original, full Ruvo (with SMS reading), app ID `com.ruvo.app`. All new work goes
+  here, on `main`, built with `installDebug`. Commit and push to `main` as usual.
+- **The published release** is GitHub Release `v1.0` (tag `v1.0`, file `Ruvo.apk`), made with
+  `:app:assembleShare` (no SMS, app ID `com.ruvo.app.share`). It is what professors and testers download.
+- **Never change, delete, re-tag or re-upload a published release, and never publish a new one, unless Kumkum
+  explicitly says to replace it with a new release.** Pushing to `main` does not change the release: a release is
+  a fixed file attached to a fixed tag. Never move or delete the tags `v1.0` and `pre-release-2026-11-13`.
+- When Kumkum asks for a new release, follow `docs/RELEASING.md` (raise `versionCode` and `versionName`, new tag
+  `v1.1`, `v1.2`…, keep the file name `Ruvo.apk` so the README link keeps working).
+- Keep the share build working: anything that needs SMS must check `SmsSupport.available(context)` first.
