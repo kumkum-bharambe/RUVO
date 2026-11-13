@@ -39,6 +39,7 @@ sealed interface LaunchRequest {
     data object QuickAdd : LaunchRequest
     data object Sort : LaunchRequest
     data object Chat : LaunchRequest
+    data object Buy : LaunchRequest
     data class Txn(val id: String, val split: Boolean) : LaunchRequest
 }
 
@@ -92,6 +93,7 @@ class MainActivity : ComponentActivity() {
             intent.getStringExtra("com.ruvo.extra.OPEN") == "quickadd" -> LaunchRequest.QuickAdd
             intent.getStringExtra("com.ruvo.extra.OPEN") == "sort" -> LaunchRequest.Sort
             intent.getStringExtra("com.ruvo.extra.OPEN") == "chat" -> LaunchRequest.Chat
+            intent.getStringExtra("com.ruvo.extra.OPEN") == "buy" -> LaunchRequest.Buy
             else -> launchRequest.value
         }
     }

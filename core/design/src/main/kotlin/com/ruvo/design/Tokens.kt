@@ -95,9 +95,10 @@ data class RuvoColors(
      * carries the colour instead.
      */
     fun bucketBrush(b: Bucket): Brush = if (isDark) when (b) {
-        Bucket.FIXED -> Brush.linearGradient(listOf(Color(0xFF221D40), Color(0xFF141322)))
-        Bucket.FUEL -> Brush.linearGradient(listOf(Color(0xFF2B2619), Color(0xFF17150F)))
-        Bucket.FUTURE -> Brush.linearGradient(listOf(Color(0xFF2E2019), Color(0xFF181210)))
+        // A shade lighter than the canvas so names and amounts stay clearly readable at night.
+        Bucket.FIXED -> Brush.linearGradient(listOf(Color(0xFF2B2550), Color(0xFF1A1830)))
+        Bucket.FUEL -> Brush.linearGradient(listOf(Color(0xFF362E1B), Color(0xFF1E1B13)))
+        Bucket.FUTURE -> Brush.linearGradient(listOf(Color(0xFF3B281D), Color(0xFF1F1813)))
     } else when (b) {
         Bucket.FIXED -> Brush.linearGradient(listOf(fixed.lighten(0.62f), fixed.lighten(0.3f)))
         Bucket.FUEL -> Brush.linearGradient(listOf(sun.lighten(0.5f), fuel.lighten(0.15f)))

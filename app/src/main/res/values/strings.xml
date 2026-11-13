@@ -3,4 +3,5 @@
     <string name="app_name">Ruvo</string>
     <string name="shortcut_add">Add a spend</string>
     <string name="shortcut_ask">Ask Ruvo</string>
+    <string name="shortcut_buy">Before you buy</string>
 </resources>

@@ -37,6 +37,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ruvo.data.ActivityItem
 import com.ruvo.data.AppState
 import com.ruvo.data.RuvoGraph
+import kotlinx.coroutines.launch
 import com.ruvo.design.BucketCard
 import com.ruvo.design.Chip
 import com.ruvo.design.Pill
@@ -121,9 +122,9 @@ fun TodayContent(state: AppState, a: TodayActions) {
         item {
             val r0 = state.runway
             val upcoming = comingUp(state).sumOf { it.first.amount }
+            // The runway itself is the hero just below, so the chips carry only what the hero does not.
             StatusChips(
                 listOf(
-                    StatusItem(if (r0.unlimited) "No end · runway" else "${IndianFormat.days(r0.runwayDays)} runway", c.fuel, a.openWhy),
                     StatusItem("${IndianFormat.rupees(r0.fuel.coerceAtLeast(0))} available", c.fuel, a.openMoney),
                     StatusItem("${IndianFormat.rupees(r0.futureProtected)} protected", c.future, a.openGoals),
                     StatusItem("${IndianFormat.rupees(upcoming)} coming up", c.fixed, a.openMoney),
@@ -131,6 +132,13 @@ fun TodayContent(state: AppState, a: TodayActions) {
                 Modifier.reveal(0),
             )
             Spacer(Modifier.height(Space.xs))
+        }
+        // Payday: money just arrived. Say so warmly and offer to pay yourself first, once per arrival.
+        val payday = state.input.transactions.let { txns ->
+            com.ruvo.engine.Payday.recent(txns, state.today, state.input.income.expectedAmount)?.takeIf { it.id !in state.settings.paydaysSeen }
+        }
+        if (payday != null) {
+            item(key = "payday-${payday.id}") { PaydayCard(payday, state, Modifier.padding(horizontal = Space.gutter).padding(bottom = Space.sm).reveal(0)) }
         }
         item {
             RunwayHero(r, a.openWhy, Modifier.padding(horizontal = Space.gutter).reveal(0))
@@ -145,6 +153,8 @@ fun TodayContent(state: AppState, a: TodayActions) {
                 BucketCard(Bucket.FUTURE, r.futureProtected, if (goals == 1) "1 goal" else "$goals goals", Modifier.weight(1f), r.futureProtected / total, a.openGoals)
             }
         }
+        // Before you buy sits right under the buckets, inside the first screen: the check belongs before paying.
+        item { BuyCard(a.openBuy, Modifier.padding(top = Space.sm).reveal(3)) }
         if (state.toSort.isNotEmpty()) {
             item { SortCard(state.toSort.size, a.openSort, Modifier.reveal(3)) }
         }
@@ -170,8 +180,6 @@ fun TodayContent(state: AppState, a: TodayActions) {
                 }
             }
         }
-        // Before you buy, in brand blue like everywhere else.
-        item { BuyCard(a.openBuy, Modifier.padding(top = Space.md).reveal(8)) }
         item {
             val lesson = Lessons.forNow(state.input, r)
             RuvoCard(Modifier.padding(horizontal = Space.gutter).padding(top = Space.sm).reveal(10), onClick = { a.openLesson(lesson.id) }, onClickLabel = "Read ${lesson.title}") {
@@ -218,6 +226,46 @@ fun TodayContent(state: AppState, a: TodayActions) {
         item { SectionTitle("Recent", Modifier.padding(horizontal = Space.gutter), action = "See all", onAction = a.openMoney) }
         val recent = state.activity.filter { it.txn.status != com.ruvo.engine.TxnStatus.IGNORED }.take(4)
         recent.forEach { entry -> item(key = entry.txn.id) { ActivityLine(entry, state, a.openTxn) } }
+    }
+}
+
+/**
+ * The payday card, in the pearly celebration colours: money arrived, you made it to payday, and an offer to pay
+ * yourself first by pouring a little into a goal before spending starts. "Not now" is always equal; nothing is moved
+ * without a tap.
+ */
+@Composable
+private fun PaydayCard(income: com.ruvo.engine.Txn, state: AppState, modifier: Modifier = Modifier) {
+    val c = Ruvo.colors
+    val ink = c.onLight
+    val r = state.runway
+    val pour = com.ruvo.engine.Payday.suggestPour(income.amount, state.input.goals, r.fuel)
+    val done: () -> Unit = { com.ruvo.data.RuvoGraph.appScope.launch { RuvoGraph.repository.markPaydaySeen(income.id) } }
+    RuvoCard(modifier.fillMaxWidth(), brush = c.irisBrush, border = null, elevated = true) {
+        Eyebrow("Payday · ${IndianFormat.rupees(income.amount)} arrived", color = ink.copy(alpha = 0.7f))
+        Spacer(Modifier.height(Space.xxs))
+        Text("You made it to payday.", style = Ruvo.type.headline, color = ink)
+        Spacer(Modifier.height(Space.xxs))
+        val bills = if (r.fixedReserved > 0) "${IndianFormat.rupees(r.fixedReserved)} is already set aside for bills. " else ""
+        Text(
+            bills + (pour?.let { "Pay yourself first: put ${IndianFormat.rupees(it.amount)} into ${it.goal.name} before spending starts?" } ?: "A fresh start for this cycle."),
+            style = Ruvo.type.body, color = ink.copy(alpha = 0.85f),
+        )
+        Spacer(Modifier.height(Space.sm))
+        Row(horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
+            if (pour != null) {
+                com.ruvo.design.InkButton("Put in ${IndianFormat.rupees(pour.amount)}", {
+                    com.ruvo.data.RuvoGraph.appScope.launch {
+                        RuvoGraph.repository.pour(pour.goal.id, pour.amount)
+                        RuvoGraph.repository.markPaydaySeen(income.id)
+                    }
+                    com.ruvo.data.Notices.post(com.ruvo.data.Notices.Notice.Text("${IndianFormat.rupees(pour.amount)} protected for ${pour.goal.name}"))
+                }, Modifier.weight(1f))
+                com.ruvo.design.OutlineButton("Not now", done, Modifier.weight(1f), color = ink)
+            } else {
+                com.ruvo.design.OutlineButton("Got it", done, Modifier.fillMaxWidth(), color = ink)
+            }
+        }
     }
 }
 

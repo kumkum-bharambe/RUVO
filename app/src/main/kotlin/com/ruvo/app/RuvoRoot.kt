@@ -81,6 +81,9 @@ import com.ruvo.feature.today.SortStackScreen
 import com.ruvo.feature.today.TodayActions
 import com.ruvo.feature.today.TodayScreen
 import com.ruvo.feature.today.WhySheet
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.liveRegion
 import kotlinx.coroutines.launch
 
 enum class Tab(val label: String) { TODAY("Home"), MONEY("Money"), GOALS("Goals"), GUIDE("Guide") }
@@ -147,6 +150,7 @@ private fun MainShell(state: AppState, request: LaunchRequest?, consumed: () -> 
             LaunchRequest.QuickAdd -> overlay = Overlay.QuickAdd
             LaunchRequest.Sort -> overlay = Overlay.Sort
             LaunchRequest.Chat -> overlay = Overlay.Chat()
+            LaunchRequest.Buy -> overlay = Overlay.Buy
             is LaunchRequest.Txn -> overlay = Overlay.Txn(request.id, request.split)
             null -> {}
         }
@@ -177,10 +181,55 @@ private fun MainShell(state: AppState, request: LaunchRequest?, consumed: () -> 
         openBuy = { overlay = Overlay.Buy },
         openChat = { overlay = Overlay.Chat(it) },
         openMarketplace = { overlay = Overlay.Marketplace },
+        openAdd = { overlay = Overlay.QuickAdd },
     )
+
+    // While a list is scrolling, the pet fades back so it never sits on top of an amount you are reading.
+    var lastScroll by remember { mutableStateOf(0L) }
+    val scrollWatch = remember {
+        object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
+            override fun onPostScroll(consumed: androidx.compose.ui.geometry.Offset, available: androidx.compose.ui.geometry.Offset, source: androidx.compose.ui.input.nestedscroll.NestedScrollSource): androidx.compose.ui.geometry.Offset {
+                if (consumed.y != 0f) lastScroll = System.currentTimeMillis()
+                return androidx.compose.ui.geometry.Offset.Zero
+            }
+        }
+    }
+    var petQuiet by remember { mutableStateOf(false) }
+    LaunchedEffect(lastScroll) {
+        if (lastScroll == 0L) return@LaunchedEffect
+        petQuiet = true
+        kotlinx.coroutines.delay(900)
+        petQuiet = false
+    }
+    val petAlpha by androidx.compose.animation.core.animateFloatAsState(if (petQuiet) 0.3f else 1f, Motion.soft(), label = "petAlpha")
+
+    // Short confirmations ("Saved ₹250 · runway 24 → 23 days"), shown above the dock and read out by TalkBack.
+    var notice by remember { mutableStateOf<String?>(null) }
+    var noticeKey by remember { mutableStateOf(0) }
+    val latest by androidx.compose.runtime.rememberUpdatedState(state)
+    LaunchedEffect(Unit) {
+        com.ruvo.data.Notices.flow.collect { n ->
+            notice = when (n) {
+                is com.ruvo.data.Notices.Notice.Text -> n.line
+                is com.ruvo.data.Notices.Notice.Saved -> {
+                    kotlinx.coroutines.delay(700) // let the saved payment reach the numbers first
+                    val after = latest.runway
+                    val what = (if (n.moneyIn) "Added " else "Saved ") + IndianFormat.rupees(n.amount)
+                    when {
+                        after.unlimited -> what
+                        after.runwayDays == n.runwayBefore -> "$what · runway still ${IndianFormat.days(after.runwayDays)}"
+                        else -> "$what · runway ${n.runwayBefore} → ${IndianFormat.days(after.runwayDays)}"
+                    }
+                }
+            }
+            noticeKey++
+        }
+    }
+    LaunchedEffect(noticeKey) { if (notice != null) { kotlinx.coroutines.delay(3_200); notice = null } }
 
     AmbientBackdrop {
         AnimatedContent(
+            modifier = Modifier.nestedScroll(scrollWatch),
             targetState = tab,
             transitionSpec = {
                 // Tabs slide toward the side you tapped, settling softly; reduced motion simply fades.
@@ -194,7 +243,7 @@ private fun MainShell(state: AppState, request: LaunchRequest?, consumed: () -> 
             when (t) {
                 Tab.TODAY -> TodayScreen(actions)
                 Tab.MONEY -> MoneyScreen(openTxn = { overlay = Overlay.Txn(it) }, openAdd = { overlay = Overlay.QuickAdd })
-                Tab.GOALS -> GoalsScreen(startNewGoal = newGoal, onNewGoalShown = { newGoal = false }, onWeekly = { overlay = Overlay.Weekly })
+                Tab.GOALS -> GoalsScreen(startNewGoal = newGoal, onNewGoalShown = { newGoal = false }, onWeekly = { overlay = Overlay.Weekly }, onAdd = { overlay = Overlay.QuickAdd })
                 Tab.GUIDE -> GuideScreen(guide)
             }
         }
@@ -220,10 +269,16 @@ private fun MainShell(state: AppState, request: LaunchRequest?, consumed: () -> 
         var bubbleKey by remember { mutableStateOf(0) }
         LaunchedEffect(tab) {
             if (tab == Tab.TODAY && !greeted) {
-                kotlinx.coroutines.delay(700); bubble = petLine(state); greeted = true; bubbleKey++
+                kotlinx.coroutines.delay(700)
+                // The very first time, the pet explains its two gestures; after that it says hello with the runway.
+                if ("pet" !in state.settings.seenTips) {
+                    bubble = "Tip: tap me to ask anything, or pull me down to add a spend."
+                    RuvoGraph.appScope.launch { RuvoGraph.repository.markTipSeen("pet") }
+                } else bubble = petLine(state)
+                greeted = true; bubbleKey++
             } else if (tab != Tab.TODAY) bubble = null
         }
-        LaunchedEffect(bubbleKey) { if (bubble != null) { kotlinx.coroutines.delay(6_500); bubble = null } }
+        LaunchedEffect(bubbleKey) { if (bubble != null) { kotlinx.coroutines.delay(7_500); bubble = null } }
 
         val anyComplete = state.goals.any { it.isComplete }
         RuvoOrb(
@@ -233,9 +288,21 @@ private fun MainShell(state: AppState, request: LaunchRequest?, consumed: () -> 
             onQuickAdd = { bubble = null; overlay = Overlay.QuickAdd },
             onPat = { bubble = patLine(state, pats); pats++; bubbleKey++ },
             size = 70.dp,
-            // Floats above the dock's right end, with room below it to be pulled down.
-            modifier = Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(end = Space.gutter + 2.dp, bottom = 90.dp),
+            // Floats above the dock's right end, with room below it to be pulled down. Fades back while you scroll.
+            modifier = Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(end = Space.gutter + 2.dp, bottom = 90.dp)
+                .graphicsLayer { alpha = petAlpha },
         )
+
+        AnimatedVisibility(
+            notice != null && overlay == Overlay.None,
+            Modifier.align(Alignment.BottomStart).navigationBarsPadding().padding(start = Space.gutter, end = Space.gutter + 84.dp, bottom = 104.dp),
+            enter = fadeIn(Motion.soft()) + slideInVertically(Motion.gentle()) { it / 2 },
+            exit = fadeOut(Motion.soft()),
+        ) {
+            var last by remember { mutableStateOf("") }
+            notice?.let { last = it }
+            NoticePill(last)
+        }
 
         AnimatedVisibility(
             bubble != null && overlay == Overlay.None,
@@ -338,16 +405,24 @@ fun FloatingDock(selected: Tab, onSelect: (Tab) -> Unit, modifier: Modifier = Mo
             }
             val weight by androidx.compose.animation.core.animateFloatAsState(if (on) 2.1f else 1f, Motion.bouncy(), label = "w${t.name}")
             val fill by androidx.compose.animation.animateColorAsState(if (on) androidx.compose.ui.graphics.Color.White else androidx.compose.ui.graphics.Color.White.copy(alpha = 0f), Motion.soft(), label = "f${t.name}")
-            Row(
+            Box(
                 Modifier.weight(weight).height(50.dp).clip(shape).background(fill)
                     .semantics { this.selected = on }
                     .clickable(role = Role.Tab, onClickLabel = "Open ${t.label}") { onSelect(t) },
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically,
+                contentAlignment = Alignment.Center,
             ) {
-                Icon(icon, t.label, Modifier.size(21.dp), tint = if (on) c.onLight else idle)
-                AnimatedVisibility(on, enter = fadeIn() + androidx.compose.animation.expandHorizontally(), exit = fadeOut() + androidx.compose.animation.shrinkHorizontally()) {
-                    Text(t.label, Modifier.padding(start = 6.dp), style = Ruvo.type.label, color = c.onLight, maxLines = 1)
+                if (on) {
+                    // The chosen tab: icon and name side by side in the white pill.
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(icon, t.label, Modifier.size(21.dp), tint = c.onLight)
+                        Text(t.label, Modifier.padding(start = 6.dp), style = Ruvo.type.label, color = c.onLight, maxLines = 1)
+                    }
+                } else {
+                    // The others keep a small name under the icon, so every tab says where it goes.
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(icon, null, Modifier.size(19.dp), tint = idle)
+                        Text(t.label, style = Ruvo.type.caption.copy(fontSize = Ruvo.type.caption.fontSize * 0.85f), color = idle, maxLines = 1)
+                    }
                 }
             }
         }
@@ -383,6 +458,23 @@ private fun petLine(state: AppState): String {
         buffer >= 3 -> "About ${IndianFormat.days(r.runwayDays)} of runway, ${IndianFormat.days(buffer)} spare. Nice and steady."
         buffer >= 0 -> "About ${IndianFormat.days(r.runwayDays)}, just enough. Let's keep an eye on Fuel."
         else -> "About ${IndianFormat.days(r.runwayDays)}, a little short of next money. Let's plan together."
+    }
+}
+
+/** A short confirmation line: an ink pill like a chosen chip, announced politely to screen readers. */
+@Composable
+private fun NoticePill(text: String) {
+    val c = Ruvo.colors
+    Row(
+        Modifier.shadow(12.dp, RoundedCornerShape(Radius.chip), ambientColor = c.shadow, spotColor = c.shadow)
+            .clip(RoundedCornerShape(Radius.chip)).background(c.ink)
+            .semantics { liveRegion = androidx.compose.ui.semantics.LiveRegionMode.Polite }
+            .padding(horizontal = Space.md, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(RuvoIcons.Check, null, Modifier.size(16.dp), tint = c.canvas)
+        Spacer(Modifier.width(Space.xs))
+        Text(text, style = Ruvo.type.label, color = c.canvas, maxLines = 2)
     }
 }
 

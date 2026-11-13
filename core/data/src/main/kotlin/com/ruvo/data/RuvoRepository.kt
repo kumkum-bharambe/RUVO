@@ -330,6 +330,10 @@ class RuvoRepository(
     suspend fun setUpiVpa(vpa: String) = settingsStore.update { it.copy(upiVpa = vpa.trim()) }
     suspend fun setName(name: String) = settingsStore.update { it.copy(name = name.trim()) }
     suspend fun setHideBalance(on: Boolean) = settingsStore.update { it.copy(hideBalance = on) }
+    /** A one-time hint has been shown, so it never shows again. */
+    suspend fun markTipSeen(id: String) = settingsStore.update { it.copy(seenTips = it.seenTips + id) }
+    /** The payday card for this money-in was shown and closed (or acted on). */
+    suspend fun markPaydaySeen(txnId: String) = settingsStore.update { it.copy(paydaysSeen = it.paydaysSeen + txnId) }
     suspend fun setNotifications(capture: Boolean? = null, weekly: Boolean? = null, goals: Boolean? = null) = settingsStore.update {
         it.copy(notifyCapture = capture ?: it.notifyCapture, notifyWeekly = weekly ?: it.notifyWeekly, notifyGoals = goals ?: it.notifyGoals)
     }

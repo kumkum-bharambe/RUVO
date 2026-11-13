@@ -69,6 +69,10 @@ data class UserSettings(
     /** Wrong PINs in a row, and when tries may start again after five. */
     val pinFails: Int = 0,
     val pinPausedUntil: Long = 0,
+    /** One-time hints already shown, by id (e.g. "pet"). */
+    val seenTips: Set<String> = emptySet(),
+    /** Money-in transactions whose payday card was already shown or dismissed. */
+    val paydaysSeen: Set<String> = emptySet(),
 ) {
     val hasAccount: Boolean get() = pinHash.isNotEmpty()
 
@@ -115,6 +119,8 @@ class SettingsStore(private val context: Context) {
         val pin = stringPreferencesKey("pin_hash")
         val pinFails = intPreferencesKey("pin_fails")
         val pinPaused = longPreferencesKey("pin_paused_until")
+        val tips = stringSetPreferencesKey("seen_tips")
+        val paydays = stringSetPreferencesKey("paydays_seen")
     }
 
     val settings: Flow<UserSettings> = context.store.data.map { readFrom(it) }
@@ -156,6 +162,8 @@ class SettingsStore(private val context: Context) {
             p[K.pin] = s.pinHash
             p[K.pinFails] = s.pinFails
             p[K.pinPaused] = s.pinPausedUntil
+            p[K.tips] = s.seenTips
+            p[K.paydays] = s.paydaysSeen
         }
     }
 
@@ -192,5 +200,7 @@ class SettingsStore(private val context: Context) {
         pinHash = p[K.pin] ?: "",
         pinFails = p[K.pinFails] ?: 0,
         pinPausedUntil = p[K.pinPaused] ?: 0,
+        seenTips = p[K.tips] ?: emptySet(),
+        paydaysSeen = p[K.paydays] ?: emptySet(),
     )
 }

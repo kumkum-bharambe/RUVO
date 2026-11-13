@@ -126,7 +126,7 @@ fun rememberTilt(): State<Float> {
  * [startNewGoal] opens the new-goal sheet straight away, e.g. from a Guide book's last page.
  */
 @Composable
-fun GoalsScreen(startNewGoal: Boolean = false, onNewGoalShown: () -> Unit = {}, onWeekly: () -> Unit = {}) {
+fun GoalsScreen(startNewGoal: Boolean = false, onNewGoalShown: () -> Unit = {}, onWeekly: () -> Unit = {}, onAdd: () -> Unit = {}) {
     val state by RuvoGraph.repository.state.collectAsStateWithLifecycle()
     var openGoal by remember { mutableStateOf<String?>(null) }
     var newGoal by remember { mutableStateOf(false) }
@@ -137,13 +137,17 @@ fun GoalsScreen(startNewGoal: Boolean = false, onNewGoalShown: () -> Unit = {}, 
 
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = Space.dockClearance)) {
         item {
-            Column(Modifier.statusBarsPadding().padding(horizontal = Space.gutter, vertical = Space.md)) {
-                Eyebrow("Goals")
-                Text("Money with a future", Modifier.semantics { heading() }, style = Ruvo.type.headline, color = c.ink)
-                Text(
-                    "${IndianFormat.rupees(state.runway.futureProtected)} protected. Your runway never counts it.",
-                    style = Ruvo.type.body, color = c.inkSoft,
-                )
+            Row(Modifier.statusBarsPadding().padding(horizontal = Space.gutter, vertical = Space.md), verticalAlignment = Alignment.Top) {
+                Column(Modifier.weight(1f)) {
+                    Eyebrow("Goals")
+                    Text("Money with a future", Modifier.semantics { heading() }, style = Ruvo.type.headline, color = c.ink)
+                    Text(
+                        "${IndianFormat.rupees(state.runway.futureProtected)} protected. Your runway never counts it.",
+                        style = Ruvo.type.body, color = c.inkSoft,
+                    )
+                }
+                // Adding a spend is one visible tap on every tab, not only by pulling the pet down.
+                com.ruvo.design.IconCircle(RuvoIcons.Plus, "Add a spend", onAdd, tint = c.onBrand, background = c.brand)
             }
         }
         item {

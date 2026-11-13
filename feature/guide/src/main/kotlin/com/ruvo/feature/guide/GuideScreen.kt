@@ -68,6 +68,7 @@ class GuideActions(
     val openBuy: () -> Unit,
     val openChat: (String?) -> Unit,
     val openMarketplace: () -> Unit = {},
+    val openAdd: () -> Unit = {},
 )
 
 @Composable
@@ -84,7 +85,11 @@ fun GuideScreen(a: GuideActions) {
         Modifier.fillMaxSize().verticalScroll(scroll).statusBarsPadding().padding(top = Space.md, bottom = Space.dockClearance),
     ) {
         Column(Modifier.padding(horizontal = Space.gutter)) {
-            Eyebrow("Guide", Modifier.reveal(0))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Eyebrow("Guide", Modifier.weight(1f).reveal(0))
+                // Adding a spend is one visible tap on every tab, not only by pulling the pet down.
+                com.ruvo.design.IconCircle(RuvoIcons.Plus, "Add a spend", a.openAdd, tint = Ruvo.colors.onBrand, background = Ruvo.colors.brand)
+            }
             Spacer(Modifier.height(Space.xs))
 
             // Hero: what the Guide is, and how far you have read, on white glass with a shelf of bright spines.

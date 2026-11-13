@@ -65,6 +65,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
@@ -495,10 +497,14 @@ fun Amount(paise: Paise, modifier: Modifier = Modifier, style: TextStyle = Ruvo.
 /** One chip in the status row. */
 data class StatusItem(val label: String, val dot: Color, val onClick: () -> Unit)
 
+/** How long the status chips glide before they rest. */
+private const val GLIDE_MS = 10_000L
+
 /**
- * Status chips that glide past like a ticker, about 28 dp a second, looping forever. Each has a pulsing coloured
- * dot and catches a slow shimmer. Dragging pauses the glide; tapping a chip opens what it describes. With reduced
- * motion the row stands still and scrolls by hand.
+ * Status chips that glide past like a ticker, about 28 dp a second, for the first [GLIDE_MS] after Home opens, then
+ * come to rest; touching the row stops the glide for good. A pulsing coloured dot and a slow shimmer play only while
+ * they glide, so nothing moves forever (moving content needs to stop by itself or on request). Tapping a chip opens
+ * what it describes. With reduced motion the row stands still and scrolls by hand.
  */
 @Composable
 fun StatusChips(items: List<StatusItem>, modifier: Modifier = Modifier) {
@@ -508,15 +514,20 @@ fun StatusChips(items: List<StatusItem>, modifier: Modifier = Modifier) {
     val loopCount = if (reduced) items.size else Int.MAX_VALUE
     val list = rememberLazyListState(initialFirstVisibleItemIndex = if (reduced) 0 else (Int.MAX_VALUE / 2).let { it - it % items.size })
     val speed = with(LocalDensity.current) { 28.dp.toPx() }
-    LaunchedEffect(reduced, items.size) {
-        if (reduced) return@LaunchedEffect
+    var gliding by remember { mutableStateOf(!reduced) }
+    LaunchedEffect(list.isScrollInProgress) { if (list.isScrollInProgress) gliding = false }
+    LaunchedEffect(reduced, items.size, gliding) {
+        if (reduced || !gliding) return@LaunchedEffect
         var last = 0L
-        while (true) {
+        val start = System.currentTimeMillis()
+        while (gliding && System.currentTimeMillis() - start < GLIDE_MS) {
             val now = withInfiniteAnimationFrameNanos { it }
             if (last != 0L && !list.isScrollInProgress) list.dispatchRawDelta(speed * ((now - last) / 1_000_000_000f).coerceAtMost(0.05f))
             last = now
         }
+        gliding = false
     }
+    val moving = gliding && !reduced
     // Frosted glass pills: milky white on Daybreak, smoky at night, each with a bright edge.
     val c = Ruvo.colors
     val dark = c.isDark
@@ -542,7 +553,7 @@ fun StatusChips(items: List<StatusItem>, modifier: Modifier = Modifier) {
         items(loopCount) { n ->
             val i = n % items.size
             val item = items[i]
-            val pulse = if (reduced) 0f else (t * 1.55f + i * 0.2f) % 1f
+            val pulse = if (!moving) 0f else (t * 1.55f + i * 0.2f) % 1f
             val shape = RoundedCornerShape(Radius.chip)
             Row(
                 Modifier
@@ -551,7 +562,7 @@ fun StatusChips(items: List<StatusItem>, modifier: Modifier = Modifier) {
                     .clickable(role = Role.Button, onClickLabel = "Open ${item.label}", onClick = item.onClick)
                     .drawWithContent {
                         drawContent()
-                        if (!reduced) {
+                        if (moving) {
                             val x = size.width * (((sweep + i * 0.35f) % 2.2f) - 0.6f)
                             drawRect(Brush.horizontalGradient(listOf(Color.Transparent, shine, Color.Transparent), startX = x, endX = x + size.width * 0.4f))
                         }
@@ -595,14 +606,14 @@ fun BucketCard(bucket: Bucket, amount: Paise, caption: String, modifier: Modifie
             val t = if (reduced) 0.3f else drift
             val a = t * 2f * PI.toFloat()
             val centre = Offset(size.width * (0.82f + 0.08f * cos(a)), size.height * (0.18f + 0.1f * sin(a)))
-            drawCircle(Brush.radialGradient(listOf(c.bucket(bucket).copy(alpha = if (c.isDark) 0.16f else 0.55f), Color.Transparent), centre, size.width * 0.55f), size.width * 0.55f, centre)
+            drawCircle(Brush.radialGradient(listOf(c.bucket(bucket).copy(alpha = if (c.isDark) 0.24f else 0.55f), Color.Transparent), centre, size.width * 0.55f), size.width * 0.55f, centre)
             drawRect(Brush.verticalGradient(listOf(Color.White.copy(alpha = if (c.isDark) 0.04f else 0.35f), Color.Transparent), endY = size.height * 0.45f))
         }
         Column(Modifier.matchParentSize().padding(12.dp)) {
             // Name first, then the number: the word carries the meaning, so no icon is needed. At night the name
             // carries the bucket's colour and the number stays plain white.
             Text(bucketName(bucket), style = Ruvo.type.bodyStrong, color = if (c.isDark) c.bucketInk(bucket) else ink, maxLines = 1)
-            Text(caption, style = Ruvo.type.caption, color = ink.copy(alpha = if (c.isDark) 0.55f else 0.68f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(caption, style = Ruvo.type.caption, color = ink.copy(alpha = if (c.isDark) 0.78f else 0.68f), maxLines = 1, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.weight(1f))
             Amount(amount, style = Ruvo.type.title, color = ink, countUp = true)
             Spacer(Modifier.height(6.dp))

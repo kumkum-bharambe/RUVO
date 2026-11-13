@@ -91,8 +91,16 @@ fun runwaySubline(r: RunwayResult): String {
     }
 }
 
+/** "Up to ₹252 a day gets you to 1 Dec": the runway as a daily amount. Null when there is no next money or no Fuel. */
+fun dailyLine(r: RunwayResult): String? {
+    val next = r.nextIncomeDate ?: return null
+    if (r.unlimited || r.safeDaily <= 0 || (r.daysToNextIncome ?: 0) <= 0) return null
+    return "Up to ${IndianFormat.rupees(r.safeDaily)} a day gets you to ${IndianFormat.date(next, r.today)}"
+}
+
 fun runwaySpoken(r: RunwayResult): String =
-    if (r.unlimited) "Runway: no end at current spending." else "Runway ${IndianFormat.days(r.runwayDays)}. ${runwaySubline(r).replace("·", ".")}"
+    if (r.unlimited) "Runway: no end at current spending."
+    else "Runway ${IndianFormat.days(r.runwayDays)}. ${runwaySubline(r).replace("·", ".")}." + (dailyLine(r)?.let { " $it." } ?: "")
 
 /**
  * The hero: a big pane of white glass. A warm sun glows in its top corner, a blue light pools at the bottom left
@@ -157,6 +165,15 @@ fun RunwayHero(r: RunwayResult, onWhy: () -> Unit, modifier: Modifier = Modifier
                 Text(if (r.runwayDays == 1) "day" else "days", Modifier.padding(bottom = 16.dp), style = Ruvo.type.display, color = c.ink, maxLines = 1, softWrap = false)
             }
             Text(runwaySubline(r), style = Ruvo.type.bodyStrong, color = if (r.makesIt) c.ink else c.warning)
+            // The same runway, said per day: the number to act on at the counter.
+            dailyLine(r)?.let { line ->
+                Spacer(Modifier.height(Space.xxs))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(8.dp).clip(CircleShape).background(c.fuel))
+                    Spacer(Modifier.width(6.dp))
+                    Text(line, style = Ruvo.type.label, color = c.ink)
+                }
+            }
             Spacer(Modifier.height(Space.xxs))
             Text("${IndianFormat.rupees(r.fuel.coerceAtLeast(0))} of Fuel at about ${IndianFormat.rupees(r.dailySpend)} a day", style = Ruvo.type.caption, color = c.inkSoft)
             val toIncome = r.daysToNextIncome

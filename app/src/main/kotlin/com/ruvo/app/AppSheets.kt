@@ -91,6 +91,8 @@ fun QuickAddSheet(onDismiss: () -> Unit) {
         // which would otherwise cancel the split before it was written (that is why splits went missing from Owed).
         val amountNow = paise; val label = what.ifBlank { category }; val incoming = moneyIn; val bucketNow = bucket
         val shares = if (!incoming && sharing) owed.filter { it.second > 0 } else emptyList()
+        // A short "Saved ₹250 · runway 24 → 23 days" line confirms it (shown by the app shell, read out by TalkBack).
+        com.ruvo.data.Notices.post(com.ruvo.data.Notices.Notice.Saved(amountNow, incoming, RuvoGraph.repository.state.value.runway.runwayDays))
         RuvoGraph.appScope.launch {
             val id = RuvoGraph.repository.addManual(
                 amountNow, label, if (incoming) "Income" else category,
