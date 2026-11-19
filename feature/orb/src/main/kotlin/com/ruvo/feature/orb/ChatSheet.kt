@@ -170,7 +170,7 @@ fun ChatSheet(onDismiss: () -> Unit, firstQuestion: String? = null) {
                 RuvoIcons.Speaker, if (state.settings.spokenReplies) "Turn off spoken replies" else "Turn on spoken replies",
                 {
                     val on = !state.settings.spokenReplies
-                    scope.launch { RuvoGraph.repository.setSpokenReplies(on) }
+                    com.ruvo.data.RuvoGraph.appScope.launch { RuvoGraph.repository.setSpokenReplies(on) }
                     // Turning it on reads the latest answer straight away, so you hear that it works.
                     if (on) {
                         val last = bubbles.indexOfLast { !it.fromUser }

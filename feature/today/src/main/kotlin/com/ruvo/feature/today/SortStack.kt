@@ -81,9 +81,9 @@ fun SortStackScreen(onClose: () -> Unit, onShare: (String) -> Unit) {
     fun act(item: ActivityItem, f: Fling) {
         sorted++
         when (f) {
-            Fling.CONFIRM -> { Haptics.tick(view); scope.launch { repo.confirm(item.txn.id) } }
-            Fling.IGNORE -> { Haptics.tick(view); scope.launch { repo.ignore(item.txn.id) } }
-            Fling.SHARE -> { Haptics.split(view); scope.launch { repo.confirm(item.txn.id) }; onShare(item.txn.id) }
+            Fling.CONFIRM -> { Haptics.tick(view); com.ruvo.data.RuvoGraph.appScope.launch { repo.confirm(item.txn.id) } }
+            Fling.IGNORE -> { Haptics.tick(view); com.ruvo.data.RuvoGraph.appScope.launch { repo.ignore(item.txn.id) } }
+            Fling.SHARE -> { Haptics.split(view); com.ruvo.data.RuvoGraph.appScope.launch { repo.confirm(item.txn.id) }; onShare(item.txn.id) }
         }
     }
 
@@ -118,7 +118,7 @@ fun SortStackScreen(onClose: () -> Unit, onShare: (String) -> Unit) {
             stack.take(3).reversed().forEachIndexed { i, item ->
                 val depth = stack.take(3).size - 1 - i
                 key(item.txn.id) {
-                    SwipeCard(item, depth, widthPx, state.today, onFling = { act(item, it) }) { b -> scope.launch { repo.setBucket(item.txn.id, b) } }
+                    SwipeCard(item, depth, widthPx, state.today, onFling = { act(item, it) }) { b -> com.ruvo.data.RuvoGraph.appScope.launch { repo.setBucket(item.txn.id, b) } }
                 }
             }
         }

@@ -130,7 +130,7 @@ fun TodayContent(state: AppState, a: TodayActions) {
                     StatusItem("${IndianFormat.rupees(r0.futureProtected)} protected", c.future, a.openGoals),
                     StatusItem("${IndianFormat.rupees(upcoming)} coming up", c.fixed, a.openMoney),
                 ),
-                Modifier.reveal(0),
+                Modifier.tourTarget("chips").reveal(0),
             )
             Spacer(Modifier.height(Space.xs))
         }
@@ -155,7 +155,7 @@ fun TodayContent(state: AppState, a: TodayActions) {
             }
         }
         // Before you buy sits right under the buckets, inside the first screen: the check belongs before paying.
-        item { BuyCard(a.openBuy, Modifier.padding(top = Space.sm).reveal(3)) }
+        item { BuyCard(a.openBuy, Modifier.padding(top = Space.sm).tourTarget("buy").reveal(3)) }
         if (state.toSort.isNotEmpty()) {
             item { SortCard(state.toSort.size, a.openSort, Modifier.reveal(3)) }
         }
@@ -399,7 +399,7 @@ private fun Header(state: AppState, a: TodayActions) {
         // Adding by hand is always one tap away, not hidden behind the Orb gesture.
         IconCircle(RuvoIcons.Plus, "Add a payment", a.openAdd, Modifier.tourTarget("add"), tint = c.onBrand, background = c.brand)
         Spacer(Modifier.width(Space.xs))
-        Avatar(state.displayName, a.openProfile)
+        Box(Modifier.tourTarget("profile")) { Avatar(state.displayName, a.openProfile) }
     }
 }
 

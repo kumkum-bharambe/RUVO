@@ -145,6 +145,7 @@ private fun MainShell(state: AppState, request: LaunchRequest?, consumed: () -> 
     val reduced = Ruvo.reducedMotion
     var lastBook by remember { mutableStateOf<String?>(null) }
     var newGoal by remember { mutableStateOf(false) }
+    val replayTour = remember { mutableStateOf(false) }
 
     LaunchedEffect(request) {
         when (request) {
@@ -358,16 +359,25 @@ private fun MainShell(state: AppState, request: LaunchRequest?, consumed: () -> 
 
         // The first-run tour: once, on Home, after setup. It walks through the runway, the buckets, adding, the pet
         // and the dock, then offers notifications (asking Android's permission only if the student says yes).
-        var tourDone by rememberSaveable { mutableStateOf(false) }
+        // touring: the tour is on screen. It starts by itself once after setup, and again from Settings → Replay the tour.
+        var touring by rememberSaveable { mutableStateOf(false) }
+        var tourKey by rememberSaveable { mutableStateOf(0) }
+        var autoShown by rememberSaveable { mutableStateOf(false) }
+        LaunchedEffect(state.settings.seenTips, tab) {
+            if (!autoShown && !touring && "tour" !in state.settings.seenTips && tab == Tab.TODAY) { autoShown = true; touring = true }
+        }
+        LaunchedEffect(replayTour.value) { if (replayTour.value) { replayTour.value = false; overlay = Overlay.None; tab = Tab.TODAY; tourKey++; touring = true } }
         val notifyLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
             androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
-        ) { granted -> if (!granted) scope.launch { RuvoGraph.repository.setNotifications(daily = false, news = false) } }
+        ) { granted -> if (!granted) com.ruvo.data.RuvoGraph.appScope.launch { RuvoGraph.repository.setNotifications(daily = false, news = false) } }
         val context = androidx.compose.ui.platform.LocalContext.current
-        if (!tourDone && "tour" !in state.settings.seenTips && tab == Tab.TODAY && overlay == Overlay.None) {
+        if (touring && overlay == Overlay.None) androidx.compose.runtime.key(tourKey) {
             com.ruvo.design.TourOverlay(
                 steps = tourSteps(state),
+                onStep = { s -> s.tab?.let { name -> tab = Tab.valueOf(name) } },
                 onFinish = {
-                    tourDone = true
+                    touring = false
+                    tab = Tab.TODAY
                     RuvoGraph.appScope.launch { RuvoGraph.repository.markTipSeen("tour"); RuvoGraph.repository.markTipSeen("pet") }
                 },
                 finalAction = if (com.ruvo.data.work.RuvoNotify.allowed(context)) null else "Yes, turn on" to {
@@ -380,11 +390,11 @@ private fun MainShell(state: AppState, request: LaunchRequest?, consumed: () -> 
         Overlay.None, Overlay.Sort, is Overlay.Book -> {}
         Overlay.Why -> WhySheet { overlay = Overlay.None }
         Overlay.Buy -> BeforeYouBuySheet(onDismiss = { overlay = Overlay.None }) { price ->
-            scope.launch { RuvoGraph.repository.addManual(price, "Purchase", "Shopping", Bucket.FUEL) }
+            com.ruvo.data.RuvoGraph.appScope.launch { RuvoGraph.repository.addManual(price, "Purchase", "Shopping", Bucket.FUEL) }
         }
         is Overlay.Chat -> ChatSheet(onDismiss = { overlay = Overlay.None }, firstQuestion = o.question)
         Overlay.QuickAdd -> QuickAddSheet { overlay = Overlay.None }
-        Overlay.Settings -> SettingsSheet(state, onDismiss = { overlay = Overlay.None }, onPersonas = { overlay = Overlay.Personas })
+        Overlay.Settings -> SettingsSheet(state, onDismiss = { overlay = Overlay.None }, onPersonas = { overlay = Overlay.Personas }, onReplayTour = { replayTour.value = true })
         Overlay.Personas -> PersonaPicker(onDismiss = { overlay = Overlay.None }) { overlay = Overlay.None; tab = Tab.TODAY }
         is Overlay.Txn -> TxnSheet(o.id, o.split) { overlay = Overlay.None }
         Overlay.Profile -> ProfileSheet(
@@ -491,13 +501,23 @@ private fun petLine(state: AppState): String {
 private fun tourSteps(state: AppState): List<com.ruvo.design.TourStep> {
     val r = state.runway
     val days = if (r.unlimited) "no end" else IndianFormat.days(r.runwayDays)
+    val daily = com.ruvo.feature.today.dailyLine(r)?.let { " The line under it, \"$it\", is what you can spend each day." } ?: ""
+    fun s(target: String?, title: String, body: String, tab: Tab = Tab.TODAY) = com.ruvo.design.TourStep(target, title, body, tab.name)
     return listOf(
-        com.ruvo.design.TourStep("runway", "This is your runway", "How long your money lasts at your usual pace: $days right now. Tap it any time to see exactly why."),
-        com.ruvo.design.TourStep("buckets", "Three buckets", "Fixed is already promised, Fuel is free to spend, Future is protected for your goals. Ruvo never counts Future as spendable."),
-        com.ruvo.design.TourStep("add", "Add money in or out", "Spent something or got money? Add it here in a few taps. Splits and money you owe friends live here too."),
-        com.ruvo.design.TourStep("pet", "Meet Ruvo", "Tap me to ask anything about your money. Pull me down to add a spend quickly."),
-        com.ruvo.design.TourStep("dock", "Everything else", "Money shows where it went and who owes whom. Goals keeps your savings. Guide has short books and student offers."),
-        com.ruvo.design.TourStep(null, "Stay in the loop?", "A short note each morning with your runway, plus new student offers, new books and payments to confirm. You can change this in Settings."),
+        s("runway", "This is your runway", "How long your money lasts at your usual pace: $days right now.$daily Tap the card to see exactly how it is worked out."),
+        s("chips", "Quick numbers", "What you can use, what is protected and what bills are coming. Tap any of them to open the details."),
+        s("buckets", "Three buckets", "Fixed is already promised (bills, money you owe), Fuel is free to spend, Future is saved for goals. Tap one to see what is in it."),
+        s("buy", "Before you buy", "Type any price to see what it costs in days of runway, before you pay. Ruvo never blocks a purchase."),
+        s("add", "Add money in or out", "Spent or received money? Type the amount, pick a category and tap Save. Switch on Shared with friends to split a bill."),
+        s("pet", "Meet Ruvo", "Tap me to ask anything about your money, like \"How much can I spend today?\". Pull me down to add a spend quickly."),
+        s("profile", "You and your settings", "Your profile, Settings (light or dark look, notifications, sample students) and Change PIN. You can replay this tour from Settings."),
+        s("balance", "Your balance", "Everything you have, split into goals, planned and yours to use. Tap it to update your balance; every number in Ruvo follows.", Tab.MONEY),
+        s("moneyTabs", "Where your money went", "Overview shows categories and bills (tap Unpaid to mark one paid). Transactions lists every payment. History shows each month. Owed tracks splits and money you owe friends.", Tab.MONEY),
+        s("goals", "Goals", "Each goal shows what you have saved and by when. Tap + ₹100 to put money in, or New goal to start one. Goal money is never counted as spendable.", Tab.GOALS),
+        s("books", "The Guide", "Short books on money, each a few minutes with a quiz. Pick one up any time; there are no streaks.", Tab.GUIDE),
+        s("market", "Student offers", "Real offers on music, food, apps and learning, checked by Ruvo. Tap How to get it on any offer.", Tab.GUIDE),
+        s("dock", "Moving around", "Home, Money, Goals and Guide are always down here. The + on every tab adds money in or out.", Tab.GUIDE),
+        s(null, "Stay in the loop?", "A short note each morning with your runway, plus new student offers, new books and payments to confirm. You can change this in Settings."),
     )
 }
 

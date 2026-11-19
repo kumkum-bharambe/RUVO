@@ -3,6 +3,7 @@ package com.ruvo.feature.money
 import android.content.Intent
 import androidx.compose.foundation.background
 import com.ruvo.design.Motion
+import com.ruvo.design.tourTarget
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -82,6 +83,7 @@ import com.ruvo.engine.IndianFormat
 import com.ruvo.engine.Insights
 import com.ruvo.engine.TxnStatus
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
 
 private enum class MoneyTab(val label: String) { OVERVIEW("Overview"), ACTIVITY("Transactions"), HISTORY("History"), OWED("Owed") }
 
@@ -132,12 +134,12 @@ fun MoneyScreen(openTxn: (String) -> Unit, openAdd: () -> Unit = {}) {
                 IconCircle(RuvoIcons.Plus, "Add a spend", openAdd, tint = c.onBrand, background = c.brand)
             }
         }
-        item { BalanceCard(state, Modifier.padding(horizontal = Space.gutter).reveal(0)) { balanceSheet = true } }
+        item { BalanceCard(state, Modifier.padding(horizontal = Space.gutter).tourTarget("balance").reveal(0)) { balanceSheet = true } }
         item {
             SegmentedControl(
                 MoneyTab.entries.map { it.label },
                 tab.ordinal, { tab = MoneyTab.entries[it] },
-                Modifier.padding(horizontal = Space.gutter, vertical = Space.md).reveal(1),
+                Modifier.padding(horizontal = Space.gutter, vertical = Space.md).tourTarget("moneyTabs").reveal(1),
             )
         }
         when (tab) {
@@ -265,7 +267,7 @@ private fun MonthEditSheet(state: AppState, month: java.time.YearMonth, onDismis
         }
         Spacer(Modifier.height(Space.lg))
         PrimaryButton("Save", {
-            scope.launch { RuvoGraph.repository.setMonthTotals(month, parseRupees(received) ?: 0, parseRupees(spent) ?: 0) }
+            com.ruvo.data.RuvoGraph.appScope.launch { RuvoGraph.repository.setMonthTotals(month, parseRupees(received) ?: 0, parseRupees(spent) ?: 0) }
             onDismiss()
         }, Modifier.fillMaxWidth())
         if (edit != null) {
@@ -515,7 +517,7 @@ private fun Buckets(state: AppState) {
                             Amount(cm.amount, style = Ruvo.type.label)
                             Spacer(Modifier.width(Space.xs))
                             // Its status for this cycle: Paid with a tick, or Unpaid, which you tap once it is paid.
-                            PaidStatus(paid = due == null, name = cm.name) { scope.launch { RuvoGraph.repository.payCommitment(cm) } }
+                            PaidStatus(paid = due == null, name = cm.name) { com.ruvo.data.RuvoGraph.appScope.launch { RuvoGraph.repository.payCommitment(cm) } }
                             Spacer(Modifier.width(Space.xxs))
                             Icon(RuvoIcons.Forward, null, Modifier.size(16.dp), tint = c.inkFaint)
                         }
@@ -588,7 +590,7 @@ private fun CommitmentSheet(cm: com.ruvo.engine.Commitment?, onDismiss: () -> Un
         Spacer(Modifier.height(Space.md))
         PrimaryButton(
             if (cm == null) "Add" else "Save changes", {
-                scope.launch {
+                com.ruvo.data.RuvoGraph.appScope.launch {
                     if (cm == null) repo.addCommitment(name.trim(), paise, dueDay ?: 1)
                     else repo.updateCommitment(cm, name, paise, dueDay)
                 }
@@ -662,7 +664,7 @@ private fun Owed(state: AppState) {
                     context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text), "Send to ${o.person}"))
                 }, Modifier.weight(1f))
                 PrimaryButton("They paid", {
-                    scope.launch { RuvoGraph.repository.markSharePaid(o.shareId) }
+                    com.ruvo.data.RuvoGraph.appScope.launch { RuvoGraph.repository.markSharePaid(o.shareId) }
                     com.ruvo.data.Notices.post(com.ruvo.data.Notices.Notice.Text("${o.person} paid you back ${IndianFormat.rupees(o.amount)}"))
                 }, Modifier.weight(1f))
             }
@@ -696,9 +698,9 @@ private fun YouOwe(state: AppState, onAdd: () -> Unit) {
             leading = { PersonAvatar(d.person, c.fixed) },
         ) { Amount(d.amount) }
         Row(Modifier.fillMaxWidth().padding(bottom = Space.sm), horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
-            GhostButton("Remove", { scope.launch { RuvoGraph.repository.deleteDebt(d.id) } }, Modifier.weight(1f))
+            GhostButton("Remove", { com.ruvo.data.RuvoGraph.appScope.launch { RuvoGraph.repository.deleteDebt(d.id) } }, Modifier.weight(1f))
             PrimaryButton("I paid them back", {
-                scope.launch { RuvoGraph.repository.payBack(d.id) }
+                com.ruvo.data.RuvoGraph.appScope.launch { RuvoGraph.repository.payBack(d.id) }
                 com.ruvo.data.Notices.post(com.ruvo.data.Notices.Notice.Text("Paid back ${d.person} ${IndianFormat.rupees(d.amount)} · all settled"))
             }, Modifier.weight(1.4f))
         }
@@ -745,7 +747,17 @@ private fun BalanceSheet(state: AppState, onDismiss: () -> Unit) {
         RuvoField(text, { text = it }, "Total", number = true, prefix = "₹ ")
         Spacer(Modifier.height(Space.lg))
         PrimaryButton("Save", {
-            parseRupees(text)?.let { v -> scope.launch { RuvoGraph.repository.setBalance(v) } }
+            // Saved on the app's own scope: the sheet closes at once, which would otherwise cancel the save.
+            parseRupees(text)?.let { v ->
+                val before = state.runway.runwayDays
+                com.ruvo.data.RuvoGraph.appScope.launch {
+                    RuvoGraph.repository.setBalance(v)
+                    // Every number follows the new balance; say how the runway moved once it has.
+                    val after = RuvoGraph.repository.state.first { it.input.balance == v }.runway
+                    val runway = if (after.unlimited) "" else if (after.runwayDays == before) " · runway still ${IndianFormat.days(after.runwayDays)}" else " · runway $before → ${IndianFormat.days(after.runwayDays)}"
+                    com.ruvo.data.Notices.post(com.ruvo.data.Notices.Notice.Text("Balance saved: ${IndianFormat.rupees(v)}$runway"))
+                }
+            }
             onDismiss()
         }, Modifier.fillMaxWidth())
     }
@@ -781,7 +793,7 @@ fun TxnSheet(id: String, startWithSplit: Boolean, onDismiss: () -> Unit) {
         Spacer(Modifier.height(Space.xs))
         FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.xs), verticalArrangement = Arrangement.spacedBy(Space.xs)) {
             categories.forEach { cat ->
-                Chip(cat, t.category == cat, { scope.launch { repo.recategorise(id, name.ifBlank { t.merchant }, cat) } })
+                Chip(cat, t.category == cat, { com.ruvo.data.RuvoGraph.appScope.launch { repo.recategorise(id, name.ifBlank { t.merchant }, cat) } })
             }
             Chip(if (making) "Cancel" else "+ New category", making, { making = !making })
         }
@@ -804,7 +816,7 @@ fun TxnSheet(id: String, startWithSplit: Boolean, onDismiss: () -> Unit) {
             Spacer(Modifier.height(Space.xs))
             Row(horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
                 // A payment is planned (Fixed) or everyday (Fuel); money for goals moves by pouring, not by paying.
-                listOf(Bucket.FIXED, Bucket.FUEL).forEach { b -> Chip(bucketName(b), t.bucket == b, { scope.launch { repo.setBucket(id, b) } }, accent = c.bucket(b)) }
+                listOf(Bucket.FIXED, Bucket.FUEL).forEach { b -> Chip(bucketName(b), t.bucket == b, { com.ruvo.data.RuvoGraph.appScope.launch { repo.setBucket(id, b) } }, accent = c.bucket(b)) }
             }
             Spacer(Modifier.height(Space.md))
             RuvoCard {
@@ -827,9 +839,9 @@ fun TxnSheet(id: String, startWithSplit: Boolean, onDismiss: () -> Unit) {
                     com.ruvo.design.SplitEditor(t.amount, item.shares.map { it.person to it.amount }) { owed = it }
                     Spacer(Modifier.height(Space.sm))
                     Row(horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
-                        if (t.othersShare > 0) GhostButton("Not shared", { scope.launch { repo.unsplit(id) }; splitOpen = false; splitSaved = "Saved · not shared any more" }, Modifier.weight(1f))
+                        if (t.othersShare > 0) GhostButton("Not shared", { com.ruvo.data.RuvoGraph.appScope.launch { repo.unsplit(id) }; splitOpen = false; splitSaved = "Saved · not shared any more" }, Modifier.weight(1f))
                         PrimaryButton("Save split", {
-                            scope.launch { repo.splitByAmounts(id, owed) }
+                            com.ruvo.data.RuvoGraph.appScope.launch { repo.splitByAmounts(id, owed) }
                             splitOpen = false
                             val names = owed.map { it.first }.let { if (it.size <= 2) it.joinToString(" and ") else "${it.size} friends" }
                             splitSaved = "Saved · $names ${if (owed.size == 1) "owes" else "owe"} you ${IndianFormat.rupees(owed.sumOf { it.second })}"
@@ -840,11 +852,11 @@ fun TxnSheet(id: String, startWithSplit: Boolean, onDismiss: () -> Unit) {
         }
         Spacer(Modifier.height(Space.lg))
         Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
-            if (t.status == TxnStatus.IGNORED) GhostButton("Count it again", { scope.launch { repo.restore(id) } }, Modifier.weight(1f))
+            if (t.status == TxnStatus.IGNORED) GhostButton("Count it again", { com.ruvo.data.RuvoGraph.appScope.launch { repo.restore(id) } }, Modifier.weight(1f))
             else GhostButton("Ignore", { RuvoGraph.appScope.launch { repo.ignore(id) }; onDismiss() }, Modifier.weight(1f))
             PrimaryButton("Done", {
-                if (name != t.merchant && name.isNotBlank()) scope.launch { repo.recategorise(id, name, t.category) }
-                if (t.status == TxnStatus.TO_SORT) scope.launch { repo.confirm(id) }
+                if (name != t.merchant && name.isNotBlank()) com.ruvo.data.RuvoGraph.appScope.launch { repo.recategorise(id, name, t.category) }
+                if (t.status == TxnStatus.TO_SORT) com.ruvo.data.RuvoGraph.appScope.launch { repo.confirm(id) }
                 onDismiss()
             }, Modifier.weight(1f))
         }

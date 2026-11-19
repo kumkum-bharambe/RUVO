@@ -160,7 +160,7 @@ fun BookReader(bookId: String, onClose: () -> Unit, onApply: (Library.Apply) -> 
     }
 
     fun finish(apply: Library.Apply?) {
-        scope.launch { RuvoGraph.repository.markBookRead(book.id) }
+        com.ruvo.data.RuvoGraph.appScope.launch { RuvoGraph.repository.markBookRead(book.id) }
         Haptics.confirm(view)
         onClose()
         if (apply != null) onApply(apply)
@@ -234,7 +234,7 @@ fun BookReader(bookId: String, onClose: () -> Unit, onApply: (Library.Apply) -> 
                         is BookPage.Words -> {
                             val key = "${book.id}:${p.idea}"
                             WordsPage(book, p, read = book.id in state.settings.readBooks, glossary = !hindi, tr = tr, onTerm = { term = it }, saved = key in state.settings.savedIdeas) {
-                                scope.launch { RuvoGraph.repository.toggleIdea(key); Haptics.tick(view) }
+                                com.ruvo.data.RuvoGraph.appScope.launch { RuvoGraph.repository.toggleIdea(key); Haptics.tick(view) }
                             }
                         }
                         is BookPage.Fact -> NotePage(fact = true, text = p.text, glossary = !hindi, tr = tr, onTerm = { term = it })

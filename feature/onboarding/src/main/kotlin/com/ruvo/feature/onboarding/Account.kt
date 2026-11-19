@@ -96,7 +96,7 @@ fun CreateAccountScreen(suggestedName: String = "") {
         } else if (pin == first) {
             saving = true
             Haptics.confirm(view)
-            scope.launch { RuvoGraph.repository.createAccount(name, phone, pin) }
+            com.ruvo.data.RuvoGraph.appScope.launch { RuvoGraph.repository.createAccount(name, phone, pin) }
         } else {
             mismatch = true; shake++; pin = ""; first = ""; step = 1
         }
@@ -222,7 +222,7 @@ fun SignInScreen(settings: UserSettings) {
                 Spacer(Modifier.height(Space.sm))
                 Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
                     GhostButton("Keep trying", { forgot = false }, Modifier.weight(1f))
-                    AccentButton("Reset Ruvo", { scope.launch { RuvoGraph.repository.deleteEverything() } }, Modifier.weight(1f), accent = c.warning)
+                    AccentButton("Reset Ruvo", { com.ruvo.data.RuvoGraph.appScope.launch { RuvoGraph.repository.deleteEverything() } }, Modifier.weight(1f), accent = c.warning)
                 }
             }
         }

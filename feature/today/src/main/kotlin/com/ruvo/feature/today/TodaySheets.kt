@@ -91,7 +91,7 @@ fun WhySheet(onDismiss: () -> Unit) {
         Spacer(Modifier.height(Space.xs))
         FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.xs), verticalArrangement = Arrangement.spacedBy(Space.xs)) {
             listOf(SpendBasis.AUTO to "Let Ruvo choose", SpendBasis.HISTORY to "My history", SpendBasis.PLAN to "My plan").forEach { (b, label) ->
-                Chip(label, state.settings.spendBasis == b, { scope.launch { RuvoGraph.repository.setSpendBasis(b) } })
+                Chip(label, state.settings.spendBasis == b, { com.ruvo.data.RuvoGraph.appScope.launch { RuvoGraph.repository.setSpendBasis(b) } })
             }
         }
         Spacer(Modifier.height(Space.lg))

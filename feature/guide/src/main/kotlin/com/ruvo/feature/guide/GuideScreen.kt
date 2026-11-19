@@ -55,6 +55,7 @@ import com.ruvo.design.Radius
 import com.ruvo.design.Ruvo
 import com.ruvo.design.RuvoCard
 import com.ruvo.design.RuvoIcons
+import com.ruvo.design.tourTarget
 import com.ruvo.design.SectionTitle
 import com.ruvo.design.Space
 import com.ruvo.design.Tag
@@ -93,7 +94,7 @@ fun GuideScreen(a: GuideActions) {
             Spacer(Modifier.height(Space.xs))
 
             // Hero: what the Guide is, and how far you have read, on white glass with a shelf of bright spines.
-            RuvoCard(Modifier.fillMaxWidth().reveal(1), padding = PaddingValues(Space.lg)) {
+            RuvoCard(Modifier.fillMaxWidth().tourTarget("books").reveal(1), padding = PaddingValues(Space.lg)) {
                 Row(verticalAlignment = Alignment.Top) {
                     Text(
                         "Understand your money. One small idea at a time.",
@@ -122,7 +123,7 @@ fun GuideScreen(a: GuideActions) {
 
             // The same Marketplace tile as in Profile, kept near the top so it is easy to find.
             Spacer(Modifier.height(Space.md))
-            com.ruvo.design.BigTile("Marketplace", MARKETPLACE_LINE, RuvoIcons.Store, Modifier.reveal(2), onClick = a.openMarketplace)
+            com.ruvo.design.BigTile("Marketplace", MARKETPLACE_LINE, RuvoIcons.Store, Modifier.tourTarget("market").reveal(2), onClick = a.openMarketplace)
 
             // New this week: the first unread fresh book, highlighted with a slow glow.
             val fresh = Library.shelf(Library.Shelf.NEW)

@@ -504,7 +504,7 @@ fun PersonaPicker(onDismiss: () -> Unit, onPicked: () -> Unit) {
         DemoPersonas.all(today).forEach { p ->
             val r = RunwayEngine.calculate(p.input)
             RuvoCard(Modifier.fillMaxWidth().padding(bottom = Space.sm), onClick = {
-                scope.launch { RuvoGraph.repository.loadPersona(p.id); onPicked() }
+                com.ruvo.data.RuvoGraph.appScope.launch { RuvoGraph.repository.loadPersona(p.id); onPicked() }
             }, onClickLabel = "Use ${p.name}") {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {

@@ -102,7 +102,7 @@ fun MarketplaceSheet(onDismiss: () -> Unit) {
     var open by rememberSaveable { mutableStateOf<String?>(null) }
     val listed = Perks.listed(today)
     val shown = listed.filter { kind == "All" || it.id in saved }
-    val toggle: (String) -> Unit = { id -> scope.launch { RuvoGraph.repository.toggleOffer(id) }; Haptics.tick(view) }
+    val toggle: (String) -> Unit = { id -> com.ruvo.data.RuvoGraph.appScope.launch { RuvoGraph.repository.toggleOffer(id) }; Haptics.tick(view) }
 
     RuvoSheet("Marketplace", onDismiss, eyebrow = "Student offers") {
         // The Marketplace is yellow wherever it appears, in both moods, with navy text.

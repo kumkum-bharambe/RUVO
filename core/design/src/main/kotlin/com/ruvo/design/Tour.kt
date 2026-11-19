@@ -57,8 +57,9 @@ object TourTargets {
 /** Marks a part of the screen the first-run tour can point at. */
 fun Modifier.tourTarget(id: String): Modifier = onGloballyPositioned { TourTargets.bounds[id] = it.boundsInWindow() }
 
-/** One stop on the tour: the part it lights up (null for a card in the middle), a title and one or two lines. */
-data class TourStep(val target: String?, val title: String, val body: String)
+/** One stop on the tour: the part it lights up (null for a card in the middle), a title, one or two lines, and the tab it
+ * is on (by name, e.g. "MONEY"), so the tour can walk through the whole app. */
+data class TourStep(val target: String?, val title: String, val body: String, val tab: String? = null)
 
 /**
  * The first-run tour, shown once after setup, like a design app's welcome walkthrough: the screen dims, one part
@@ -71,6 +72,8 @@ fun TourOverlay(
     steps: List<TourStep>,
     onFinish: (completed: Boolean) -> Unit,
     finalAction: Pair<String, () -> Unit>? = null,
+    /** Called as each step opens, so the app can switch to the tab that step is about. */
+    onStep: (TourStep) -> Unit = {},
 ) {
     val c = Ruvo.colors
     val density = LocalDensity.current
@@ -78,6 +81,7 @@ fun TourOverlay(
     var index by rememberSaveable { mutableStateOf(0) }
     var origin by remember { mutableStateOf(Offset.Zero) }
     val step = steps[index.coerceIn(0, steps.lastIndex)]
+    androidx.compose.runtime.LaunchedEffect(index) { onStep(step) }
     val pad = with(density) { 8.dp.toPx() }
     val target = step.target?.let { TourTargets.bounds[it] }?.translate(-origin.x, -origin.y)?.inflate(pad)
     // The lit window glides from one part to the next (or jumps, with reduced motion).
@@ -125,7 +129,11 @@ fun TourOverlay(
         ) {
             // Solid, never glass, so whatever is behind it never shows through the words.
             RuvoCard(Modifier.fillMaxWidth(), color = if (c.isDark) c.raised else c.surface, elevated = true) {
-                Text("${index + 1} of ${steps.size}", style = Ruvo.type.caption, color = c.inkSoft)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("${index + 1} of ${steps.size}", Modifier.weight(1f), style = Ruvo.type.caption, color = c.inkSoft)
+                    // Skip stays one tap away on every step.
+                    if (index > 0 && !last) Text("Skip tour", Modifier.clickable { onFinish(false) }.padding(horizontal = 8.dp, vertical = 14.dp), style = Ruvo.type.label, color = c.inkSoft)
+                }
                 Spacer(Modifier.height(Space.xxs))
                 Text(step.title, style = Ruvo.type.title, color = c.ink)
                 Spacer(Modifier.height(Space.xxs))
@@ -140,7 +148,7 @@ fun TourOverlay(
                 Spacer(Modifier.height(Space.sm))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (!last) {
-                        GhostButton("Skip", { onFinish(false) }, Modifier.weight(1f))
+                        GhostButton(if (index == 0) "Skip" else "Back", { if (index == 0) onFinish(false) else index-- }, Modifier.weight(1f))
                         Spacer(Modifier.width(Space.xs))
                         PrimaryButton("Next", { index++ }, Modifier.weight(1f))
                     } else if (finalAction != null) {

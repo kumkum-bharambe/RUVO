@@ -79,6 +79,7 @@ import com.ruvo.design.Ruvo
 import com.ruvo.design.RuvoCard
 import com.ruvo.design.RuvoField
 import com.ruvo.design.RuvoIcons
+import com.ruvo.design.tourTarget
 import com.ruvo.design.RuvoSheet
 import com.ruvo.design.SectionTitle
 import com.ruvo.design.Space
@@ -151,7 +152,7 @@ fun GoalsScreen(startNewGoal: Boolean = false, onNewGoalShown: () -> Unit = {}, 
             }
         }
         item {
-            Column(Modifier.padding(horizontal = Space.gutter), verticalArrangement = Arrangement.spacedBy(Space.sm)) {
+            Column(Modifier.padding(horizontal = Space.gutter).tourTarget("goals"), verticalArrangement = Arrangement.spacedBy(Space.sm)) {
                 // One big card per goal: the picture of what it's for leads, the numbers follow.
                 state.goals.forEachIndexed { i, g ->
                     GoalCard(g, state.goalShapes[g.id] ?: 0, tilt, state.today, state.runway.fuel, Modifier.fillMaxWidth().reveal(i)) { openGoal = g.id }
@@ -265,7 +266,7 @@ private fun GoalCard(g: Goal, shape: Int, tilt: Float, today: LocalDate, fuel: L
                             .background(androidx.compose.ui.graphics.Brush.linearGradient(listOf(c.future.lighten(0.2f), c.future)))
                             .clickable(role = androidx.compose.ui.semantics.Role.Button, onClickLabel = "Add 100 rupees to ${g.name} from Fuel") {
                                 Haptics.confirm(view)
-                                scope.launch { RuvoGraph.repository.pour(g.id, 100_00) }
+                                com.ruvo.data.RuvoGraph.appScope.launch { RuvoGraph.repository.pour(g.id, 100_00) }
                             }
                             .padding(horizontal = 14.dp, vertical = 10.dp),
                         style = Ruvo.type.label, color = c.onLight,
@@ -343,7 +344,7 @@ private fun GoalSheet(id: String, state: AppState, onDismiss: () -> Unit) {
                     val days = if (daily > 0) (paise / daily).toInt() else 0
                     Chip(if (days > 0) "${IndianFormat.rupees(paise)} · ${days}d" else IndianFormat.rupees(paise), false, {
                         Haptics.confirm(view)
-                        scope.launch { RuvoGraph.repository.pour(g.id, paise) }
+                        com.ruvo.data.RuvoGraph.appScope.launch { RuvoGraph.repository.pour(g.id, paise) }
                     }, accent = c.future)
                 }
             }
@@ -354,7 +355,7 @@ private fun GoalSheet(id: String, state: AppState, onDismiss: () -> Unit) {
             PrimaryButton(
                 if (amount > 0) "Pour ${IndianFormat.rupees(amount)}" else "Pour", {
                     Haptics.confirm(view)
-                    scope.launch { RuvoGraph.repository.pour(g.id, amount) }
+                    com.ruvo.data.RuvoGraph.appScope.launch { RuvoGraph.repository.pour(g.id, amount) }
                     custom = ""
                 }, Modifier.fillMaxWidth(), enabled = amount in 1..fuel,
             )
@@ -393,7 +394,7 @@ private fun GoalSheet(id: String, state: AppState, onDismiss: () -> Unit) {
             Spacer(Modifier.height(Space.md))
             Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
                 GhostButton("Keep it protected", { releasing = false; custom = "" }, Modifier.weight(1f))
-                PrimaryButton("Move to Fuel", { scope.launch { RuvoGraph.repository.release(g.id, take) }; releasing = false; custom = "" }, Modifier.weight(1f), enabled = take > 0)
+                PrimaryButton("Move to Fuel", { com.ruvo.data.RuvoGraph.appScope.launch { RuvoGraph.repository.release(g.id, take) }; releasing = false; custom = "" }, Modifier.weight(1f), enabled = take > 0)
             }
         }
     }
@@ -477,7 +478,7 @@ fun NewGoalSheet(onDismiss: () -> Unit) {
         val spanMonths = java.time.temporal.ChronoUnit.MONTHS.between(LocalDate.now().withDayOfMonth(1), by.withDayOfMonth(1)).coerceAtLeast(1)
         if (t > 0) Text("About ${IndianFormat.rupees(t / spanMonths)} a month gets you there by ${IndianFormat.date(by, LocalDate.now())}.", Modifier.padding(bottom = Space.sm), style = Ruvo.type.caption, color = c.inkSoft)
         PrimaryButton("Create goal", {
-            scope.launch {
+            com.ruvo.data.RuvoGraph.appScope.launch {
                 RuvoGraph.repository.addGoal(name.ifBlank { "My goal" }, t, by, parseRupees(monthly) ?: (t / spanMonths), picked?.let { PICKED_SCENE + it.ordinal } ?: 0)
             }
             onDismiss()
