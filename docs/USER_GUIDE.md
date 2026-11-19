@@ -58,8 +58,8 @@ Top to bottom:
 ## Adding a payment
 
 Tap **+** or drag the pet down. Choose **Spent** or **Received**, type the amount, optionally what it was, pick
-**Fixed** or **Fuel**, switch on **Shared with friends?** to split it, then tap a category to save. Your runway
-updates straight away. **+ New category** makes your own. When **Shared with friends?** is on, pick a category and tap **Save split**; a short line confirms who owes you what.
+**Fixed** or **Fuel**, switch on **Shared with friends?** to split it, then pick a category and tap **Save** (the button says what it will save, e.g. "Save · ₹250 in Food"). Your runway
+updates straight away. **+ New category** makes your own. When **Shared with friends?** is on, pick a category and tap **Save split**; a short line confirms who owes you what. To change your balance, open Money and tap the **You have** card; every number follows it.
 
 ## The welcome tour
 

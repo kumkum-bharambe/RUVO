@@ -13,8 +13,8 @@ today.
 | 4 | Tap **Explore with a sample student**, pick **Aarav** | Home with "Good morning/afternoon/evening, Aarav" and a runway in days |
 | 5 | Tap the runway card or **Why N days?** | The sum: You have − Fixed − Future = Fuel, then Fuel ÷ daily spend = days |
 | 6 | On Home, tap **Before you buy**, type 1500 | "Costs N days", runway before → after, and whether you would still make it; **Got it** closes it |
-| 7 | Tap **+**, type 250, tap **Food** | The sheet closes; the runway number drops; the payment is first under **Recent** |
-| 8 | Tap **+**, type 400, switch on **Shared with friends?**, add a friend, save, tap **Food** | Money → **Owed** lists the friend with their share |
+| 7 | Tap **+**, type 250, pick **Food**, tap **Save · ₹250 in Food** | "Saved ₹250 · runway …"; the runway number drops; the payment is first under **Recent** |
+| 8 | Tap **+**, type 400, switch on **Shared with friends?**, add a friend, tap **Save split** | Money → **Owed** lists the friend with their share |
 | 9 | On Owed, tap **They paid** | The person moves out of Waiting; your balance goes up by their share |
 | 10 | Money → Overview, find an **Unpaid** fixed cost, tap it | It turns **Paid**; the Fixed amount on Home drops |
 | 11 | Money → **+ Add a fixed cost**: "Gym", 500, day 10 | It appears in the list; Fixed grows if day 10 is before the next money |
@@ -41,6 +41,8 @@ today.
 | 32 | **+** → 600 → switch on **Shared with friends?** → Friend 1: Rahul → **Save split** | "Split saved · Rahul owes you ₹300"; Owed to you shows ₹300 |
 | 33 | Add ₹12,000 with **Received** | A payday card at the top of Home offering to put money into your goal first |
 | 34 | Profile → Settings → Notifications | Switches for Daily update, New offers and books, Weekly review and Goal moments |
+| 35 | Money → tap **You have** → type 8000 → **Save** | "Balance saved: ₹8,000 · runway …"; Home, the buckets and the daily amount all change |
+| 36 | Settings → **Replay the tour** | 14 short stops across Home, Money, Goals and Guide, switching tabs by itself |
 
 ## Things worth noticing
 

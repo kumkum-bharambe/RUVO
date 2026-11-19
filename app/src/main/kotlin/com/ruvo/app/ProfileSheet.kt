@@ -170,7 +170,7 @@ fun ProfileSheet(
         Row(verticalAlignment = Alignment.CenterVertically) {
             RuvoLogo(size = 26.dp)
             Spacer(Modifier.width(Space.sm))
-            Text("Ruvo 1.1", style = Ruvo.type.caption, color = c.inkFaint)
+            Text("Ruvo 1.2", style = Ruvo.type.caption, color = c.inkFaint)
         }
     }
     if (changingPin) com.ruvo.feature.onboarding.ChangePinSheet { changingPin = false }

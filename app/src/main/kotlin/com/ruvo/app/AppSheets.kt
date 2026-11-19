@@ -360,7 +360,7 @@ fun SettingsSheet(state: AppState, onDismiss: () -> Unit, onPersonas: () -> Unit
         SectionTitle("About Ruvo")
         Text("Your money, without the mental load. Ruvo helps you see what you have, what you can spend, and what matters next.", style = Ruvo.type.body, color = c.inkSoft)
         Spacer(Modifier.height(Space.xs))
-        Text("Ruvo 1.1 · made for students · portfolio build · Marketplace offers are checked by hand and may change", style = Ruvo.type.caption, color = c.inkFaint)
+        Text("Ruvo 1.2 · made for students · portfolio build · Marketplace offers are checked by hand and may change", style = Ruvo.type.caption, color = c.inkFaint)
     }
 }
 
