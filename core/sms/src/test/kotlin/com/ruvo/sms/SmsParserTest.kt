@@ -114,4 +114,53 @@ class SmsParserTest {
         assertEquals(Direction.DEBIT, parser.direction("acct xx234 debited for rs 1,299.00; amazon pay credited."))
         assertEquals(Direction.CREDIT, parser.direction("rs 1500.00 credited to a/c xxxx1234 by a/c linked to vpa"))
     }
+
+    // --- Cards and other money messages ---
+
+    @Test fun `credit card spends are read as spending on the card`() {
+        val p = parse("AX-HDFCBK", "Rs.1,249.00 spent on HDFC Bank Credit Card xx4321 at AMAZON on 2026-10-07:18:22:11. Avl Lmt Rs.48,751. Not you? Call 18002586161")!!
+        assertEquals(rupees(1249), p.amount)
+        assertEquals(Direction.DEBIT, p.direction)
+        assertEquals(Channel.CREDIT_CARD, p.channel)
+        assertEquals("4321", p.accountLast4)
+        assertFalse(p.isCardBillPayment)
+    }
+
+    @Test fun `card issuers that are not banks are known senders`() {
+        val p = parse("JD-AMEXIN", "Alert: You've spent INR 2,100.00 on your AMEX card ** 31005 at ZOMATO on 07 October 2026 at 08:15 PM IST.")
+        assertNotNull(p)
+        assertEquals(rupees(2100), p.amount)
+        assertEquals(Channel.CREDIT_CARD, p.channel)
+        assertNotNull(parser.bankFor("VM-ONECRD"))
+        assertNotNull(parser.bankFor("AD-SLCEIT"))
+    }
+
+    @Test fun `debit card purchases are card spends from the account`() {
+        val p = parse("VM-ICICIT", "INR 560.00 spent using ICICI Bank Debit Card XX9876 on 07-Oct-26 at DMART. Avl Bal INR 12,300.50.")!!
+        assertEquals(rupees(560), p.amount)
+        assertEquals(Direction.DEBIT, p.direction)
+        assertEquals(Channel.DEBIT_CARD, p.channel)
+    }
+
+    @Test fun `paying the card bill from the bank is a transfer, not new spending`() {
+        val p = parse("VM-SBIINB", "Rs 8,500.00 debited from A/c XX1234 on 07-Oct-26 towards Credit Card payment for SBI Card XX4321. Avl Bal Rs 22,000.")!!
+        assertEquals(rupees(8500), p.amount)
+        assertTrue(p.isCardBillPayment)
+    }
+
+    @Test fun `the issuer's payment received note is ignored, because the bank debit already records it`() {
+        assertNull(parse("VM-SBICRD", "Payment of Rs.8,500.00 received towards your SBI Credit Card ending 4321 on 07/10/26. Thank you."))
+    }
+
+    @Test fun `emi and auto debits are read as spending`() {
+        val p = parse("VM-AXISBK", "EMI of INR 1,999.00 debited from A/c XX5678 on 07-10-2026 towards loan 99887766. Avl bal INR 4,550.")!!
+        assertEquals(rupees(1999), p.amount)
+        assertEquals(Direction.DEBIT, p.direction)
+        assertEquals("Bills", p.category)
+    }
+
+    @Test fun `bill reminders and credit limit notices are not transactions`() {
+        assertNull(parse("VM-HDFCBK", "Your HDFC Bank Credit Card xx4321 statement is generated. Total due Rs.12,450. Minimum amount due Rs.620, due by 20-Oct-26."))
+        assertNull(parse("VM-ICICIT", "Good news! Your credit limit on ICICI Bank Credit Card XX9876 is now INR 1,50,000."))
+    }
 }

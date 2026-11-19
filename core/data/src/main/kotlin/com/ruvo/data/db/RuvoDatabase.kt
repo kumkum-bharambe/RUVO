@@ -46,6 +46,12 @@ abstract class RuvoDao {
     @Query("UPDATE split_share SET paid = :paid WHERE id = :id") abstract suspend fun setSharePaid(id: Long, paid: Boolean)
     @Query("SELECT * FROM split_share WHERE id = :id") abstract suspend fun share(id: Long): SplitShareEntity?
 
+    @Query("SELECT * FROM debt ORDER BY dateEpochDay DESC, createdAtMillis DESC") abstract fun debts(): Flow<List<DebtEntity>>
+    @Query("SELECT * FROM debt WHERE id = :id") abstract suspend fun debt(id: String): DebtEntity?
+    @Upsert abstract suspend fun upsertDebt(d: DebtEntity)
+    @Query("DELETE FROM debt WHERE id = :id") abstract suspend fun deleteDebt(id: String)
+    @Query("DELETE FROM debt") abstract suspend fun clearDebts()
+
     @Query("SELECT * FROM merchant_learned") abstract suspend fun learned(): List<MerchantLearnedEntity>
     @Insert(onConflict = OnConflictStrategy.REPLACE) abstract suspend fun learn(m: MerchantLearnedEntity)
 
@@ -61,16 +67,16 @@ abstract class RuvoDao {
 
     @Transaction
     open suspend fun clearAll() {
-        clearTxns(); clearCommitments(); clearGoals(); clearShares(); clearSnapshots(); clearLearned()
+        clearTxns(); clearCommitments(); clearGoals(); clearShares(); clearSnapshots(); clearLearned(); clearDebts()
     }
 }
 
 @Database(
     entities = [
         TxnEntity::class, CommitmentEntity::class, GoalEntity::class, SplitShareEntity::class,
-        MerchantLearnedEntity::class, SnapshotEntity::class,
+        MerchantLearnedEntity::class, SnapshotEntity::class, DebtEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = false,
 )
 abstract class RuvoDatabase : RoomDatabase() {
@@ -83,8 +89,20 @@ abstract class RuvoDatabase : RoomDatabase() {
             val passphrase = KeystorePassphrase.get(context)
             return Room.databaseBuilder(context, RuvoDatabase::class.java, "ruvo.db")
                 .openHelperFactory(SupportOpenHelperFactory(passphrase))
+                // Upgrades keep everything already saved; only a version with no upgrade path falls back to a fresh start.
+                .addMigrations(MIGRATION_1_2)
                 .fallbackToDestructiveMigration()
                 .build()
+        }
+
+        /** Version 2 adds the "You owe" table. Nothing else changes, so existing data is kept as it is. */
+        val MIGRATION_1_2 = object : androidx.room.migration.Migration(1, 2) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `debt` (`id` TEXT NOT NULL, `person` TEXT NOT NULL, `amount` INTEGER NOT NULL, " +
+                        "`note` TEXT NOT NULL, `dateEpochDay` INTEGER NOT NULL, `paidEpochDay` INTEGER, `createdAtMillis` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+                )
+            }
         }
 
         /** Unencrypted in-memory database for tests. */

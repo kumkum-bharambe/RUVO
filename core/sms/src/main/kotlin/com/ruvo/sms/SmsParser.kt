@@ -10,7 +10,7 @@ import java.util.Locale
 
 data class SmsMessage(val sender: String, val body: String, val receivedAt: LocalDateTime)
 
-enum class Channel { UPI, CARD, NEFT, IMPS, ATM, OTHER }
+enum class Channel { UPI, CREDIT_CARD, DEBIT_CARD, CARD, NEFT, IMPS, ATM, OTHER }
 
 data class ParsedTxn(
     val amount: Paise,
@@ -28,6 +28,8 @@ data class ParsedTxn(
     val receivedAt: LocalDateTime,
     /** Money coming back for an earlier purchase. Not income and not spending. */
     val isRefund: Boolean = false,
+    /** The bank paying a credit card bill. The card spends were already counted, so this is a transfer. */
+    val isCardBillPayment: Boolean = false,
 )
 
 /**
@@ -58,13 +60,25 @@ class SmsParser(
             else -> MerchantDictionary.Entry("Payment", "Other")
         }
         val category = if (direction == Direction.CREDIT && entry.category == "Other") "Income" else entry.category
-        val channel = channel(lower)
+        val channel = channel(lower, bank)
+        val billPayment = direction == Direction.DEBIT && CARD_BILL.any { it.containsMatchIn(lower) }
+        // EMIs and standing instructions read as bills, so they land in the right category.
+        val autoDebit = direction == Direction.DEBIT && AUTO_DEBIT.containsMatchIn(lower)
         return ParsedTxn(
             amount = amount,
             direction = direction,
             rawCounterparty = raw ?: "",
-            merchant = if (channel == Channel.ATM) "ATM cash" else entry.name,
-            category = if (channel == Channel.ATM) "Cash" else category,
+            merchant = when {
+                billPayment -> "Credit card bill"
+                channel == Channel.ATM -> "ATM cash"
+                autoDebit && raw == null -> if (lower.contains("emi")) "EMI" else "Auto debit"
+                else -> entry.name
+            },
+            category = when {
+                billPayment || autoDebit -> "Bills"
+                channel == Channel.ATM -> "Cash"
+                else -> category
+            },
             date = date(body) ?: msg.receivedAt.toLocalDate(),
             reference = reference(body),
             accountLast4 = account(body),
@@ -73,6 +87,7 @@ class SmsParser(
             balanceAfter = balance(body),
             receivedAt = msg.receivedAt,
             isRefund = direction == Direction.CREDIT && Regex("\\brefund").containsMatchIn(lower),
+            isCardBillPayment = billPayment,
         )
     }
 
@@ -133,9 +148,11 @@ class SmsParser(
 
     internal fun account(body: String): String? = ACCOUNT.find(body)?.groupValues?.get(1)?.takeLast(4)
 
-    internal fun channel(lower: String): Channel = when {
+    internal fun channel(lower: String, bank: String? = null): Channel = when {
         lower.contains("upi") || Regex("[a-z0-9.\\-_]+@[a-z]{2,}").containsMatchIn(lower) -> Channel.UPI
         lower.contains("atm") || lower.contains("cash withdrawal") || lower.contains("withdrawn") -> Channel.ATM
+        lower.contains("credit card") || (lower.contains("card") && bank in CARD_ISSUERS) -> Channel.CREDIT_CARD
+        lower.contains("debit card") -> Channel.DEBIT_CARD
         lower.contains("card") -> Channel.CARD
         lower.contains("neft") -> Channel.NEFT
         lower.contains("imps") -> Channel.IMPS
@@ -191,7 +208,25 @@ class SmsParser(
             "IPBMSG" to "India Post Payments Bank",
             "INDUSB" to "IndusInd Bank",
             "AUBANK" to "AU Small Finance Bank",
+            // More banks, and card issuers that send their own alerts.
+            "RBLBNK" to "RBL Bank", "RBLCRD" to "RBL Bank",
+            "HSBCIN" to "HSBC", "SCBANK" to "Standard Chartered", "DBSBNK" to "DBS Bank",
+            "IDBIBK" to "IDBI Bank", "CENTBK" to "Central Bank of India", "IOBCHN" to "Indian Overseas Bank",
+            "UCOBNK" to "UCO Bank", "MAHABK" to "Bank of Maharashtra", "SIBSMS" to "South Indian Bank", "KVBANK" to "Karur Vysya Bank",
+            "AMEXIN" to "American Express", "ONECRD" to "OneCard", "SLCEIT" to "slice", "BOBCRD" to "BOBCARD",
         )
+
+        /** Issuers whose alerts are always about a credit card, even when the message just says "card". */
+        val CARD_ISSUERS = setOf("SBI Card", "American Express", "OneCard", "slice", "BOBCARD")
+
+        /** The bank paying a credit card bill: a transfer, since each card spend was counted when it happened. */
+        private val CARD_BILL = listOf(
+            Regex("towards (your )?credit card"), Regex("credit card (bill|payment|dues)"), Regex("\\bcc (bill|payment)\\b"),
+            Regex("card (bill|payment) (for|of)"),
+        )
+
+        /** EMIs, loan instalments and standing instructions taken from the account. */
+        private val AUTO_DEBIT = Regex("\\bemi\\b|\\bnach\\b|\\bach[- ]?d|\\bauto[- ]?debit|standing instruction|\\bsi\\b.*\\bdebited|towards loan")
 
         private val BODY_BANKS = linkedMapOf(
             "hdfc" to "HDFC Bank", "icici" to "ICICI Bank", "axis" to "Axis Bank", "kotak" to "Kotak Bank",
@@ -206,6 +241,9 @@ class SmsParser(
             Regex("collect request"), Regex("has requested"), Regex("requested money"), Regex("payment request"),
             Regex("\\b(declined|failed|unsuccessful|reversed? due)\\b"), Regex("minimum amount due"), Regex("statement (is|for)"),
             Regex("\\bget\\b.*\\bcashback\\b"), Regex("\\bupto\\b.*\\boff\\b"), Regex("\\bclick\\b.*\\b(apply|claim)\\b"),
+            // A card issuer's "payment received" note: the bank's debit for the same bill is already recorded.
+            Regex("received towards your .*card"), Regex("payment (of .{1,20})?received .*card"),
+            Regex("credit limit"), Regex("\\btotal (amount )?due\\b"),
         )
 
         private val DEBIT_WORDS = listOf(

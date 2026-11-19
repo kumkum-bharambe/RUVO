@@ -1,6 +1,7 @@
 package com.ruvo.data
 
 import com.ruvo.data.db.CommitmentEntity
+import com.ruvo.data.db.DebtEntity
 import com.ruvo.data.db.GoalEntity
 import com.ruvo.data.db.MerchantLearnedEntity
 import com.ruvo.data.db.RuvoDao
@@ -48,6 +49,12 @@ data class ActivityItem(
 
 data class OwedItem(val shareId: Long, val person: String, val amount: Paise, val merchant: String, val date: LocalDate)
 
+/** Money you owe a friend who paid for you. Set aside like a bill until you pay it back. */
+data class DebtItem(val id: String, val person: String, val amount: Paise, val note: String, val date: LocalDate)
+
+/** Debts reach the runway as one-off commitments with this id prefix, so they sit in Fixed until paid back. */
+const val DEBT_PREFIX = "owe-"
+
 /** Everything the screens need, recalculated whenever any stored value changes. */
 data class AppState(
     val ready: Boolean,
@@ -62,8 +69,11 @@ data class AppState(
     val commitments: List<Commitment>,
     val owed: List<OwedItem>,
     val persona: Persona?,
+    /** What you owe friends, not yet paid back. */
+    val debts: List<DebtItem> = emptyList(),
 ) {
     val owedToYou: Paise get() = owed.sumOf { it.amount }
+    val youOwe: Paise get() = debts.sumOf { it.amount }
     val isDemo: Boolean get() = settings.demoPersona != null
     /** The name to greet with, capitalised however it was typed ("kumkum" shows as "Kumkum"). */
     val displayName: String get() = persona?.name ?: settings.name.trim().split(" ").filter { it.isNotEmpty() }.joinToString(" ") { w -> w.replaceFirstChar { it.uppercase() } }.ifBlank { "there" }
@@ -109,11 +119,12 @@ class RuvoRepository(
     val state: StateFlow<AppState> = combine(
         settingsStore.settings, dao.txns(), dao.commitments(), dao.goals(), dao.shares(),
     ) { s, txns, commitments, goals, shares -> listOf(s, txns, commitments, goals, shares) }
+        .combine(dao.debts()) { parts, debts -> parts + listOf(debts) }
         .combine(todayFlow) { parts, today ->
             @Suppress("UNCHECKED_CAST")
             build(
                 parts[0] as UserSettings, parts[1] as List<TxnEntity>, parts[2] as List<CommitmentEntity>,
-                parts[3] as List<GoalEntity>, parts[4] as List<SplitShareEntity>, today,
+                parts[3] as List<GoalEntity>, parts[4] as List<SplitShareEntity>, today, parts[5] as List<DebtEntity>,
             )
         }
         .stateIn(scope, SharingStarted.Eagerly, AppState.empty(LocalDate.now(zone)))
@@ -125,6 +136,7 @@ class RuvoRepository(
         goalRows: List<GoalEntity>,
         shareRows: List<SplitShareEntity>,
         today: LocalDate,
+        debtRows: List<DebtEntity> = emptyList(),
     ): AppState {
         val sharesByTxn = shareRows.groupBy { it.txnId }
         val txns = txnRows.map { it.toEngine(sharesByTxn[it.id]) }
@@ -134,7 +146,10 @@ class RuvoRepository(
         val commitments = commitmentRows.map { it.toEngine() }
         val goals = goalRows.map { it.toEngine() }
         val income = IncomePlan(s.cadence, s.expectedIncome, s.nextIncomeEpochDay?.let(LocalDate::ofEpochDay), s.cycleDays)
-        val input = RunwayInput(today, balance, income, commitments, goals, txns, s.spendBasis)
+        val debts = debtRows.filter { it.paidEpochDay == null }.map { DebtItem(it.id, it.person, it.amount, it.note, LocalDate.ofEpochDay(it.dateEpochDay)) }
+        // What you owe friends is promised money: it sits in Fixed, due today, until you pay it back.
+        val owing = debts.map { Commitment(DEBT_PREFIX + it.id, "Pay back ${it.person}", it.amount, dueDate = today, recurring = false) }
+        val input = RunwayInput(today, balance, income, commitments + owing, goals, txns, s.spendBasis)
         val result = RunwayEngine.calculate(input)
         val activity = txnRows.zip(txns).map { (row, t) ->
             ActivityItem(t, runCatching { Source.valueOf(row.source) }.getOrDefault(Source.MANUAL), sharesByTxn[row.id].orEmpty(), row.note)
@@ -148,7 +163,7 @@ class RuvoRepository(
             ready = true, settings = s, today = today, input = input, runway = result,
             activity = activity, toSort = activity.filter { it.txn.status == TxnStatus.TO_SORT },
             goals = goals, goalShapes = goalRows.associate { it.id to it.jarShape },
-            commitments = commitments, owed = owed, persona = persona,
+            commitments = commitments, owed = owed, persona = persona, debts = debts,
         )
     }
 
@@ -193,16 +208,20 @@ class RuvoRepository(
             if (dup) continue
             val entry = if (p.rawCounterparty.isNotEmpty()) dict.resolve(p.rawCounterparty) else MerchantDictionary.Entry(p.merchant, p.category)
             val kind = when {
-                p.isRefund -> TxnKind.TRANSFER
+                p.isRefund || p.isCardBillPayment -> TxnKind.TRANSFER
                 p.direction == Direction.CREDIT -> TxnKind.INCOME
                 else -> TxnKind.SPEND
             }
             val row = TxnEntity(
                 id = newId(), amount = p.amount, direction = p.direction.name, dateEpochDay = p.date.toEpochDay(),
-                kind = kind.name, bucket = Bucket.FUEL.name, status = TxnStatus.TO_SORT.name,
-                category = if (entry.category == "Other") p.category else entry.category,
-                merchant = if (entry.category == "Other") p.merchant else entry.name,
+                kind = kind.name, bucket = Bucket.FUEL.name,
+                // A card bill paid from the bank: each card spend already counted when it happened, so this one is
+                // kept for the record but not counted again. "Count it again" brings it back if needed.
+                status = (if (p.isCardBillPayment) TxnStatus.IGNORED else TxnStatus.TO_SORT).name,
+                category = if (p.isCardBillPayment || entry.category == "Other") p.category else entry.category,
+                merchant = if (p.isCardBillPayment || entry.category == "Other") p.merchant else entry.name,
                 source = Source.SMS.name, rawCounterparty = p.rawCounterparty, reference = p.reference,
+                note = if (p.isCardBillPayment) "Card bill paid. Your card spends were already counted when you made them." else "",
                 // The SMS time, not now: messages from before the balance was entered must not move it.
                 createdAtMillis = received,
             )
@@ -267,6 +286,24 @@ class RuvoRepository(
             .let { id -> edit(id) { it.copy(kind = TxnKind.SETTLEMENT.name) } }
     }
 
+    // --- You owe ---
+
+    /** A friend paid for you: what you owe them, set aside in Fixed until you pay it back. */
+    suspend fun addDebt(person: String, amount: Paise, note: String) {
+        if (amount <= 0 || person.isBlank()) return
+        dao.upsertDebt(DebtEntity(newId(), person.trim(), amount, note.trim(), todayFlow.value.toEpochDay(), null, clock()))
+    }
+
+    /** You paid a friend back: the debt is settled and the money leaves as a Fixed payment, so the runway does not drop twice. */
+    suspend fun payBack(debtId: String) {
+        val d = dao.debt(debtId) ?: return
+        if (d.paidEpochDay != null) return
+        dao.upsertDebt(d.copy(paidEpochDay = todayFlow.value.toEpochDay()))
+        addManual(d.amount, "Paid back ${d.person}", "Paid back", Bucket.FIXED, note = d.note)
+    }
+
+    suspend fun deleteDebt(debtId: String) = dao.deleteDebt(debtId)
+
     fun upiLink(amount: Paise, note: String): String? {
         val vpa = state.value.settings.upiVpa.ifBlank { return null }
         return Splits.upiLink(vpa, state.value.displayName, amount, note)
@@ -314,6 +351,8 @@ class RuvoRepository(
 
     /** Records paying a commitment: a Fixed-bucket spend, and the commitment is marked paid. */
     suspend fun payCommitment(c: Commitment) {
+        // "Pay back Priya" in Fixed is a debt, not a bill: settle it as one.
+        if (c.id.startsWith(DEBT_PREFIX)) return payBack(c.id.removePrefix(DEBT_PREFIX))
         val today = todayFlow.value
         val id = addManual(c.amount, c.name, "Bills", Bucket.FIXED)
         edit(id) { it.copy(kind = TxnKind.SPEND.name) }

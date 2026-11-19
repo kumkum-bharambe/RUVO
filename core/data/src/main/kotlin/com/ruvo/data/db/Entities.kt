@@ -81,3 +81,20 @@ data class SnapshotEntity(
     val bufferDays: Int?,
     val fuel: Long,
 )
+
+/**
+ * Money you owe a friend: they paid for you and you will pay them back. Until it is paid back it is set aside like a
+ * bill, so the runway stays honest. Added in database version 2.
+ */
+@Entity(tableName = "debt")
+data class DebtEntity(
+    @PrimaryKey val id: String,
+    val person: String,
+    val amount: Long,
+    /** What it was for, e.g. "Dinner". */
+    val note: String,
+    val dateEpochDay: Long,
+    /** When it was paid back; null while you still owe it. */
+    val paidEpochDay: Long?,
+    val createdAtMillis: Long,
+)

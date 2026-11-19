@@ -47,7 +47,8 @@ class SmsReceiver : BroadcastReceiver() {
                 }
                 val parsed = joined.mapNotNull(parser::parse)
                 val added = RuvoGraph.repository.importSms(parsed)
-                added.forEach { SpendNotifier.show(context, it) }
+                // "New payment to confirm", respecting the switch in Settings. Card bills already counted stay quiet.
+                if (s.notifyCapture) added.filter { it.status != "IGNORED" }.forEach { SpendNotifier.show(context, it) }
             } finally {
                 pending.finish()
             }
@@ -125,7 +126,7 @@ object SpendNotifier {
         val n = NotificationCompat.Builder(context, CHANNEL)
             .setSmallIcon(android.R.drawable.stat_notify_more)
             .setContentTitle("$sign${IndianFormat.rupees(t.amount)} ${t.merchant}")
-            .setContentText(if (t.direction == "CREDIT") "Money in. Your runway updated." else "Fuel · waiting in your weekly sort")
+            .setContentText(if (t.direction == "CREDIT") "Money in. Your runway updated." else "New payment to confirm · tap to sort it")
             .setContentIntent(pi(null, t.id.hashCode()))
             .addAction(0, "Shared?", pi(ACTION_SPLIT, t.id.hashCode() + 1))
             .setAutoCancel(true)

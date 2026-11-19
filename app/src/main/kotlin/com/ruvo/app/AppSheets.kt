@@ -78,6 +78,7 @@ fun QuickAddSheet(onDismiss: () -> Unit) {
     var moneyIn by remember { mutableStateOf(false) }
     var bucket by remember { mutableStateOf(Bucket.FUEL) }
     var sharing by remember { mutableStateOf(false) }
+    var splitCategory by remember { mutableStateOf("Food") }
     var owed by remember { mutableStateOf<List<Pair<String, Long>>>(emptyList()) }
     var making by remember { mutableStateOf(false) }
     var newCategory by remember { mutableStateOf("") }
@@ -91,8 +92,14 @@ fun QuickAddSheet(onDismiss: () -> Unit) {
         // which would otherwise cancel the split before it was written (that is why splits went missing from Owed).
         val amountNow = paise; val label = what.ifBlank { category }; val incoming = moneyIn; val bucketNow = bucket
         val shares = if (!incoming && sharing) owed.filter { it.second > 0 } else emptyList()
-        // A short "Saved ₹250 · runway 24 → 23 days" line confirms it (shown by the app shell, read out by TalkBack).
-        com.ruvo.data.Notices.post(com.ruvo.data.Notices.Notice.Saved(amountNow, incoming, RuvoGraph.repository.state.value.runway.runwayDays))
+        // A short line confirms it (shown by the app shell, read out by TalkBack): "Saved ₹250 · runway 24 → 23 days",
+        // or for a split, who owes you what.
+        if (shares.isNotEmpty()) {
+            val names = shares.map { it.first }.let { if (it.size <= 2) it.joinToString(" and ") else "${it.size} friends" }
+            com.ruvo.data.Notices.post(com.ruvo.data.Notices.Notice.Text("Split saved · $names owe you ${IndianFormat.rupees(shares.sumOf { it.second })}"))
+        } else {
+            com.ruvo.data.Notices.post(com.ruvo.data.Notices.Notice.Saved(amountNow, incoming, RuvoGraph.repository.state.value.runway.runwayDays))
+        }
         RuvoGraph.appScope.launch {
             val id = RuvoGraph.repository.addManual(
                 amountNow, label, if (incoming) "Income" else category,
@@ -133,15 +140,19 @@ fun QuickAddSheet(onDismiss: () -> Unit) {
                 Text("Shared with friends?", Modifier.weight(1f), style = Ruvo.type.bodyStrong, color = c.ink)
                 androidx.compose.material3.Switch(sharing, { sharing = it }, enabled = paise > 0)
             }
-            if (sharing && paise > 0) {
+            val splitting = sharing && paise > 0
+            if (splitting) {
                 Spacer(Modifier.height(Space.xs))
                 com.ruvo.design.SplitEditor(paise, emptyList()) { owed = it }
             }
             Spacer(Modifier.height(Space.md))
-            Eyebrow("Tap a category to save")
+            // Splitting takes a few steps, so it ends with its own Save button; a plain spend saves on one tap.
+            Eyebrow(if (splitting) "Pick a category" else "Tap a category to save")
             Spacer(Modifier.height(Space.xs))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.xs), verticalArrangement = Arrangement.spacedBy(Space.xs)) {
-                (quick + state.settings.customCategories.sorted()).forEach { cat -> Chip(cat, false, { save(cat) }) }
+                (quick + state.settings.customCategories.sorted()).forEach { cat ->
+                    Chip(cat, splitting && splitCategory == cat, { if (splitting) splitCategory = cat else save(cat) })
+                }
                 Chip(if (making) "Cancel" else "+ New category", making, { making = !making })
             }
             // Their own category: name it once, and it is offered every time from now on.
@@ -157,6 +168,15 @@ fun QuickAddSheet(onDismiss: () -> Unit) {
                         save(n)
                     },
                     Modifier.fillMaxWidth(), enabled = paise > 0 && newCategory.isNotBlank(),
+                )
+            }
+            if (splitting) {
+                val friends = owed.filter { it.second > 0 }
+                Spacer(Modifier.height(Space.md))
+                PrimaryButton(
+                    if (friends.isEmpty()) "Add a friend's name to save" else "Save split · your part ${IndianFormat.rupees(paise - friends.sumOf { it.second })}",
+                    { save(splitCategory) },
+                    Modifier.fillMaxWidth(), enabled = friends.isNotEmpty(),
                 )
             }
         }
