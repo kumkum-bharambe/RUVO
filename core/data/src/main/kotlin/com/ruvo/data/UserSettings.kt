@@ -73,6 +73,14 @@ data class UserSettings(
     val seenTips: Set<String> = emptySet(),
     /** Money-in transactions whose payday card was already shown or dismissed. */
     val paydaysSeen: Set<String> = emptySet(),
+    /** The morning update notification, and new offers and books. Each can be switched off. */
+    val notifyDaily: Boolean = true,
+    val notifyNews: Boolean = true,
+    /** Offers and books the student has already been told about, so only new ones are announced. */
+    val seenOffers: Set<String> = emptySet(),
+    val seenBooks: Set<String> = emptySet(),
+    /** True once the offers and books in the installed app were marked as seen, so a first install announces nothing. */
+    val newsBaseline: Boolean = false,
 ) {
     val hasAccount: Boolean get() = pinHash.isNotEmpty()
 
@@ -121,6 +129,11 @@ class SettingsStore(private val context: Context) {
         val pinPaused = longPreferencesKey("pin_paused_until")
         val tips = stringSetPreferencesKey("seen_tips")
         val paydays = stringSetPreferencesKey("paydays_seen")
+        val nDaily = booleanPreferencesKey("notify_daily")
+        val nNews = booleanPreferencesKey("notify_news")
+        val seenOffers = stringSetPreferencesKey("seen_offers")
+        val seenBooks = stringSetPreferencesKey("seen_books")
+        val baseline = booleanPreferencesKey("news_baseline")
     }
 
     val settings: Flow<UserSettings> = context.store.data.map { readFrom(it) }
@@ -164,6 +177,11 @@ class SettingsStore(private val context: Context) {
             p[K.pinPaused] = s.pinPausedUntil
             p[K.tips] = s.seenTips
             p[K.paydays] = s.paydaysSeen
+            p[K.nDaily] = s.notifyDaily
+            p[K.nNews] = s.notifyNews
+            p[K.seenOffers] = s.seenOffers
+            p[K.seenBooks] = s.seenBooks
+            p[K.baseline] = s.newsBaseline
         }
     }
 
@@ -202,5 +220,10 @@ class SettingsStore(private val context: Context) {
         pinPausedUntil = p[K.pinPaused] ?: 0,
         seenTips = p[K.tips] ?: emptySet(),
         paydaysSeen = p[K.paydays] ?: emptySet(),
+        notifyDaily = p[K.nDaily] ?: true,
+        notifyNews = p[K.nNews] ?: true,
+        seenOffers = p[K.seenOffers] ?: emptySet(),
+        seenBooks = p[K.seenBooks] ?: emptySet(),
+        newsBaseline = p[K.baseline] ?: false,
     )
 }

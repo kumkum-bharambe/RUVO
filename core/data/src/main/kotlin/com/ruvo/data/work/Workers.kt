@@ -43,7 +43,7 @@ class WeeklySortWorker(context: Context, params: WorkerParameters) : CoroutineWo
         RuvoGraph.init(applicationContext)
         val state = RuvoGraph.repository.state.first { it.ready }
         val count = state.toSort.size
-        if (count == 0) return Result.success()
+        if (count == 0 || !state.settings.notifyWeekly) return Result.success()
         if (Build.VERSION.SDK_INT >= 33 &&
             ContextCompat.checkSelfPermission(applicationContext, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) return Result.success()
@@ -70,6 +70,72 @@ class WeeklySortWorker(context: Context, params: WorkerParameters) : CoroutineWo
     }
 }
 
+/**
+ * Every morning at 9: new student offers and new Guide books (only ones not announced before), then the daily update
+ * with the runway, today's amount and payments waiting to be confirmed. Each kind has its own switch in Settings and
+ * its own channel, so the phone's settings can silence one without the others.
+ */
+@SuppressLint("MissingPermission") // checked in post()
+class MorningWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
+    override suspend fun doWork(): Result {
+        RuvoGraph.init(applicationContext)
+        RuvoGraph.repository.refreshDay()
+        val state = RuvoGraph.repository.state.first { it.ready }
+        val s = state.settings
+        if (!s.onboarded) return Result.success()
+        val (offers, books) = RuvoGraph.repository.takeNews()
+        if (s.notifyNews) {
+            offers.firstOrNull()?.let { o ->
+                val more = if (offers.size > 1) " and ${offers.size - 1} more" else ""
+                RuvoNotify.post(applicationContext, RuvoNotify.NEWS, 21, "New student offer: ${o.brand}$more", o.offer, "marketplace")
+            }
+            books.firstOrNull()?.let { b ->
+                val more = if (books.size > 1) " and ${books.size - 1} more" else ""
+                RuvoNotify.post(applicationContext, RuvoNotify.NEWS, 22, "New in the Guide: ${b.title}$more", "A ${b.minutes}-minute read. Tap to open the Guide.", "guide")
+            }
+        }
+        if (s.notifyDaily) {
+            val (title, body) = com.ruvo.engine.guide.WhatsNew.daily(state.runway, state.toSort.size)
+            RuvoNotify.post(applicationContext, RuvoNotify.DAILY, 20, title, body, if (state.toSort.isNotEmpty()) "sort" else null)
+        }
+        return Result.success()
+    }
+}
+
+/** Posts Ruvo's calm notifications. Nothing is posted without the notification permission. */
+object RuvoNotify {
+    const val DAILY = "ruvo_daily"
+    const val NEWS = "ruvo_news"
+
+    fun ensureChannels(context: Context) {
+        if (Build.VERSION.SDK_INT < 26) return
+        val nm = context.getSystemService(NotificationManager::class.java)
+        nm.createNotificationChannel(NotificationChannel(DAILY, "Daily update", NotificationManager.IMPORTANCE_DEFAULT).apply { description = "Your runway and today's amount, each morning" })
+        nm.createNotificationChannel(NotificationChannel(NEWS, "New offers and books", NotificationManager.IMPORTANCE_LOW).apply { description = "New student offers in the Marketplace and new books in the Guide" })
+    }
+
+    fun allowed(context: Context): Boolean = Build.VERSION.SDK_INT < 33 ||
+        ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+
+    @SuppressLint("MissingPermission") // checked just below
+    fun post(context: Context, channel: String, id: Int, title: String, text: String, open: String?) {
+        if (!allowed(context)) return
+        ensureChannels(context)
+        val launch = context.packageManager.getLaunchIntentForPackage(context.packageName) ?: return
+        if (open != null) launch.putExtra("com.ruvo.extra.OPEN", open)
+        val pi = PendingIntent.getActivity(context, id, launch, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+        val n = NotificationCompat.Builder(context, channel)
+            .setSmallIcon(android.R.drawable.stat_notify_more)
+            .setContentTitle(title)
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setContentIntent(pi)
+            .setAutoCancel(true)
+            .build()
+        runCatching { NotificationManagerCompat.from(context).notify(id, n) }
+    }
+}
+
 object RuvoWork {
     fun schedule(context: Context) {
         val wm = WorkManager.getInstance(context)
@@ -83,6 +149,19 @@ object RuvoWork {
                 .setInitialDelay(delayToNextSunday7pm().toMinutes(), TimeUnit.MINUTES)
                 .build(),
         )
+        wm.enqueueUniquePeriodicWork(
+            "ruvo-morning", ExistingPeriodicWorkPolicy.UPDATE,
+            PeriodicWorkRequestBuilder<MorningWorker>(1, TimeUnit.DAYS)
+                .setInitialDelay(delayToNext9am().toMinutes(), TimeUnit.MINUTES)
+                .build(),
+        )
+    }
+
+    private fun delayToNext9am(): Duration {
+        val now = LocalDateTime.now()
+        var target = LocalDate.now().atTime(9, 0)
+        if (!target.isAfter(now)) target = target.plusDays(1)
+        return Duration.between(now, target)
     }
 
     private fun delayToNextSunday7pm(): Duration {

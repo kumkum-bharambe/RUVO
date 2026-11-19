@@ -30,6 +30,7 @@ class RuvoApp : Application() {
         super.onCreate()
         RuvoGraph.init(this)
         SpendNotifier.ensureChannel(this)
+        com.ruvo.data.work.RuvoNotify.ensureChannels(this)
         RuvoWork.schedule(this)
     }
 }
@@ -40,6 +41,8 @@ sealed interface LaunchRequest {
     data object Sort : LaunchRequest
     data object Chat : LaunchRequest
     data object Buy : LaunchRequest
+    data object Marketplace : LaunchRequest
+    data object Guide : LaunchRequest
     data class Txn(val id: String, val split: Boolean) : LaunchRequest
 }
 
@@ -94,6 +97,8 @@ class MainActivity : ComponentActivity() {
             intent.getStringExtra("com.ruvo.extra.OPEN") == "sort" -> LaunchRequest.Sort
             intent.getStringExtra("com.ruvo.extra.OPEN") == "chat" -> LaunchRequest.Chat
             intent.getStringExtra("com.ruvo.extra.OPEN") == "buy" -> LaunchRequest.Buy
+            intent.getStringExtra("com.ruvo.extra.OPEN") == "marketplace" -> LaunchRequest.Marketplace
+            intent.getStringExtra("com.ruvo.extra.OPEN") == "guide" -> LaunchRequest.Guide
             else -> launchRequest.value
         }
     }

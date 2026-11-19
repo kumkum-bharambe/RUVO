@@ -37,6 +37,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ruvo.data.ActivityItem
 import com.ruvo.data.AppState
 import com.ruvo.data.RuvoGraph
+import com.ruvo.design.tourTarget
 import kotlinx.coroutines.launch
 import com.ruvo.design.BucketCard
 import com.ruvo.design.Chip
@@ -141,10 +142,10 @@ fun TodayContent(state: AppState, a: TodayActions) {
             item(key = "payday-${payday.id}") { PaydayCard(payday, state, Modifier.padding(horizontal = Space.gutter).padding(bottom = Space.sm).reveal(0)) }
         }
         item {
-            RunwayHero(r, a.openWhy, Modifier.padding(horizontal = Space.gutter).reveal(0))
+            RunwayHero(r, a.openWhy, Modifier.padding(horizontal = Space.gutter).tourTarget("runway").reveal(0))
         }
         item {
-            Row(Modifier.padding(horizontal = Space.gutter).padding(top = Space.sm).reveal(2), horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
+            Row(Modifier.padding(horizontal = Space.gutter).padding(top = Space.sm).tourTarget("buckets").reveal(2), horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
                 val promised = r.reservedCommitments.size
                 val total = (r.fixedReserved + r.fuel.coerceAtLeast(0) + r.futureProtected).coerceAtLeast(1).toFloat()
                 BucketCard(Bucket.FIXED, r.fixedReserved, if (promised == 1) "1 planned" else "$promised planned", Modifier.weight(1f), r.fixedReserved / total, a.openMoney)
@@ -396,7 +397,7 @@ private fun Header(state: AppState, a: TodayActions) {
             }
         }
         // Adding by hand is always one tap away, not hidden behind the Orb gesture.
-        IconCircle(RuvoIcons.Plus, "Add a payment", a.openAdd, tint = c.onBrand, background = c.brand)
+        IconCircle(RuvoIcons.Plus, "Add a payment", a.openAdd, Modifier.tourTarget("add"), tint = c.onBrand, background = c.brand)
         Spacer(Modifier.width(Space.xs))
         Avatar(state.displayName, a.openProfile)
     }

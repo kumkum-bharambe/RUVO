@@ -260,9 +260,19 @@ fun SettingsSheet(state: AppState, onDismiss: () -> Unit, onPersonas: () -> Unit
 
         SectionTitle("Notifications")
         Text("Calm and occasional. Each one can be switched off.", style = Ruvo.type.caption, color = c.inkSoft)
-        Toggle("New payments found", "When an SMS payment is tracked", s.notifyCapture) { on -> scope.launch { repo.setNotifications(capture = on) } }
-        Toggle("Weekly review", "A Sunday nudge to sort and review your week", s.notifyWeekly) { on -> scope.launch { repo.setNotifications(weekly = on) } }
-        Toggle("Goal moments", "When a goal is reached or falls behind", s.notifyGoals) { on -> scope.launch { repo.setNotifications(goals = on) } }
+        // Android 13 and later ask once before any notification can show; switching one on asks if needed.
+        var allowed by remember { mutableStateOf(com.ruvo.data.work.RuvoNotify.allowed(context)) }
+        val notifyLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { allowed = it }
+        val ask = { if (!allowed && android.os.Build.VERSION.SDK_INT >= 33) notifyLauncher.launch(Manifest.permission.POST_NOTIFICATIONS) }
+        if (!allowed) {
+            Text("Notifications are off for Ruvo on this phone.", Modifier.padding(top = Space.xs), style = Ruvo.type.bodyStrong, color = c.warning)
+            GhostButton("Turn on notifications", { ask() }, Modifier.fillMaxWidth().padding(top = Space.xs))
+        }
+        Toggle("Daily update", "Each morning: your runway and today's amount", s.notifyDaily) { on -> if (on) ask(); scope.launch { repo.setNotifications(daily = on) } }
+        Toggle("New offers and books", "When a student offer or a Guide book is added", s.notifyNews) { on -> if (on) ask(); scope.launch { repo.setNotifications(news = on) } }
+        if (smsAvailable) Toggle("Payments to confirm", "When Ruvo reads a new payment from a bank SMS", s.notifyCapture) { on -> if (on) ask(); scope.launch { repo.setNotifications(capture = on) } }
+        Toggle("Weekly review", "A Sunday nudge to sort and review your week", s.notifyWeekly) { on -> if (on) ask(); scope.launch { repo.setNotifications(weekly = on) } }
+        Toggle("Goal moments", "When a goal is reached or falls behind", s.notifyGoals) { on -> if (on) ask(); scope.launch { repo.setNotifications(goals = on) } }
 
         SectionTitle("Money view")
         Toggle("Hide my balance", "Shows •••• on Money instead of the amount", s.hideBalance) { on -> scope.launch { repo.setHideBalance(on) } }

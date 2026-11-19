@@ -84,6 +84,7 @@ import com.ruvo.feature.today.WhySheet
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.liveRegion
+import com.ruvo.design.tourTarget
 import kotlinx.coroutines.launch
 
 enum class Tab(val label: String) { TODAY("Home"), MONEY("Money"), GOALS("Goals"), GUIDE("Guide") }
@@ -151,6 +152,8 @@ private fun MainShell(state: AppState, request: LaunchRequest?, consumed: () -> 
             LaunchRequest.Sort -> overlay = Overlay.Sort
             LaunchRequest.Chat -> overlay = Overlay.Chat()
             LaunchRequest.Buy -> overlay = Overlay.Buy
+            LaunchRequest.Marketplace -> overlay = Overlay.Marketplace
+            LaunchRequest.Guide -> { overlay = Overlay.None; tab = Tab.GUIDE }
             is LaunchRequest.Txn -> overlay = Overlay.Txn(request.id, request.split)
             null -> {}
         }
@@ -258,7 +261,7 @@ private fun MainShell(state: AppState, request: LaunchRequest?, consumed: () -> 
 
         FloatingDock(
             tab, { tab = it },
-            Modifier.align(Alignment.BottomCenter).fillMaxWidth().navigationBarsPadding().padding(horizontal = Space.gutter, vertical = Space.md),
+            Modifier.align(Alignment.BottomCenter).fillMaxWidth().navigationBarsPadding().padding(horizontal = Space.gutter, vertical = Space.md).tourTarget("dock"),
         )
 
         // On Home the pet says hello once per start: a short line about the runway, tap to talk. A pat (press and
@@ -270,8 +273,11 @@ private fun MainShell(state: AppState, request: LaunchRequest?, consumed: () -> 
         LaunchedEffect(tab) {
             if (tab == Tab.TODAY && !greeted) {
                 kotlinx.coroutines.delay(700)
-                // The very first time, the pet explains its two gestures; after that it says hello with the runway.
-                if ("pet" !in state.settings.seenTips) {
+                // The very first time the guided tour runs instead; after that the pet explains its two gestures
+                // once, then says hello with the runway.
+                if ("tour" !in state.settings.seenTips) {
+                    bubble = null
+                } else if ("pet" !in state.settings.seenTips) {
                     bubble = "Tip: tap me to ask anything, or pull me down to add a spend."
                     RuvoGraph.appScope.launch { RuvoGraph.repository.markTipSeen("pet") }
                 } else bubble = petLine(state)
@@ -290,7 +296,7 @@ private fun MainShell(state: AppState, request: LaunchRequest?, consumed: () -> 
             size = 70.dp,
             // Floats above the dock's right end, with room below it to be pulled down. Fades back while you scroll.
             modifier = Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(end = Space.gutter + 2.dp, bottom = 90.dp)
-                .graphicsLayer { alpha = petAlpha },
+                .graphicsLayer { alpha = petAlpha }.tourTarget("pet"),
         )
 
         AnimatedVisibility(
@@ -348,6 +354,26 @@ private fun MainShell(state: AppState, request: LaunchRequest?, consumed: () -> 
                     onAsk = { overlay = Overlay.Chat(it) },
                 )
             }
+        }
+
+        // The first-run tour: once, on Home, after setup. It walks through the runway, the buckets, adding, the pet
+        // and the dock, then offers notifications (asking Android's permission only if the student says yes).
+        var tourDone by rememberSaveable { mutableStateOf(false) }
+        val notifyLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+            androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+        ) { granted -> if (!granted) scope.launch { RuvoGraph.repository.setNotifications(daily = false, news = false) } }
+        val context = androidx.compose.ui.platform.LocalContext.current
+        if (!tourDone && "tour" !in state.settings.seenTips && tab == Tab.TODAY && overlay == Overlay.None) {
+            com.ruvo.design.TourOverlay(
+                steps = tourSteps(state),
+                onFinish = {
+                    tourDone = true
+                    RuvoGraph.appScope.launch { RuvoGraph.repository.markTipSeen("tour"); RuvoGraph.repository.markTipSeen("pet") }
+                },
+                finalAction = if (com.ruvo.data.work.RuvoNotify.allowed(context)) null else "Turn on notifications" to {
+                    if (android.os.Build.VERSION.SDK_INT >= 33) notifyLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                },
+            )
         }
     }
     when (val o = overlay) {
@@ -459,6 +485,20 @@ private fun petLine(state: AppState): String {
         buffer >= 0 -> "About ${IndianFormat.days(r.runwayDays)}, just enough. Let's keep an eye on Fuel."
         else -> "About ${IndianFormat.days(r.runwayDays)}, a little short of next money. Let's plan together."
     }
+}
+
+/** The first-run tour's stops, in the order a student meets them on Home. */
+private fun tourSteps(state: AppState): List<com.ruvo.design.TourStep> {
+    val r = state.runway
+    val days = if (r.unlimited) "no end" else IndianFormat.days(r.runwayDays)
+    return listOf(
+        com.ruvo.design.TourStep("runway", "This is your runway", "How long your money lasts at your usual pace: $days right now. Tap it any time to see exactly why."),
+        com.ruvo.design.TourStep("buckets", "Three buckets", "Fixed is already promised, Fuel is free to spend, Future is protected for your goals. Ruvo never counts Future as spendable."),
+        com.ruvo.design.TourStep("add", "Add money in or out", "Spent something or got money? Add it here in a few taps. Splits and money you owe friends live here too."),
+        com.ruvo.design.TourStep("pet", "Meet Ruvo", "Tap me to ask anything about your money. Pull me down to add a spend quickly."),
+        com.ruvo.design.TourStep("dock", "Everything else", "Money shows where it went and who owes whom. Goals keeps your savings. Guide has short books and student offers."),
+        com.ruvo.design.TourStep(null, "Stay in the loop?", "A short note each morning with your runway, plus new student offers, new books and payments to confirm. You can change this in Settings."),
+    )
 }
 
 /** A short confirmation line: an ink pill like a chosen chip, announced politely to screen readers. */

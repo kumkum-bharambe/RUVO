@@ -373,8 +373,28 @@ class RuvoRepository(
     suspend fun markTipSeen(id: String) = settingsStore.update { it.copy(seenTips = it.seenTips + id) }
     /** The payday card for this money-in was shown and closed (or acted on). */
     suspend fun markPaydaySeen(txnId: String) = settingsStore.update { it.copy(paydaysSeen = it.paydaysSeen + txnId) }
-    suspend fun setNotifications(capture: Boolean? = null, weekly: Boolean? = null, goals: Boolean? = null) = settingsStore.update {
-        it.copy(notifyCapture = capture ?: it.notifyCapture, notifyWeekly = weekly ?: it.notifyWeekly, notifyGoals = goals ?: it.notifyGoals)
+    suspend fun setNotifications(
+        capture: Boolean? = null, weekly: Boolean? = null, goals: Boolean? = null, daily: Boolean? = null, news: Boolean? = null,
+    ) = settingsStore.update {
+        it.copy(
+            notifyCapture = capture ?: it.notifyCapture, notifyWeekly = weekly ?: it.notifyWeekly, notifyGoals = goals ?: it.notifyGoals,
+            notifyDaily = daily ?: it.notifyDaily, notifyNews = news ?: it.notifyNews,
+        )
+    }
+
+    /**
+     * Offers and books not announced yet. The first time it runs, everything already in the app is marked as seen
+     * (a fresh install announces nothing); after an update, only what is new comes back.
+     */
+    suspend fun takeNews(): Pair<List<com.ruvo.engine.guide.Perks.Perk>, List<com.ruvo.engine.guide.Library.Book>> {
+        val s = settingsStore.current()
+        val today = todayFlow.value
+        val offers = com.ruvo.engine.guide.WhatsNew.offers(s.seenOffers, today)
+        val books = com.ruvo.engine.guide.WhatsNew.books(s.seenBooks)
+        settingsStore.update {
+            it.copy(seenOffers = it.seenOffers + offers.map { o -> o.id }, seenBooks = it.seenBooks + books.map { b -> b.id }, newsBaseline = true)
+        }
+        return if (s.newsBaseline) offers to books else emptyList<com.ruvo.engine.guide.Perks.Perk>() to emptyList()
     }
 
     /** History: "this month I really received X and spent Y". Shown in History only. */
