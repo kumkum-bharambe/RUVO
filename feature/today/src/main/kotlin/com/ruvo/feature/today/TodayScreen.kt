@@ -242,13 +242,15 @@ private fun PaydayCard(income: com.ruvo.engine.Txn, state: AppState, modifier: M
     val pour = com.ruvo.engine.Payday.suggestPour(income.amount, state.input.goals, r.fuel)
     val done: () -> Unit = { com.ruvo.data.RuvoGraph.appScope.launch { RuvoGraph.repository.markPaydaySeen(income.id) } }
     RuvoCard(modifier.fillMaxWidth(), brush = c.irisBrush, border = null, elevated = true) {
-        Eyebrow("Payday · ${IndianFormat.rupees(income.amount)} arrived", color = ink.copy(alpha = 0.7f))
+        // Only the expected payday says "you made it"; money that lands mid-cycle is simply welcomed.
+        val payday = com.ruvo.engine.Payday.isPayday(r.daysToNextIncome, state.input.income.cycleDays)
+        Eyebrow("${if (payday) "Payday" else "Money in"} · ${IndianFormat.rupees(income.amount)} arrived", color = ink.copy(alpha = 0.7f))
         Spacer(Modifier.height(Space.xxs))
-        Text("You made it to payday.", style = Ruvo.type.headline, color = ink)
+        Text(if (payday) "You made it to payday." else "Money's in.", style = Ruvo.type.headline, color = ink)
         Spacer(Modifier.height(Space.xxs))
         val bills = if (r.fixedReserved > 0) "${IndianFormat.rupees(r.fixedReserved)} is already set aside for bills. " else ""
         Text(
-            bills + (pour?.let { "Pay yourself first: put ${IndianFormat.rupees(it.amount)} into ${it.goal.name} before spending starts?" } ?: "A fresh start for this cycle."),
+            bills + (pour?.let { "Pay yourself first: put ${IndianFormat.rupees(it.amount)} into ${it.goal.name} before spending starts?" } ?: if (payday) "A fresh start for this cycle." else "Your runway has grown."),
             style = Ruvo.type.body, color = ink.copy(alpha = 0.85f),
         )
         Spacer(Modifier.height(Space.sm))

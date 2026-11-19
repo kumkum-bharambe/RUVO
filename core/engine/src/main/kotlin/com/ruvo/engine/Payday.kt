@@ -22,6 +22,14 @@ object Payday {
             .maxWithOrNull(compareBy<Txn> { it.date }.thenBy { it.amount })
     }
 
+    /**
+     * True when the money that just arrived was the expected payday: the next money is now close to a full cycle
+     * away (within a week of it). Money that lands mid-cycle (a refund, a gift, a top-up) is just "money in".
+     * With no next date (money that varies) every arrival counts.
+     */
+    fun isPayday(daysToNextIncome: Int?, cycleDays: Int): Boolean =
+        daysToNextIncome == null || daysToNextIncome >= cycleDays - 7
+
     data class Pour(val goal: Goal, val amount: Paise)
 
     /**

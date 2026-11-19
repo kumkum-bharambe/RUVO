@@ -49,6 +49,15 @@ class PaydayTest {
         assertEquals(rupees(400), Payday.suggestPour(rupees(12_000), listOf(goal("B", 8_000, 0, monthly = 1_000)), rupees(450))?.amount)
     }
 
+    @Test fun itIsPaydayOnlyWhenTheNextMoneyMovedAFullCycleAway() {
+        // After the real payday the next money is about a month away; money that lands mid-cycle is not payday.
+        kotlin.test.assertTrue(Payday.isPayday(daysToNextIncome = 29, cycleDays = 30))
+        kotlin.test.assertTrue(Payday.isPayday(daysToNextIncome = 24, cycleDays = 30))
+        kotlin.test.assertFalse(Payday.isPayday(daysToNextIncome = 12, cycleDays = 30))
+        // Money that varies has no next date: any arrival counts.
+        kotlin.test.assertTrue(Payday.isPayday(daysToNextIncome = null, cycleDays = 30))
+    }
+
     @Test fun noSuggestionWithoutAnOpenGoalOrFuel() {
         assertNull(Payday.suggestPour(rupees(12_000), emptyList(), rupees(9_000)))
         assertNull(Payday.suggestPour(rupees(12_000), listOf(goal("Done", 1_000, 1_000)), rupees(9_000)))
