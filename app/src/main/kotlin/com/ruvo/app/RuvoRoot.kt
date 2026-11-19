@@ -370,7 +370,7 @@ private fun MainShell(state: AppState, request: LaunchRequest?, consumed: () -> 
                     tourDone = true
                     RuvoGraph.appScope.launch { RuvoGraph.repository.markTipSeen("tour"); RuvoGraph.repository.markTipSeen("pet") }
                 },
-                finalAction = if (com.ruvo.data.work.RuvoNotify.allowed(context)) null else "Turn on notifications" to {
+                finalAction = if (com.ruvo.data.work.RuvoNotify.allowed(context)) null else "Yes, turn on" to {
                     if (android.os.Build.VERSION.SDK_INT >= 33) notifyLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
                 },
             )

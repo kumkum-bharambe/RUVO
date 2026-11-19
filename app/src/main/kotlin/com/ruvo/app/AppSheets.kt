@@ -96,7 +96,7 @@ fun QuickAddSheet(onDismiss: () -> Unit) {
         // or for a split, who owes you what.
         if (shares.isNotEmpty()) {
             val names = shares.map { it.first }.let { if (it.size <= 2) it.joinToString(" and ") else "${it.size} friends" }
-            com.ruvo.data.Notices.post(com.ruvo.data.Notices.Notice.Text("Split saved · $names owe you ${IndianFormat.rupees(shares.sumOf { it.second })}"))
+            com.ruvo.data.Notices.post(com.ruvo.data.Notices.Notice.Text("Split saved · $names ${if (shares.size == 1) "owes" else "owe"} you ${IndianFormat.rupees(shares.sumOf { it.second })}"))
         } else {
             com.ruvo.data.Notices.post(com.ruvo.data.Notices.Notice.Saved(amountNow, incoming, RuvoGraph.repository.state.value.runway.runwayDays))
         }
@@ -348,7 +348,7 @@ fun SettingsSheet(state: AppState, onDismiss: () -> Unit, onPersonas: () -> Unit
         SectionTitle("About Ruvo")
         Text("Your money, without the mental load. Ruvo helps you see what you have, what you can spend, and what matters next.", style = Ruvo.type.body, color = c.inkSoft)
         Spacer(Modifier.height(Space.xs))
-        Text("Ruvo 1.0 · made for students · portfolio build · Marketplace offers are checked by hand and may change", style = Ruvo.type.caption, color = c.inkFaint)
+        Text("Ruvo 1.1 · made for students · portfolio build · Marketplace offers are checked by hand and may change", style = Ruvo.type.caption, color = c.inkFaint)
     }
 }
 

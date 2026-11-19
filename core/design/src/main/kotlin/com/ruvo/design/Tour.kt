@@ -40,6 +40,7 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -102,20 +103,28 @@ fun TourOverlay(
                 drawRoundRect(Color.White.copy(alpha = 0.85f), Offset(l, t), Size(r - l, b - t), corner, style = androidx.compose.ui.graphics.drawscope.Stroke(2.dp.toPx()))
             }
         }
-        // The card sits below the lit part when there is room, otherwise above it; a middle card when no target.
+        // The card goes below the lit part when it fits, else above it; when neither fits it sits on the side with more
+        // room, kept on screen. A middle card when there is no target. Placed by its real measured height.
         val screenH = with(density) { maxHeight.toPx() }
-        val cardGap = with(density) { 14.dp.toPx() }
-        val estimate = with(density) { 210.dp.toPx() }
+        val gap = with(density) { 14.dp.toPx() }
+        val topEdge = with(density) { 44.dp.toPx() }
+        val bottomEdge = screenH - with(density) { 28.dp.toPx() }
+        var cardH by remember { mutableStateOf(0) }
         val y = when {
-            target == null -> (screenH - estimate) / 2f
-            target.bottom + cardGap + estimate < screenH -> target.bottom + cardGap
-            else -> (target.top - cardGap - estimate).coerceAtLeast(with(density) { 40.dp.toPx() })
+            target == null -> (screenH - cardH) / 2f
+            target.bottom + gap + cardH <= bottomEdge -> target.bottom + gap
+            target.top - gap - cardH >= topEdge -> target.top - gap - cardH
+            screenH - target.bottom > target.top -> bottomEdge - cardH
+            else -> topEdge
         }
         Column(
             Modifier.offset { IntOffset(0, y.toInt()) }.padding(horizontal = Space.gutter).fillMaxWidth()
+                .onSizeChanged { cardH = it.height }
+                .graphicsLayer { alpha = if (cardH == 0) 0f else 1f }
                 .semantics { liveRegion = LiveRegionMode.Polite },
         ) {
-            RuvoCard(Modifier.fillMaxWidth(), elevated = true) {
+            // Solid, never glass, so whatever is behind it never shows through the words.
+            RuvoCard(Modifier.fillMaxWidth(), color = if (c.isDark) c.raised else c.surface, elevated = true) {
                 Text("${index + 1} of ${steps.size}", style = Ruvo.type.caption, color = c.inkSoft)
                 Spacer(Modifier.height(Space.xxs))
                 Text(step.title, style = Ruvo.type.title, color = c.ink)

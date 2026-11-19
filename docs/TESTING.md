@@ -35,6 +35,12 @@ today.
 | 26 | Close Ruvo fully and open it again | **Welcome back** with the PIN pad; the right PIN opens it, a wrong one is refused |
 | 27 | Turn on flight mode and use the app | Everything works; only Marketplace links and Hindi book translation need internet |
 | 28 | Settings → **Delete everything** (confirm) | Ruvo starts again from account creation |
+| 29 | On a fresh install, finish setup and land on Home | A short guided tour lights up the runway, buckets, + button, pet and dock one at a time; **Skip** ends it; it never shows again |
+| 30 | Money → **Owed** → **You owe** → **A friend paid for me**: Priya, 400, Dinner, **Save** | "Saved · you owe Priya ₹400"; Planned on the You have card grows by ₹400 |
+| 31 | Tap **I paid them back** | "Paid back Priya ₹400 · all settled"; the balance drops by ₹400 once, Yours to use does not change |
+| 32 | **+** → 600 → switch on **Shared with friends?** → Friend 1: Rahul → **Save split** | "Split saved · Rahul owes you ₹300"; Owed to you shows ₹300 |
+| 33 | Add ₹12,000 with **Received** | A payday card at the top of Home offering to put money into your goal first |
+| 34 | Profile → Settings → Notifications | Switches for Daily update, New offers and books, Weekly review and Goal moments |
 
 ## Things worth noticing
 

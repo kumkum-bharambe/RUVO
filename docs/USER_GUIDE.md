@@ -53,13 +53,21 @@ Top to bottom:
     (tap Unpaid to mark it paid), **+ Add a fixed cost**, then Fuel and Future.
   - **Transactions** — Weekly, Monthly or All; money in and out for the period; every payment by day.
   - **History** — received and spent per month as a chart; tap a month; **Edit** corrects a month's totals.
-  - **Owed** — money friends owe you from split payments; **Send UPI link** or **They paid**.
+  - **Owed** — two sides. **Owed to you**: money friends owe you from split payments; **Send UPI link** or **They paid**. **You owe**: tap **A friend paid for me** when someone pays for you; Ruvo sets that amount aside in Fixed until you tap **I paid them back**.
 
 ## Adding a payment
 
 Tap **+** or drag the pet down. Choose **Spent** or **Received**, type the amount, optionally what it was, pick
 **Fixed** or **Fuel**, switch on **Shared with friends?** to split it, then tap a category to save. Your runway
-updates straight away. **+ New category** makes your own.
+updates straight away. **+ New category** makes your own. When **Shared with friends?** is on, pick a category and tap **Save split**; a short line confirms who owes you what.
+
+## The welcome tour
+
+Right after setup, a short tour dims the screen and lights up each part of Home with one line about it. Tap **Next**, or **Skip** at any time. It shows only once.
+
+## Notifications
+
+Calm and occasional, each with its own switch in Settings: a **daily update** each morning (runway and today's amount), **new offers and books**, **payments to confirm** (full app only, from bank SMS), the **weekly review** and **goal moments**. Android asks once for permission.
 
 ## Goals
 
