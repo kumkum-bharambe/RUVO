@@ -4,6 +4,7 @@ import com.ruvo.engine.Bucket
 import com.ruvo.engine.Cadence
 import com.ruvo.engine.Commitment
 import com.ruvo.engine.Direction
+import com.ruvo.engine.ExpectedMoney
 import com.ruvo.engine.Goal
 import com.ruvo.engine.IncomePlan
 import com.ruvo.engine.RunwayInput
@@ -80,7 +81,7 @@ object DemoPersonas {
                 S(10, 260, "Zomato", "Food"), S(11, 75, "Auto rickshaw", "Transport"),
             ),
         ) + income("m-in", 18_000, next.minusMonths(1), "Internship stipend") +
-            income("m-in2", 5_000, next.minusMonths(1).plusDays(2), "Family top-up")
+            income("m-in2", 5_000, next.minusMonths(1).plusDays(2), "Family top-up").map { it.copy(topUp = true) }
         return Persona(
             "meera", "Meera", 22, "Shared flat",
             "Internship stipend plus a family top-up. Splits rent and groceries with two flatmates.",
@@ -151,6 +152,8 @@ object DemoPersonas {
                 commitments = listOf(Commitment("r-pg", "PG rent", rupees(6_500), dueDayOfMonth = 5)),
                 goals = listOf(Goal("r-g1", "Drawing tablet", rupees(7_500), rupees(1_500), today.plusMonths(3), rupees(1_000))),
                 transactions = tx,
+                // Riya has no payday. Café shift pay that may come is shown, but not counted on until she marks it Sure.
+                expected = listOf(ExpectedMoney("r-exp1", rupees(1_800), today.plusDays(6), sure = false, note = "Café shifts")),
             ),
         )
     }

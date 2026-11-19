@@ -100,6 +100,8 @@ data class OnboardingAnswers(
     val goalDate: LocalDate? = null,
     /** They allowed SMS tracking at the end of setup. */
     val trackSms: Boolean = false,
+    /** "About how much do you spend on a usual day?" 0 when skipped. */
+    val dailyEstimate: Paise = 0,
 )
 
 class RuvoRepository(
@@ -139,7 +141,7 @@ class RuvoRepository(
         debtRows: List<DebtEntity> = emptyList(),
     ): AppState {
         val sharesByTxn = shareRows.groupBy { it.txnId }
-        val txns = txnRows.map { it.toEngine(sharesByTxn[it.id]) }
+        val txns = txnRows.map { it.toEngine(sharesByTxn[it.id]).copy(oneOff = it.id in s.oneOffTxns, topUp = it.id in s.topUpTxns) }
         val balance = s.anchorAmount + txnRows
             .filter { it.createdAtMillis > s.anchorMillis && it.status != TxnStatus.IGNORED.name }
             .sumOf { if (it.direction == Direction.CREDIT.name) it.amount else -it.amount }
@@ -149,7 +151,10 @@ class RuvoRepository(
         val debts = debtRows.filter { it.paidEpochDay == null }.map { DebtItem(it.id, it.person, it.amount, it.note, LocalDate.ofEpochDay(it.dateEpochDay)) }
         // What you owe friends is promised money: it sits in Fixed, due today, until you pay it back.
         val owing = debts.map { Commitment(DEBT_PREFIX + it.id, "Pay back ${it.person}", it.amount, dueDate = today, recurring = false) }
-        val input = RunwayInput(today, balance, income, commitments + owing, goals, txns, s.spendBasis)
+        val input = RunwayInput(
+            today, balance, income, commitments + owing, goals, txns, s.spendBasis,
+            expected = s.expectedList(), estimatedDaily = s.dailyEstimate.takeIf { it > 0 },
+        )
         val result = RunwayEngine.calculate(input)
         val activity = txnRows.zip(txns).map { (row, t) ->
             ActivityItem(t, runCatching { Source.valueOf(row.source) }.getOrDefault(Source.MANUAL), sharesByTxn[row.id].orEmpty(), row.note)
@@ -359,6 +364,40 @@ class RuvoRepository(
         dao.upsertCommitment(CommitmentEntity(c.id, c.name, c.amount, c.dueDayOfMonth, c.dueDate?.toEpochDay(), c.recurring, today.toEpochDay()))
     }
 
+    // --- Usual day, expected money, one-offs, top-ups, make it last ---
+
+    /** "About how much do you spend on a usual day?" 0 clears it, so the runway goes back to the old rule. */
+    suspend fun setDailyEstimate(amount: Paise) = settingsStore.update { it.copy(dailyEstimate = amount.coerceAtLeast(0)) }
+
+    suspend fun addExpected(amount: Paise, date: LocalDate, sure: Boolean, note: String) {
+        if (amount <= 0) return
+        val clean = note.replace("|", " ").trim()
+        settingsStore.update { it.copy(expectedMoney = it.expectedMoney + "${newId()}|$amount|${date.toEpochDay()}|${if (sure) "S" else "M"}|$clean") }
+    }
+
+    suspend fun removeExpected(id: String) = settingsStore.update { s -> s.copy(expectedMoney = s.expectedMoney.filterNot { it.startsWith("$id|") }.toSet()) }
+
+    /** Expected money arrived: it is recorded as money in and leaves the list. */
+    suspend fun expectedArrived(e: com.ruvo.engine.ExpectedMoney) {
+        removeExpected(e.id)
+        addManual(e.amount, e.note.ifBlank { "Money in" }, "Income", direction = Direction.CREDIT)
+    }
+
+    /** A top-up from home: money in that is not a payday and does not move the next-money date. */
+    suspend fun addTopUp(amount: Paise, note: String): String {
+        val id = addManual(amount, note.ifBlank { "Top-up from home" }, "Income", direction = Direction.CREDIT)
+        settingsStore.update { it.copy(topUpTxns = it.topUpTxns + id, paydaysSeen = it.paydaysSeen + id) }
+        return id
+    }
+
+    suspend fun setOneOff(txnId: String, on: Boolean) = settingsStore.update {
+        it.copy(oneOffTxns = if (on) it.oneOffTxns + txnId else it.oneOffTxns - txnId)
+    }
+
+    suspend fun setAllowanceOn(on: Boolean) = settingsStore.update { it.copy(allowanceOn = on) }
+    /** Keeps the "make it last until" date as a target on Home; null removes it. */
+    suspend fun keepAllowance(until: LocalDate?) = settingsStore.update { it.copy(allowanceUntilEpochDay = until?.toEpochDay()) }
+
     // --- Settings ---
 
     suspend fun setTheme(theme: String) = settingsStore.update { it.copy(theme = theme) }
@@ -438,7 +477,7 @@ class RuvoRepository(
         val balance = state.value.input.balance
         dao.clearShares()
         dao.clearTxns()
-        settingsStore.update { it.copy(anchorAmount = balance, anchorMillis = clock(), purchaseReviews = emptySet()) }
+        settingsStore.update { it.copy(anchorAmount = balance, anchorMillis = clock(), purchaseReviews = emptySet(), oneOffTxns = emptySet(), topUpTxns = emptySet()) }
     }
 
     /** Settings → Export my data: a plain-text copy of transactions, goals and commitments, made on the phone. */
@@ -491,6 +530,8 @@ class RuvoRepository(
                 expectedIncome = a.expectedIncome, nextIncomeEpochDay = a.nextIncome?.toEpochDay(),
                 cycleDays = IncomePlan.defaultCycleDays(a.cadence), anchorAmount = a.balance, anchorMillis = now,
                 realSms = a.trackSms || it.realSms,
+                dailyEstimate = a.dailyEstimate, expectedMoney = emptySet(), oneOffTxns = emptySet(), topUpTxns = emptySet(),
+                allowanceOn = false, allowanceUntilEpochDay = null,
             )
         }
     }
@@ -521,6 +562,10 @@ class RuvoRepository(
                 onboarded = true, ageConfirmed = true, demoPersona = p.id, cadence = p.input.income.cadence,
                 expectedIncome = p.input.income.expectedAmount, nextIncomeEpochDay = p.input.income.nextDate?.toEpochDay(),
                 cycleDays = p.input.income.cycleDays, anchorAmount = p.input.balance, anchorMillis = now,
+                dailyEstimate = p.input.estimatedDaily ?: 0,
+                expectedMoney = p.input.expected.map { e -> "${e.id}|${e.amount}|${e.date.toEpochDay()}|${if (e.sure) "S" else "M"}|${e.note}" }.toSet(),
+                oneOffTxns = emptySet(), topUpTxns = p.input.transactions.filter { t -> t.topUp }.map { t -> t.id }.toSet(),
+                allowanceOn = false, allowanceUntilEpochDay = null,
             )
         }
     }

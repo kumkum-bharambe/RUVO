@@ -9,6 +9,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -78,6 +81,8 @@ fun QuickAddSheet(onDismiss: () -> Unit) {
     var moneyIn by remember { mutableStateOf(false) }
     var bucket by remember { mutableStateOf(Bucket.FUEL) }
     var sharing by remember { mutableStateOf(false) }
+    var topUp by remember { mutableStateOf(false) }
+    var oneOff by remember { mutableStateOf(false) }
     var splitCategory by remember { mutableStateOf("Food") }
     var owed by remember { mutableStateOf<List<Pair<String, Long>>>(emptyList()) }
     var making by remember { mutableStateOf(false) }
@@ -91,6 +96,7 @@ fun QuickAddSheet(onDismiss: () -> Unit) {
         // Everything the sheet knows, copied now, and saved on the app's own scope: the sheet closes straight away,
         // which would otherwise cancel the split before it was written (that is why splits went missing from Owed).
         val amountNow = paise; val label = what.ifBlank { category }; val incoming = moneyIn; val bucketNow = bucket
+        val isTopUp = incoming && topUp; val isOneOff = !incoming && oneOff
         val shares = if (!incoming && sharing) owed.filter { it.second > 0 } else emptyList()
         // A short line confirms it (shown by the app shell, read out by TalkBack): "Saved ₹250 · runway 24 → 23 days",
         // or for a split, who owes you what.
@@ -101,10 +107,14 @@ fun QuickAddSheet(onDismiss: () -> Unit) {
             com.ruvo.data.Notices.post(com.ruvo.data.Notices.Notice.Saved(amountNow, incoming, RuvoGraph.repository.state.value.runway.runwayDays))
         }
         RuvoGraph.appScope.launch {
+            // A top-up from home is money in that is not a payday and does not move the next-money date.
+            if (isTopUp) { RuvoGraph.repository.addTopUp(amountNow, what.trim()); return@launch }
             val id = RuvoGraph.repository.addManual(
                 amountNow, label, if (incoming) "Income" else category,
                 if (incoming) Bucket.FUEL else bucketNow, if (incoming) Direction.CREDIT else Direction.DEBIT,
             )
+            // A one-off still leaves the balance, but stays out of the usual daily average.
+            if (isOneOff) RuvoGraph.repository.setOneOff(id, true)
             // Shared on the way in: friends' parts go straight to Owed in Money.
             if (shares.isNotEmpty()) RuvoGraph.repository.splitByAmounts(id, shares)
         }
@@ -129,7 +139,16 @@ fun QuickAddSheet(onDismiss: () -> Unit) {
         RuvoField(what, { what = it }, if (moneyIn) "From (optional)" else "What was it? (optional)")
         Spacer(Modifier.height(Space.md))
         if (moneyIn) {
-            PrimaryButton(if (paise > 0) "Save · ${IndianFormat.rupees(paise)} received" else "Type the amount to save", { save("Income") }, Modifier.fillMaxWidth(), enabled = paise > 0)
+            SwitchLine("Top-up from home", "Extra money between paydays. Your next money date stays the same.", topUp) { topUp = it }
+            Spacer(Modifier.height(Space.md))
+            PrimaryButton(
+                when {
+                    paise <= 0 -> "Type the amount to save"
+                    topUp -> "Save · ${IndianFormat.rupees(paise)} top-up"
+                    else -> "Save · ${IndianFormat.rupees(paise)} received"
+                },
+                { save("Income") }, Modifier.fillMaxWidth(), enabled = paise > 0,
+            )
         } else {
             Row(horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
                 // A payment is planned (Fixed) or everyday (Fuel); money for goals moves by pouring, not by paying.
@@ -145,6 +164,8 @@ fun QuickAddSheet(onDismiss: () -> Unit) {
                 Spacer(Modifier.height(Space.xs))
                 com.ruvo.design.SplitEditor(paise, emptyList()) { owed = it }
             }
+            Spacer(Modifier.height(Space.xs))
+            SwitchLine("One-off?", "Big and rare, like a trip or a deposit. Left out of your usual day.", oneOff) { oneOff = it }
             Spacer(Modifier.height(Space.md))
             // Pick a category, then Save: nothing is saved until the Save button, so a stray tap never records a payment.
             Eyebrow("Pick a category")
@@ -250,7 +271,7 @@ fun SettingsSheet(state: AppState, onDismiss: () -> Unit, onPersonas: () -> Unit
                 style = Ruvo.type.caption, color = c.inkSoft,
             )
         }
-        if (smsAvailable) Toggle("Read payment SMS", "Bank and UPI senders only, read on this phone", s.realSms) { on ->
+        if (smsAvailable) Toggle("Read payment SMS", "Bank and card payment messages only, read on this phone", s.realSms) { on ->
             if (on) {
                 val perms = buildList {
                     add(Manifest.permission.READ_SMS); add(Manifest.permission.RECEIVE_SMS)
@@ -259,6 +280,7 @@ fun SettingsSheet(state: AppState, onDismiss: () -> Unit, onPersonas: () -> Unit
                 smsLauncher.launch(perms.toTypedArray())
             } else com.ruvo.data.RuvoGraph.appScope.launch { repo.setRealSms(false) }
         }
+        if (smsAvailable) WhatRuvoReads(s.demoSms)
         scanned?.let { Text("Found $it new payments in the last 90 days. They are waiting in your weekly sort.", style = Ruvo.type.caption, color = c.fuel) }
         if (smsAvailable) Toggle("Demo SMS", "Accept test messages from any sender, for emulator demos", s.demoSms) { on -> com.ruvo.data.RuvoGraph.appScope.launch { repo.setDemoSms(on) } }
         Toggle("Spoken replies", "Ruvo reads answers aloud in your chat language", s.spokenReplies) { on -> com.ruvo.data.RuvoGraph.appScope.launch { repo.setSpokenReplies(on) } }
@@ -278,6 +300,11 @@ fun SettingsSheet(state: AppState, onDismiss: () -> Unit, onPersonas: () -> Unit
         if (smsAvailable) Toggle("Payments to confirm", "When Ruvo reads a new payment from a bank SMS", s.notifyCapture) { on -> if (on) ask(); com.ruvo.data.RuvoGraph.appScope.launch { repo.setNotifications(capture = on) } }
         Toggle("Weekly review", "A Sunday nudge to sort and review your week", s.notifyWeekly) { on -> if (on) ask(); com.ruvo.data.RuvoGraph.appScope.launch { repo.setNotifications(weekly = on) } }
         Toggle("Goal moments", "When a goal is reached or falls behind", s.notifyGoals) { on -> if (on) ask(); com.ruvo.data.RuvoGraph.appScope.launch { repo.setNotifications(goals = on) } }
+
+        SectionTitle("Runway")
+        Toggle("Make it last until", "A Home card with a daily amount to reach a date you choose. Shows by itself when next money is over 45 days away.", s.allowanceOn) { on -> com.ruvo.data.RuvoGraph.appScope.launch { repo.setAllowanceOn(on) } }
+        Spacer(Modifier.height(Space.sm))
+        com.ruvo.feature.today.UsualDayEditor(s.dailyEstimate)
 
         SectionTitle("Money view")
         Toggle("Hide my balance", "Shows •••• on Money instead of the amount", s.hideBalance) { on -> com.ruvo.data.RuvoGraph.appScope.launch { repo.setHideBalance(on) } }
@@ -341,7 +368,7 @@ fun SettingsSheet(state: AppState, onDismiss: () -> Unit, onPersonas: () -> Unit
             "A friend paid for me. How do I track it?" to "Money → Owed → You owe → A friend paid for me → who, how much, what for → Save. Ruvo keeps that money aside in Fixed until you tap I paid them back.",
             "I spent money. How do I add it?" to "Tap + on any tab (or pull Ruvo's pet down) → type the amount → pick a category → Save. Received money works the same way with Received.",
             "Why does Ruvo not count my goal money?" to "Money in a goal is protected for its purpose. Leaving it out of Fuel means a goal can never quietly shrink without you deciding.",
-            "Does Ruvo read my messages?" to "Only if you switch on Read payment SMS. Then it reads bank and UPI senders on this phone only, and never uploads them.",
+            "Does Ruvo read my messages?" to "Only if you switch on Read payment SMS. Then it reads payment messages from the banks and card companies on its list, on this phone only, and never uploads them. Settings → Tracking → What Ruvo reads has the details.",
             "Can Ruvo move or hold my money?" to "No. Ruvo never holds, moves or invests money. It explains your own numbers.",
             "Will Ruvo stop me buying something?" to "Never. Before you buy shows what a purchase changes. The choice is always yours.",
         ).forEachIndexed { i, (q, a) ->
@@ -405,5 +432,59 @@ private fun MoodCard(name: String, line: String, palette: RuvoColors, selected: 
         Spacer(Modifier.height(Space.sm))
         Text(name, style = Ruvo.type.bodyStrong, color = palette.ink)
         Text(line, style = Ruvo.type.caption, color = palette.inkSoft)
+    }
+}
+
+/** A labelled switch row: the whole row toggles, so the touch target is the full width. */
+@Composable
+internal fun SwitchLine(title: String, detail: String, on: Boolean, onChange: (Boolean) -> Unit) {
+    val c = Ruvo.colors
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = 48.dp)
+            .toggleable(on, role = androidx.compose.ui.semantics.Role.Switch, onValueChange = onChange),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = Ruvo.type.bodyStrong, color = c.ink)
+            Text(detail, style = Ruvo.type.caption, color = c.inkSoft)
+        }
+        Spacer(Modifier.width(Space.xs))
+        androidx.compose.material3.Switch(on, null)
+    }
+}
+
+/**
+ * "What Ruvo reads": the SMS trust line. Every sentence matches the code: SmsParser only accepts known bank and card
+ * sender IDs (unless Demo SMS is on), the inbox scan skips other senders before reading the text, the scan covers 90
+ * days once, and only the amount, date, payee and reference are kept, in the encrypted database. Nothing is uploaded.
+ */
+@Composable
+private fun WhatRuvoReads(demoSms: Boolean) {
+    val c = Ruvo.colors
+    var open by remember { mutableStateOf(false) }
+    RuvoCard(
+        Modifier.fillMaxWidth().padding(vertical = Space.xs), onClick = { open = !open },
+        onClickLabel = if (open) "Hide what Ruvo reads" else "Show what Ruvo reads",
+        padding = androidx.compose.foundation.layout.PaddingValues(Space.md),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("What Ruvo reads", Modifier.weight(1f), style = Ruvo.type.bodyStrong, color = c.ink)
+            Text(if (open) "–" else "+", style = Ruvo.type.title, color = c.inkSoft)
+        }
+        androidx.compose.animation.AnimatedVisibility(open) {
+            Column(Modifier.padding(top = Space.xs), verticalArrangement = Arrangement.spacedBy(Space.xs)) {
+                listOf(
+                    "Only payment messages from banks and card companies on Ruvo's list. UPI alerts come from your bank, so they are included.",
+                    "Messages from anyone else are skipped before their text is read.",
+                    "When you switch this on, Ruvo looks back over the last 90 days once. After that, only new messages.",
+                    "Everything is read on this phone. Ruvo keeps the amount, date, who was paid and the bank reference in its encrypted database, not the whole message.",
+                    "Nothing is uploaded. You can switch this off any time.",
+                ).forEach { Text("• $it", style = Ruvo.type.body, color = c.inkSoft) }
+                if (demoSms) Text(
+                    "Demo SMS is on, so test messages from any sender are accepted too. Turn it off when you use Ruvo with your real messages.",
+                    style = Ruvo.type.bodyStrong, color = c.warning,
+                )
+            }
+        }
     }
 }

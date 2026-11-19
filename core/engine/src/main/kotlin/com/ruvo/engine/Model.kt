@@ -74,6 +74,10 @@ data class Txn(
     val merchant: String = "",
     /** For a split: the part other people owe you. Your own spending is amount minus this. */
     val othersShare: Paise = 0,
+    /** A one-off spend (a laptop, a deposit, a trip): still spent, but left out of the usual daily average. */
+    val oneOff: Boolean = false,
+    /** Money in that is a top-up from home: counted, but it is not a payday and does not move the next-money date. */
+    val topUp: Boolean = false,
 ) {
     val yourShare: Paise get() = (amount - othersShare).coerceAtLeast(0)
     val countsAsSpending: Boolean
@@ -97,4 +101,23 @@ data class Goal(
 enum class SpendBasis { AUTO, HISTORY, PLAN }
 
 /** The source the engine actually used, shown to the user in "Why 23 days?". */
-enum class SpendSource { HISTORY, PLAN, EVEN_SPREAD }
+enum class SpendSource {
+    HISTORY, PLAN, EVEN_SPREAD,
+    /** The student's own usual-day estimate. */
+    ESTIMATE,
+    /** The estimate averaged with the last two weeks of spending. */
+    BLEND,
+}
+
+/**
+ * Money the student expects but may not have a fixed date for: a parent's transfer, a gig payment, a refund.
+ * Only "sure" entries can set the next-money date; "maybe" ones are shown but never counted on.
+ */
+data class ExpectedMoney(
+    val id: String,
+    val amount: Paise,
+    /** A rough date. */
+    val date: LocalDate,
+    val sure: Boolean,
+    val note: String = "",
+)

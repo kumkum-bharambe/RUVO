@@ -14,6 +14,10 @@ data class RunwayInput(
     val goals: List<Goal> = emptyList(),
     val transactions: List<Txn> = emptyList(),
     val basis: SpendBasis = SpendBasis.AUTO,
+    /** The "Expected money" list. Empty means the income plan alone sets the next-money date, as before. */
+    val expected: List<ExpectedMoney> = emptyList(),
+    /** "About how much do you spend on a usual day?" Null when not given, so the old rule applies. */
+    val estimatedDaily: Paise? = null,
 )
 
 data class RunwayResult(
@@ -116,13 +120,24 @@ object RunwayEngine {
      * - otherwise the income is overdue and we count zero days to it.
      */
     internal fun effectiveNextIncome(input: RunwayInput): Pair<LocalDate?, Boolean> {
+        val (planned, overdue) = plannedNextIncome(input)
+        // The earliest "sure" expected money from today on can bring the next money closer. "Maybe" never counts.
+        val sure = earliestSure(input.expected, input.today) ?: return planned to overdue
+        return if (planned == null || sure.isBefore(planned)) sure to false else planned to overdue
+    }
+
+    /** The earliest "sure" expected money dated today or later, or null. */
+    fun earliestSure(expected: List<ExpectedMoney>, today: LocalDate): LocalDate? =
+        expected.filter { it.sure && it.amount > 0 && !it.date.isBefore(today) }.minOfOrNull { it.date }
+
+    private fun plannedNextIncome(input: RunwayInput): Pair<LocalDate?, Boolean> {
         val plan = input.income
         val planned = plan.nextDate ?: return null to false
         if (plan.cadence == Cadence.IRREGULAR) return null to false
         if (!planned.isBefore(input.today)) return planned to false
 
         val arrived = input.transactions.any {
-            it.direction == Direction.CREDIT && it.kind == TxnKind.INCOME &&
+            it.direction == Direction.CREDIT && it.kind == TxnKind.INCOME && !it.topUp &&
                 it.status != TxnStatus.IGNORED &&
                 !it.date.isBefore(planned.minusDays(3)) && !it.date.isAfter(input.today)
         }
@@ -185,6 +200,15 @@ object RunwayEngine {
         val plan = planDaily(input)
         val even = if (fuel > 0) fuel / horizonDays else 0L
 
+        // The student's own "usual day" estimate from setup (editable later). On its own until there is a week of
+        // real spending; after that it is averaged with the last two weeks, so one heavy week cannot swing the runway.
+        val estimate = input.estimatedDaily?.takeIf { it > 0 }
+        if (estimate != null && input.basis != SpendBasis.HISTORY) {
+            return if (history != null && history.trusted && input.basis == SpendBasis.AUTO) {
+                (estimate + history.daily) / 2 to SpendSource.BLEND
+            } else estimate to SpendSource.ESTIMATE
+        }
+
         return when (input.basis) {
             SpendBasis.HISTORY -> when {
                 history != null -> history.daily to SpendSource.HISTORY
@@ -209,9 +233,12 @@ object RunwayEngine {
         val trusted: Boolean get() = spanDays >= MIN_HISTORY_DAYS && count >= MIN_HISTORY_TXNS
     }
 
-    /** Average daily Fuel spending over the last 14 days, counting only your share of splits. */
+    /**
+     * Average daily Fuel spending over the last 14 days, counting only your share of splits. One-off spends are left
+     * out: they still came out of the balance, but they are not how you usually spend.
+     */
     fun historyDaily(transactions: List<Txn>, today: LocalDate): History? {
-        val spends = transactions.filter { it.countsAsSpending && it.bucket == Bucket.FUEL && !it.date.isAfter(today) }
+        val spends = transactions.filter { it.countsAsSpending && !it.oneOff && it.bucket == Bucket.FUEL && !it.date.isAfter(today) }
         if (spends.isEmpty()) return null
         val windowStart = today.minusDays((HISTORY_WINDOW_DAYS - 1).toLong())
         val firstEver = transactions.filter { !it.date.isAfter(today) }.minOf { it.date }

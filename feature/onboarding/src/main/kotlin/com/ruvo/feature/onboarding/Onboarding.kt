@@ -110,6 +110,7 @@ fun OnboardingFlow(onDone: () -> Unit) {
     var cadence by remember { mutableStateOf(Cadence.MONTHLY) }
     var balance by remember { mutableStateOf("") }
     var expected by remember { mutableStateOf("") }
+    var daily by remember { mutableStateOf("") }
     var nextIn by remember { mutableIntStateOf(-1) }
     // A date picked on the calendar wins over the quick choices.
     var pickedDate by remember { mutableStateOf<LocalDate?>(null) }
@@ -138,7 +139,7 @@ fun OnboardingFlow(onDone: () -> Unit) {
         nextIncome = nextDate(),
         commitments = chosen.map { Commitment(UUID.randomUUID().toString(), it.name, it.rupees * 100L, dueDayOfMonth = it.day) },
         goalName = goalName, goalTarget = parseRupees(goalTarget) ?: 0, goalDate = goalDate ?: today.plusMonths(6),
-        trackSms = trackSms,
+        trackSms = trackSms, dailyEstimate = parseRupees(daily) ?: 0,
     )
 
     AmbientBackdrop {
@@ -175,10 +176,29 @@ fun OnboardingFlow(onDone: () -> Unit) {
                     2 -> {
                         Title("How much do you have right now?", "Bank plus cash. A rough number is fine.")
                         RuvoField(balance, { balance = it }, "Right now", number = true, prefix = "₹ ")
+                        Spacer(Modifier.height(Space.lg))
+                        Text("About how much do you spend on a usual day?", Modifier.semantics { heading() }, style = Ruvo.type.title, color = c.ink)
+                        Spacer(Modifier.height(Space.xxs))
+                        Text("Food, travel, small things. Leave out rent and big one-offs.", style = Ruvo.type.caption, color = c.inkSoft)
+                        Spacer(Modifier.height(Space.xs))
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.xs), verticalArrangement = Arrangement.spacedBy(Space.xs)) {
+                            listOf(100, 200, 300, 500).forEach { r -> Chip(IndianFormat.rupees(r * 100L), parseRupees(daily) == r * 100L, { daily = r.toString() }) }
+                        }
+                        Spacer(Modifier.height(Space.xs))
+                        RuvoField(daily, { daily = it }, "A usual day", number = true, prefix = "₹ ")
+                        Text(
+                            "Your runway uses this until there is a week of real spending, then mixes the two, so one big week cannot swing it. Change it any time from Why N days.",
+                            Modifier.padding(top = Space.xs), style = Ruvo.type.caption, color = c.inkFaint,
+                        )
                     }
                     3 -> {
                         if (cadence == Cadence.IRREGULAR) {
                             Title("No fixed payday. That is fine.", "Ruvo will show how long your money lasts at your pace, rather than a date to reach.")
+                            Spacer(Modifier.height(Space.sm))
+                            Text(
+                                "Know some money is coming, like shift pay or a transfer from home? Add it in Money → Expected money with a rough date. Mark it Sure and Ruvo counts it as your next money; Maybe is shown but never counted on.",
+                                style = Ruvo.type.body, color = c.inkSoft,
+                            )
                         } else {
                             Title("When does the next money arrive?", "So Ruvo knows the finish line. Pick one, or choose the exact date.")
                             FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.xs), verticalArrangement = Arrangement.spacedBy(Space.xs)) {

@@ -97,6 +97,8 @@ object RuvoGuide {
             SpendSource.HISTORY -> "your spending over the last two weeks"
             SpendSource.PLAN -> "your plan, since there is not much history yet"
             SpendSource.EVEN_SPREAD -> "an even spread to your next money, since there is no plan or history yet"
+            SpendSource.ESTIMATE -> "your own estimate of a usual day"
+            SpendSource.BLEND -> "your own estimate, averaged with the last two weeks"
         }
         val parts = mutableListOf<String>()
         parts += "You have ${IndianFormat.rupees(r.balance)} in total."

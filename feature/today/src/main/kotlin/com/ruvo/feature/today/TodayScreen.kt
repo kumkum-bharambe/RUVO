@@ -4,6 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -156,6 +158,10 @@ fun TodayContent(state: AppState, a: TodayActions) {
         }
         // Before you buy sits right under the buckets, inside the first screen: the check belongs before paying.
         item { BuyCard(a.openBuy, Modifier.padding(top = Space.sm).tourTarget("buy").reveal(3)) }
+        // Make it last until: for one big amount (a scholarship), a daily allowance to a chosen date.
+        if (com.ruvo.engine.Allowance.offered(r.daysToNextIncome, state.settings.allowanceOn) || state.settings.allowanceUntilEpochDay != null) {
+            item(key = "last") { LastCard(state, Modifier.padding(horizontal = Space.gutter).padding(top = Space.sm).reveal(3)) }
+        }
         if (state.toSort.isNotEmpty()) {
             item { SortCard(state.toSort.size, a.openSort, Modifier.reveal(3)) }
         }
@@ -451,4 +457,52 @@ fun ActivityLine(item: ActivityItem, state: AppState, open: (String) -> Unit) {
     ) {
         Amount(if (credit) t.amount else -t.yourShare, color = if (credit) c.brandInk else c.ink, signed = credit)
     }
+}
+
+/**
+ * "Make it last until": Fuel ÷ days to a chosen date, beside the usual daily spend, with one kind line. The student can
+ * keep the date as a target; Home then shows it every day, recalculated from what is free to spend.
+ */
+@Composable
+private fun LastCard(state: AppState, modifier: Modifier = Modifier) {
+    val c = Ruvo.colors
+    val r = state.runway
+    val kept = state.settings.allowanceUntilEpochDay?.let(LocalDate::ofEpochDay)?.takeIf { it.isAfter(state.today) }
+    var picked by remember(kept) { mutableStateOf<LocalDate?>(kept) }
+    var choosing by remember { mutableStateOf(false) }
+    val until = picked ?: com.ruvo.engine.Allowance.defaultUntil(r)
+    val plan = com.ruvo.engine.Allowance.plan(r, until)
+    val isKept = kept != null && kept == until
+    RuvoCard(modifier.fillMaxWidth()) {
+        Eyebrow(if (isKept) "Your target" else "Make it last", color = c.brandInk)
+        Spacer(Modifier.height(Space.xxs))
+        Text(
+            "${IndianFormat.rupees(plan.daily)} a day until ${IndianFormat.date(until, state.today)}",
+            Modifier.semantics { contentDescription = "${IndianFormat.spoken(plan.daily)} a day until ${IndianFormat.date(until)}" },
+            style = Ruvo.type.title, color = c.ink,
+        )
+        Spacer(Modifier.height(Space.xxs))
+        Text(
+            "Your usual: ${IndianFormat.rupees(plan.usual)} a day · ${IndianFormat.days(plan.days)} to go",
+            style = Ruvo.type.caption, color = c.inkSoft,
+        )
+        Spacer(Modifier.height(Space.xs))
+        Text(com.ruvo.engine.Allowance.message(plan), style = Ruvo.type.body, color = c.ink)
+        Spacer(Modifier.height(Space.sm))
+        Row(horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
+            com.ruvo.design.GhostButton("Change date", { choosing = true }, Modifier.weight(1f))
+            if (isKept) {
+                com.ruvo.design.GhostButton("Stop target", {
+                    com.ruvo.data.RuvoGraph.appScope.launch { RuvoGraph.repository.keepAllowance(null) }
+                    com.ruvo.data.Notices.post(com.ruvo.data.Notices.Notice.Text("Target removed"))
+                }, Modifier.weight(1f))
+            } else {
+                com.ruvo.design.PrimaryButton("Keep as target", {
+                    com.ruvo.data.RuvoGraph.appScope.launch { RuvoGraph.repository.keepAllowance(until) }
+                    com.ruvo.data.Notices.post(com.ruvo.data.Notices.Notice.Text("Target kept: ${IndianFormat.rupees(plan.daily)} a day until ${IndianFormat.date(until)}"))
+                }, Modifier.weight(1f), enabled = plan.daily > 0)
+            }
+        }
+    }
+    if (choosing) com.ruvo.design.FutureDatePicker(until, { picked = it }, { choosing = false })
 }

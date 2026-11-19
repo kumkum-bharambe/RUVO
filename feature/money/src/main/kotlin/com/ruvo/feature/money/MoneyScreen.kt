@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Box
 import com.ruvo.design.Radius
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -122,6 +123,7 @@ fun MoneyScreen(openTxn: (String) -> Unit, openAdd: () -> Unit = {}) {
     var editMonth by remember { mutableStateOf<java.time.YearMonth?>(null) }
     var category by rememberSaveable { mutableStateOf<String?>(null) }
     var balanceSheet by remember { mutableStateOf(false) }
+    var expectedSheet by remember { mutableStateOf(false) }
     val c = Ruvo.colors
 
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = Space.dockClearance)) {
@@ -144,6 +146,7 @@ fun MoneyScreen(openTxn: (String) -> Unit, openAdd: () -> Unit = {}) {
         }
         when (tab) {
             MoneyTab.OVERVIEW -> {
+                item { Expected(state, Modifier.padding(horizontal = Space.gutter).padding(bottom = Space.md).reveal(2)) { expectedSheet = true } }
                 item { WhereItWent(state, Modifier.reveal(2)) { cat -> category = cat; span = Span.MONTH; back = 0; tab = MoneyTab.ACTIVITY } }
                 item { Buckets(state) }
             }
@@ -193,6 +196,7 @@ fun MoneyScreen(openTxn: (String) -> Unit, openAdd: () -> Unit = {}) {
         }
     }
     if (balanceSheet) BalanceSheet(state) { balanceSheet = false }
+    if (expectedSheet) ExpectedSheet(state) { expectedSheet = false }
     editMonth?.let { m -> MonthEditSheet(state, m) { editMonth = null } }
 }
 
@@ -818,6 +822,21 @@ fun TxnSheet(id: String, startWithSplit: Boolean, onDismiss: () -> Unit) {
                 // A payment is planned (Fixed) or everyday (Fuel); money for goals moves by pouring, not by paying.
                 listOf(Bucket.FIXED, Bucket.FUEL).forEach { b -> Chip(bucketName(b), t.bucket == b, { com.ruvo.data.RuvoGraph.appScope.launch { repo.setBucket(id, b) } }, accent = c.bucket(b)) }
             }
+            Spacer(Modifier.height(Space.sm))
+            val oneOff = id in state.settings.oneOffTxns
+            Row(
+                Modifier.fillMaxWidth().heightIn(min = 48.dp).toggleable(oneOff, role = Role.Switch) { on ->
+                    com.ruvo.data.RuvoGraph.appScope.launch { repo.setOneOff(id, on) }
+                    com.ruvo.data.Notices.post(com.ruvo.data.Notices.Notice.Text(if (on) "Marked one-off · left out of your usual day" else "Counted in your usual day again"))
+                },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("One-off?", style = Ruvo.type.bodyStrong, color = c.ink)
+                    Text("Big and rare, like a trip. Still spent, but left out of your usual day.", style = Ruvo.type.caption, color = c.inkSoft)
+                }
+                androidx.compose.material3.Switch(oneOff, null)
+            }
             Spacer(Modifier.height(Space.md))
             RuvoCard {
                 Text(if (t.othersShare > 0) "Shared · your part ${IndianFormat.rupees(t.yourShare)}" else "Shared with friends?", style = Ruvo.type.bodyStrong, color = c.ink)
@@ -866,4 +885,104 @@ fun TxnSheet(id: String, startWithSplit: Boolean, onDismiss: () -> Unit) {
             Text("Read from a bank SMS on this phone. The message itself is never uploaded.", Modifier.padding(top = Space.xs), style = Ruvo.type.caption, color = c.inkFaint)
         }
     }
+}
+
+/**
+ * Expected money: amounts with a rough date, Sure or Maybe. The earliest Sure one becomes the next money; Maybe ones are
+ * shown but never counted on. Empty, it says how it helps and nothing else changes.
+ */
+@Composable
+private fun Expected(state: AppState, modifier: Modifier, onAdd: () -> Unit) {
+    val c = Ruvo.colors
+    val list = state.settings.expectedList()
+    val next = com.ruvo.engine.RunwayEngine.earliestSure(list, state.today)
+    RuvoCard(modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Eyebrow("Expected money")
+                Text(
+                    if (list.isEmpty()) "Money on the way without a fixed date? Shift pay, a transfer from home."
+                    else next?.let { "Next money counted from ${IndianFormat.date(it, state.today)}" } ?: "Nothing Sure yet, so your next money date is unchanged.",
+                    style = Ruvo.type.caption, color = c.inkSoft,
+                )
+            }
+            Spacer(Modifier.width(Space.xs))
+            IconCircle(RuvoIcons.Plus, "Add expected money", onAdd)
+        }
+        list.forEach { e ->
+            val past = e.date.isBefore(state.today)
+            Spacer(Modifier.height(Space.sm))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(e.note.ifBlank { "Money in" }, style = Ruvo.type.bodyStrong, color = if (e.sure) c.ink else c.inkSoft)
+                    Text(
+                        "${if (past) "Was due" else "Around"} ${IndianFormat.date(e.date, state.today)} · ${if (e.sure) "Sure" else "Maybe, not counted"}",
+                        style = Ruvo.type.caption, color = c.inkSoft,
+                    )
+                }
+                Amount(e.amount, style = Ruvo.type.label, color = if (e.sure) c.ink else c.inkSoft)
+            }
+            Spacer(Modifier.height(Space.xxs))
+            Row(horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
+                GhostButton("Remove", {
+                    RuvoGraph.appScope.launch { RuvoGraph.repository.removeExpected(e.id) }
+                }, Modifier.weight(1f))
+                PrimaryButton("It arrived", {
+                    RuvoGraph.appScope.launch { RuvoGraph.repository.expectedArrived(e) }
+                    com.ruvo.data.Notices.post(com.ruvo.data.Notices.Notice.Saved(e.amount, true, state.runway.runwayDays))
+                }, Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ExpectedSheet(state: AppState, onDismiss: () -> Unit) {
+    val c = Ruvo.colors
+    var amount by remember { mutableStateOf("") }
+    var note by remember { mutableStateOf("") }
+    var sure by remember { mutableStateOf(false) }
+    var date by remember { mutableStateOf(state.today.plusDays(7)) }
+    var choosing by remember { mutableStateOf(false) }
+    val paise = parseRupees(amount) ?: 0
+    RuvoSheet("Money on the way", onDismiss, eyebrow = "Expected money") {
+        Text("A rough date is fine. Sure counts as your next money; Maybe is shown but never counted on.", style = Ruvo.type.body, color = c.inkSoft)
+        Spacer(Modifier.height(Space.md))
+        RuvoField(amount, { amount = it }, "How much?", number = true, prefix = "₹ ")
+        Spacer(Modifier.height(Space.sm))
+        RuvoField(note, { note = it.take(30) }, "From? e.g. Café shifts, Mum")
+        Spacer(Modifier.height(Space.md))
+        Eyebrow("Around when?")
+        Spacer(Modifier.height(Space.xs))
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.xs), verticalArrangement = Arrangement.spacedBy(Space.xs)) {
+            val presets = listOf(3L to "In 3 days", 7L to "In a week", 14L to "In 2 weeks", 30L to "In a month")
+            presets.forEach { (d, label) -> Chip(label, date == state.today.plusDays(d), { date = state.today.plusDays(d) }) }
+            val custom = presets.none { date == state.today.plusDays(it.first) }
+            Chip(if (custom) "On ${IndianFormat.date(date)}" else "Choose a date", custom, { choosing = true })
+        }
+        Spacer(Modifier.height(Space.md))
+        Eyebrow("How sure?")
+        Spacer(Modifier.height(Space.xs))
+        Row(horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
+            Chip("Sure", sure, { sure = true })
+            Chip("Maybe", !sure, { sure = false })
+        }
+        Spacer(Modifier.height(Space.lg))
+        PrimaryButton(
+            if (paise > 0) "Save · ${IndianFormat.rupees(paise)} ${if (sure) "sure" else "maybe"}" else "Type the amount to save",
+            {
+                val a = paise; val d = date; val s = sure; val n = note.trim()
+                RuvoGraph.appScope.launch { RuvoGraph.repository.addExpected(a, d, s, n) }
+                com.ruvo.data.Notices.post(
+                    com.ruvo.data.Notices.Notice.Text(
+                        if (s) "Saved · ${IndianFormat.rupees(a)} expected around ${IndianFormat.date(d)}" else "Saved as Maybe · not counted until it is Sure",
+                    ),
+                )
+                onDismiss()
+            },
+            Modifier.fillMaxWidth(), enabled = paise > 0,
+        )
+    }
+    if (choosing) com.ruvo.design.FutureDatePicker(date, { date = it }, { choosing = false })
 }

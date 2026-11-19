@@ -86,6 +86,8 @@ fun WhySheet(onDismiss: () -> Unit) {
             SpendSource.HISTORY -> "your last two weeks of spending"
             SpendSource.PLAN -> "your monthly plan"
             SpendSource.EVEN_SPREAD -> "an even spread to your next money"
+            SpendSource.ESTIMATE -> "your own estimate of a usual day"
+            SpendSource.BLEND -> "your estimate, averaged with your last two weeks"
         }
         Text("Right now: $used.", style = Ruvo.type.caption, color = c.inkSoft)
         Spacer(Modifier.height(Space.xs))
@@ -94,6 +96,8 @@ fun WhySheet(onDismiss: () -> Unit) {
                 Chip(label, state.settings.spendBasis == b, { com.ruvo.data.RuvoGraph.appScope.launch { RuvoGraph.repository.setSpendBasis(b) } })
             }
         }
+        Spacer(Modifier.height(Space.lg))
+        UsualDayEditor(state.settings.dailyEstimate)
         Spacer(Modifier.height(Space.lg))
         Eyebrow("What can change it?")
         Spacer(Modifier.height(Space.xs))
@@ -203,4 +207,42 @@ fun LessonSheet(id: String, onDismiss: () -> Unit, onAsk: () -> Unit) {
             GhostButton("Close", onDismiss, Modifier.fillMaxWidth())
         }
     }
+}
+
+/**
+ * "Your usual day": the student's own estimate. Used on its own until there is a week of spending, then averaged with
+ * the last two weeks, so one heavy week cannot make the runway look scary. Empty and Save clears it.
+ */
+@Composable
+fun UsualDayEditor(current: Long) {
+    val c = Ruvo.colors
+    var text by remember(current) { mutableStateOf(if (current > 0) (current / 100).toString() else "") }
+    Eyebrow("Your usual day")
+    Spacer(Modifier.height(Space.xs))
+    Text(
+        if (current > 0) "You said about ${IndianFormat.rupees(current)} a day. One heavy week only moves the runway half as much."
+        else "Tell Ruvo what a usual day costs, so one heavy week cannot swing your runway.",
+        style = Ruvo.type.caption, color = c.inkSoft,
+    )
+    Spacer(Modifier.height(Space.xs))
+    RuvoField(text, { text = it }, "A usual day", number = true, prefix = "₹ ")
+    Spacer(Modifier.height(Space.xs))
+    val typed = parseRupees(text) ?: 0
+    PrimaryButton(
+        when {
+            typed > 0 -> "Save · ${IndianFormat.rupees(typed)} a day"
+            current > 0 -> "Clear my estimate"
+            else -> "Type an amount to save"
+        },
+        {
+            RuvoGraph.appScope.launch {
+                RuvoGraph.repository.setDailyEstimate(typed)
+                com.ruvo.data.Notices.post(
+                    com.ruvo.data.Notices.Notice.Text(if (typed > 0) "Usual day saved: ${IndianFormat.rupees(typed)}" else "Estimate cleared · runway uses your spending"),
+                )
+            }
+        },
+        Modifier.fillMaxWidth(),
+        enabled = typed > 0 || current > 0,
+    )
 }

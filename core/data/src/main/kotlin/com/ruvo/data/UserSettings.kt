@@ -81,7 +81,24 @@ data class UserSettings(
     val seenBooks: Set<String> = emptySet(),
     /** True once the offers and books in the installed app were marked as seen, so a first install announces nothing. */
     val newsBaseline: Boolean = false,
+    /** "About how much do you spend on a usual day?" in paise; 0 when not given. */
+    val dailyEstimate: Long = 0,
+    /** Expected money, as "id|amountPaise|epochDay|S or M|note". */
+    val expectedMoney: Set<String> = emptySet(),
+    /** Transactions marked one-off (left out of the daily average) and money in marked as a top-up from home. */
+    val oneOffTxns: Set<String> = emptySet(),
+    val topUpTxns: Set<String> = emptySet(),
+    /** "Make it last until" switched on by hand, and the date kept as a target on Home (null when none). */
+    val allowanceOn: Boolean = false,
+    val allowanceUntilEpochDay: Long? = null,
 ) {
+    fun expectedList(): List<com.ruvo.engine.ExpectedMoney> = expectedMoney.mapNotNull { e ->
+        val p = e.split("|")
+        runCatching {
+            com.ruvo.engine.ExpectedMoney(p[0], p[1].toLong(), java.time.LocalDate.ofEpochDay(p[2].toLong()), p[3] == "S", p.getOrElse(4) { "" })
+        }.getOrNull()
+    }.sortedBy { it.date }
+
     val hasAccount: Boolean get() = pinHash.isNotEmpty()
 
     fun monthEditMap(): Map<java.time.YearMonth, Pair<Long, Long>> = monthEdits.mapNotNull { e ->
@@ -134,6 +151,12 @@ class SettingsStore(private val context: Context) {
         val seenOffers = stringSetPreferencesKey("seen_offers")
         val seenBooks = stringSetPreferencesKey("seen_books")
         val baseline = booleanPreferencesKey("news_baseline")
+        val estimate = longPreferencesKey("daily_estimate")
+        val expectedMoney = stringSetPreferencesKey("expected_money")
+        val oneOff = stringSetPreferencesKey("one_off_txns")
+        val topUp = stringSetPreferencesKey("top_up_txns")
+        val allowanceOn = booleanPreferencesKey("allowance_on")
+        val allowanceUntil = longPreferencesKey("allowance_until")
     }
 
     val settings: Flow<UserSettings> = context.store.data.map { readFrom(it) }
@@ -182,6 +205,12 @@ class SettingsStore(private val context: Context) {
             p[K.seenOffers] = s.seenOffers
             p[K.seenBooks] = s.seenBooks
             p[K.baseline] = s.newsBaseline
+            p[K.estimate] = s.dailyEstimate
+            p[K.expectedMoney] = s.expectedMoney
+            p[K.oneOff] = s.oneOffTxns
+            p[K.topUp] = s.topUpTxns
+            p[K.allowanceOn] = s.allowanceOn
+            if (s.allowanceUntilEpochDay != null) p[K.allowanceUntil] = s.allowanceUntilEpochDay else p.remove(K.allowanceUntil)
         }
     }
 
@@ -225,5 +254,11 @@ class SettingsStore(private val context: Context) {
         seenOffers = p[K.seenOffers] ?: emptySet(),
         seenBooks = p[K.seenBooks] ?: emptySet(),
         newsBaseline = p[K.baseline] ?: false,
+        dailyEstimate = p[K.estimate] ?: 0,
+        expectedMoney = p[K.expectedMoney] ?: emptySet(),
+        oneOffTxns = p[K.oneOff] ?: emptySet(),
+        topUpTxns = p[K.topUp] ?: emptySet(),
+        allowanceOn = p[K.allowanceOn] ?: false,
+        allowanceUntilEpochDay = p[K.allowanceUntil],
     )
 }
