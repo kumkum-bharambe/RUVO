@@ -83,6 +83,7 @@ import com.ruvo.engine.Direction
 import com.ruvo.engine.IndianFormat
 import com.ruvo.engine.Insights
 import com.ruvo.engine.TxnStatus
+import com.ruvo.engine.paidThisMonth
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
 
@@ -504,6 +505,7 @@ private fun Buckets(state: AppState) {
                     }
                     state.commitments.forEach { cm ->
                         val due = r.reservedCommitments.firstOrNull { it.id == cm.id }
+                        val paidNow = cm.paidThisMonth(state.today)
                         Row(
                             Modifier.fillMaxWidth().heightIn(min = 56.dp).clip(RoundedCornerShape(Radius.inner))
                                 .clickable(role = Role.Button, onClickLabel = "Edit ${cm.name}") { editing = cm.id }
@@ -513,15 +515,15 @@ private fun Buckets(state: AppState) {
                             Column(Modifier.weight(1f)) {
                                 Text(cm.name, style = Ruvo.type.bodyStrong, color = c.ink)
                                 Text(
-                                    (if (due != null) "Due ${due.dueDate?.let { IndianFormat.date(it, state.today) }}" else "Paid for this cycle") +
+                                    (if (paidNow) "Paid this month" else due?.dueDate?.let { "Due ${IndianFormat.date(it, state.today)}" } ?: "Not paid this month") +
                                         (cm.dueDayOfMonth?.takeIf { cm.recurring }?.let { " · monthly on day $it" } ?: ""),
                                     style = Ruvo.type.caption, color = c.inkFaint,
                                 )
                             }
                             Amount(cm.amount, style = Ruvo.type.label)
                             Spacer(Modifier.width(Space.xs))
-                            // Its status for this cycle: Paid with a tick, or Unpaid, which you tap once it is paid.
-                            PaidStatus(paid = due == null, name = cm.name) { com.ruvo.data.RuvoGraph.appScope.launch { RuvoGraph.repository.payCommitment(cm) } }
+                            // Paid this month with a tick, or Unpaid, which you tap once it is paid. A new month resets it.
+                            PaidStatus(paid = paidNow, name = cm.name) { com.ruvo.data.RuvoGraph.appScope.launch { RuvoGraph.repository.payCommitment(cm) } }
                             Spacer(Modifier.width(Space.xxs))
                             Icon(RuvoIcons.Forward, null, Modifier.size(16.dp), tint = c.inkFaint)
                         }

@@ -113,37 +113,6 @@ fun ProfileSheet(
                 HeroStat("Books read", "$read of ${Library.all.size}", Modifier.weight(1f))
             }
         }
-        // This month so far: what came in, what went out, what is protected.
-        Spacer(Modifier.height(Space.md))
-        val from = state.today.withDayOfMonth(1)
-        val flow = Insights.flow(state.activity.map { it.txn }, from, state.today)
-        RuvoCard(Modifier.fillMaxWidth().reveal(1)) {
-            Eyebrow("${state.today.month.name.lowercase().replaceFirstChar { it.uppercase() }} so far")
-            Spacer(Modifier.height(Space.xs))
-            // Money in is brand blue, protected is Future orange, what went out stays plain ink.
-            Row {
-                MonthFigure("Came in", flow.moneyIn, c.brandInk, Modifier.weight(1f))
-                MonthFigure("Went out", flow.moneyOut, c.ink, Modifier.weight(1f))
-                MonthFigure("Protected", state.runway.futureProtected, c.futureInk, Modifier.weight(1f))
-            }
-            Spacer(Modifier.height(Space.sm))
-            val spentShade = c.ink.copy(alpha = if (c.isDark) 0.45f else 0.3f)
-            val total = (flow.moneyOut + state.runway.futureProtected + state.runway.fuel.coerceAtLeast(0)).toFloat().coerceAtLeast(1f)
-            SplitBar(
-                listOf(
-                    Segment(flow.moneyOut / total, spentShade),
-                    Segment(state.runway.futureProtected / total, c.future),
-                    Segment(state.runway.fuel.coerceAtLeast(0) / total, c.fuel),
-                ),
-                height = 10.dp,
-            )
-            Spacer(Modifier.height(Space.xs))
-            Row(horizontalArrangement = Arrangement.spacedBy(Space.md)) {
-                com.ruvo.design.LegendDot(spentShade, "Spent")
-                com.ruvo.design.LegendDot(c.future, "Protected")
-                com.ruvo.design.LegendDot(c.fuel, "Still yours")
-            }
-        }
 
         // Mood and your data sit here, up front, rather than deep in Settings.
         Spacer(Modifier.height(Space.md))

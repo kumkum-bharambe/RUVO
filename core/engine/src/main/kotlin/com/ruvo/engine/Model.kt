@@ -121,3 +121,15 @@ data class ExpectedMoney(
     val sure: Boolean,
     val note: String = "",
 )
+
+/**
+ * Paid / Unpaid for this month, as Money shows it. Paid once it was paid this month (or up to 10 days early for this
+ * month's due date); on the 1st of a new month it goes back to Unpaid by itself. One-off commitments stay paid once paid.
+ */
+fun Commitment.paidThisMonth(today: LocalDate): Boolean {
+    val paid = lastPaidOn ?: return false
+    if (!recurring || dueDayOfMonth == null) return true
+    val due = today.withDayOfMonth(dueDayOfMonth.coerceIn(1, today.lengthOfMonth()))
+    val from = minOf(today.withDayOfMonth(1), due.minusDays(RunwayEngine.EARLY_PAY_GRACE_DAYS))
+    return !paid.isBefore(from)
+}
