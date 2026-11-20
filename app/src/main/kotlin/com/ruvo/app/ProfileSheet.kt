@@ -178,7 +178,7 @@ fun ProfileSheet(
         Spacer(Modifier.height(Space.md))
         BigTile("Marketplace", MARKETPLACE_LINE, RuvoIcons.Store, Modifier.reveal(3)) { onDismiss(); onMarketplace() }
         Spacer(Modifier.height(Space.sm))
-        BigTile("Settings", "Your name, mood, tracking, notifications, sample students, your data and help.", RuvoIcons.Settings, Modifier.reveal(4), style = com.ruvo.design.TileStyle.GLASS) { onDismiss(); onSettings() }
+        BigTile("Settings", "Your name, tracking, notifications, your usual day, privacy and help.", RuvoIcons.Settings, Modifier.reveal(4), style = com.ruvo.design.TileStyle.GLASS) { onDismiss(); onSettings() }
 
         Spacer(Modifier.height(Space.md))
         RuvoCard(Modifier.fillMaxWidth().reveal(5), padding = PaddingValues(horizontal = Space.md, vertical = Space.xs)) {
