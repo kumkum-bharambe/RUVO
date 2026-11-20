@@ -289,6 +289,8 @@ fun SettingsSheet(state: AppState, onDismiss: () -> Unit, onPersonas: () -> Unit
         Toggle("Make it last until", "A Home card with a daily amount to reach a date you choose. Shows by itself when next money is over 45 days away.", s.allowanceOn) { on -> com.ruvo.data.RuvoGraph.appScope.launch { repo.setAllowanceOn(on) } }
         Spacer(Modifier.height(Space.sm))
         com.ruvo.feature.today.UsualDayEditor(s.dailyEstimate)
+        Spacer(Modifier.height(Space.md))
+        com.ruvo.feature.money.ExpectedMoneyCard(state)
 
         SectionTitle("Money view")
         Toggle("Hide my balance", "Shows •••• on Money instead of the amount", s.hideBalance) { on -> com.ruvo.data.RuvoGraph.appScope.launch { repo.setHideBalance(on) } }

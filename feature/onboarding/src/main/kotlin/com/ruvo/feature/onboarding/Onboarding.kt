@@ -196,7 +196,7 @@ fun OnboardingFlow(onDone: () -> Unit) {
                             Title("No fixed payday. That is fine.", "Ruvo will show how long your money lasts at your pace, rather than a date to reach.")
                             Spacer(Modifier.height(Space.sm))
                             Text(
-                                "Know some money is coming, like shift pay or a transfer from home? Add it in Money → Expected money with a rough date. Mark it Sure and Ruvo counts it as your next money; Maybe is shown but never counted on.",
+                                "Know some money is coming, like shift pay or a transfer from home? Add it in Profile → Settings → Runway → Expected money with a rough date. Mark it Sure and Ruvo counts it as your next money; Maybe is shown but never counted on.",
                                 style = Ruvo.type.body, color = c.inkSoft,
                             )
                         } else {
