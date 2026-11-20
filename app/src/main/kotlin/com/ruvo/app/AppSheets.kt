@@ -231,36 +231,11 @@ fun SettingsSheet(state: AppState, onDismiss: () -> Unit, onPersonas: () -> Unit
     }
 
     RuvoSheet("Settings", onDismiss) {
-        Eyebrow("Mood")
-        Spacer(Modifier.height(Space.xs))
-        Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
-            MoodCard("Daybreak", "Soft light, amber dawn glow", Daybreak, s.theme == ThemeChoice.DAYBREAK.name, Modifier.weight(1f)) {
-                com.ruvo.data.RuvoGraph.appScope.launch { repo.setTheme(ThemeChoice.DAYBREAK.name) }
-            }
-            MoodCard("Night swim", "True black, quiet glow", NightSwim, s.theme == ThemeChoice.NIGHT_SWIM.name, Modifier.weight(1f)) {
-                com.ruvo.data.RuvoGraph.appScope.launch { repo.setTheme(ThemeChoice.NIGHT_SWIM.name) }
-            }
-        }
-        Spacer(Modifier.height(Space.xs))
-        Chip("Follow my phone", s.theme == ThemeChoice.SYSTEM.name, { com.ruvo.data.RuvoGraph.appScope.launch { repo.setTheme(ThemeChoice.SYSTEM.name) } })
-
         if (!state.isDemo) {
             SectionTitle("Your name")
             RuvoField(name, { name = it }, "What should Ruvo call you?")
             Spacer(Modifier.height(Space.xs))
             GhostButton("Save name", { com.ruvo.data.RuvoGraph.appScope.launch { repo.setName(name) } }, Modifier.fillMaxWidth())
-        }
-
-        SectionTitle("Your data")
-        if (state.isDemo) {
-            Text("Showing sample student ${state.persona?.name}. None of it is real.", style = Ruvo.type.body, color = c.inkSoft)
-            Spacer(Modifier.height(Space.xs))
-            Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
-                GhostButton("Switch", onPersonas, Modifier.weight(1f))
-                PrimaryButton("Use my own", { com.ruvo.data.RuvoGraph.appScope.launch { repo.deleteEverything() } }, Modifier.weight(1f))
-            }
-        } else {
-            GhostButton("Explore a sample student", onPersonas, Modifier.fillMaxWidth())
         }
 
         SectionTitle("Tracking")
@@ -295,11 +270,20 @@ fun SettingsSheet(state: AppState, onDismiss: () -> Unit, onPersonas: () -> Unit
             Text("Notifications are off for Ruvo on this phone.", Modifier.padding(top = Space.xs), style = Ruvo.type.bodyStrong, color = c.warning)
             GhostButton("Turn on notifications", { ask() }, Modifier.fillMaxWidth().padding(top = Space.xs))
         }
-        Toggle("Daily update", "Each morning: your runway and today's amount", s.notifyDaily) { on -> if (on) ask(); com.ruvo.data.RuvoGraph.appScope.launch { repo.setNotifications(daily = on) } }
-        Toggle("New offers and books", "When a student offer or a Guide book is added", s.notifyNews) { on -> if (on) ask(); com.ruvo.data.RuvoGraph.appScope.launch { repo.setNotifications(news = on) } }
-        if (smsAvailable) Toggle("Payments to confirm", "When Ruvo reads a new payment from a bank SMS", s.notifyCapture) { on -> if (on) ask(); com.ruvo.data.RuvoGraph.appScope.launch { repo.setNotifications(capture = on) } }
-        Toggle("Weekly review", "A Sunday nudge to sort and review your week", s.notifyWeekly) { on -> if (on) ask(); com.ruvo.data.RuvoGraph.appScope.launch { repo.setNotifications(weekly = on) } }
-        Toggle("Goal moments", "When a goal is reached or falls behind", s.notifyGoals) { on -> if (on) ask(); com.ruvo.data.RuvoGraph.appScope.launch { repo.setNotifications(goals = on) } }
+        // One switch for all of them; the individual ones show only while notifications are on.
+        val anyOn = s.notifyDaily || s.notifyNews || s.notifyCapture || s.notifyWeekly || s.notifyGoals
+        Toggle("Notifications", if (anyOn) "On. Choose which ones below." else "Off. Ruvo sends nothing.", anyOn) { on ->
+            if (on) ask()
+            com.ruvo.data.RuvoGraph.appScope.launch { repo.setNotifications(capture = on, weekly = on, goals = on, daily = on, news = on) }
+            com.ruvo.data.Notices.post(com.ruvo.data.Notices.Notice.Text(if (on) "Notifications on" else "Notifications off"))
+        }
+        if (anyOn) {
+            Toggle("Daily update", "Each morning: your runway and today's amount", s.notifyDaily) { on -> if (on) ask(); com.ruvo.data.RuvoGraph.appScope.launch { repo.setNotifications(daily = on) } }
+            Toggle("New offers and books", "When a student offer or a Guide book is added", s.notifyNews) { on -> if (on) ask(); com.ruvo.data.RuvoGraph.appScope.launch { repo.setNotifications(news = on) } }
+            if (smsAvailable) Toggle("Payments to confirm", "When Ruvo reads a new payment from a bank SMS", s.notifyCapture) { on -> if (on) ask(); com.ruvo.data.RuvoGraph.appScope.launch { repo.setNotifications(capture = on) } }
+            Toggle("Weekly review", "A Sunday nudge to sort and review your week", s.notifyWeekly) { on -> if (on) ask(); com.ruvo.data.RuvoGraph.appScope.launch { repo.setNotifications(weekly = on) } }
+            Toggle("Goal moments", "When a goal is reached or falls behind", s.notifyGoals) { on -> if (on) ask(); com.ruvo.data.RuvoGraph.appScope.launch { repo.setNotifications(goals = on) } }
+        }
 
         SectionTitle("Runway")
         Toggle("Make it last until", "A Home card with a daily amount to reach a date you choose. Shows by itself when next money is over 45 days away.", s.allowanceOn) { on -> com.ruvo.data.RuvoGraph.appScope.launch { repo.setAllowanceOn(on) } }
@@ -366,7 +350,7 @@ fun SettingsSheet(state: AppState, onDismiss: () -> Unit, onPersonas: () -> Unit
             "How do I change my balance?" to "Money → tap the You have card → type what you have in bank and cash → Save. Runway, Fuel, the buckets, the daily amount and the widget all update straight away.",
             "How do I split a bill?" to "Tap + → type the amount → switch on Shared with friends → add each friend → pick a category → Save split. Their part shows in Money → Owed → Owed to you, and They paid settles it.",
             "A friend paid for me. How do I track it?" to "Money → Owed → You owe → A friend paid for me → who, how much, what for → Save. Ruvo keeps that money aside in Fixed until you tap I paid them back.",
-            "I spent money. How do I add it?" to "Tap + on any tab (or pull Ruvo's pet down) → type the amount → pick a category → Save. Received money works the same way with Received.",
+            "I spent money. How do I add it?" to "Tap + on Home or Money (or pull Ruvo's pet down) → type the amount → pick a category → Save. Received money works the same way with Received.",
             "Why does Ruvo not count my goal money?" to "Money in a goal is protected for its purpose. Leaving it out of Fuel means a goal can never quietly shrink without you deciding.",
             "Does Ruvo read my messages?" to "Only if you switch on Read payment SMS. Then it reads payment messages from the banks and card companies on its list, on this phone only, and never uploads them. Settings → Tracking → What Ruvo reads has the details.",
             "Can Ruvo move or hold my money?" to "No. Ruvo never holds, moves or invests money. It explains your own numbers.",
@@ -408,7 +392,7 @@ private fun Toggle(title: String, subtitle: String, on: Boolean, onChange: (Bool
 
 /** A small preview of each mood, drawn with that mood's own colours. */
 @Composable
-private fun MoodCard(name: String, line: String, palette: RuvoColors, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
+internal fun MoodCard(name: String, line: String, palette: RuvoColors, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
     val c = Ruvo.colors
     val shape = RoundedCornerShape(Radius.inner)
     // Painted in the mood's own sky, with a pane of its glass and its brand blue, so you see it before you pick it.

@@ -516,7 +516,7 @@ private fun tourSteps(state: AppState): List<com.ruvo.design.TourStep> {
         s("goals", "Goals", "Each goal shows what you have saved and by when. Tap + ₹100 to put money in, or New goal to start one. Goal money is never counted as spendable.", Tab.GOALS),
         s("books", "The Guide", "Short books on money, each a few minutes with a quiz. Pick one up any time; there are no streaks.", Tab.GUIDE),
         s("market", "Student offers", "Real offers on music, food, apps and learning, checked by Ruvo. Tap How to get it on any offer.", Tab.GUIDE),
-        s("dock", "Moving around", "Home, Money, Goals and Guide are always down here. The + on every tab adds money in or out.", Tab.GUIDE),
+        s("dock", "Moving around", "Home, Money, Goals and Guide are always down here. The + on Home and Money adds money in or out.", Tab.GUIDE),
         s(null, "Stay in the loop?", "A short note each morning with your runway, plus new student offers, new books and payments to confirm. You can change this in Settings."),
     )
 }

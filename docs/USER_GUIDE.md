@@ -22,7 +22,7 @@ The dark bar at the bottom has four tabs: **Home**, **Money**, **Goals**, **Guid
 - **Drag the pet down** to add a spend quickly.
 - The pet's mood follows your money. It is never sad; when money is tight it turns supportive.
 
-The round **+** button at the top of Home and Money also adds a payment.
+The round **+** button at the top of Home and Money adds a payment. Goals and Guide have no +; drag the pet down there instead.
 
 ## Home
 
@@ -78,6 +78,7 @@ says when the goal will land at your current pace.
 
 ## Guide
 
+- **Search** at the top of the Guide finds books by title or theme: saving, spending, money, UPI, loans, tax, investing.
 - **See the list** shows all 36 books. The ticks fill in as you read; there are no streaks and no pressure.
 - **Marketplace** — real student offers. Tap **How to get it** on an offer for the steps and a button to the
   brand's own app or site. Tap the bookmark to save an offer; **Saved** shows only saved offers.
@@ -94,10 +95,7 @@ spend today?" or "Can I afford ₹1,500?". Answers use your own numbers and work
 
 ## Profile and Settings
 
-Tap your initial on Home. **Profile** shows your runway, goals, books read and this month's money. **Settings**:
-light (**Daybreak**) or dark (**Night swim**) look, your data (switch sample student, or **Use my own** to start
-fresh), spoken replies, notifications, hide my balance, your UPI ID for split reminders, export your data, clear
-transactions or delete everything. **Change PIN** and **Sign out** are on Profile.
+Tap your initial on Home. **Profile** shows your runway, goals, books read and this month's money, the **Mood** switch (light **Daybreak**, dark **Night swim** or **Follow my phone**) and **Your data** (switch sample student, or **Use my own** to start fresh). **Change PIN** and **Sign out** are there too. **Settings**: tracking and What Ruvo reads, spoken replies, one **Notifications** switch with a switch for each kind, your usual day and Make it last, hide my balance, your UPI ID for split reminders, export your data, clear transactions or delete everything.
 
 ## Outside the app
 

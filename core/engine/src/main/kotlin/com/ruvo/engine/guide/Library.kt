@@ -339,6 +339,34 @@ object Library {
 
     fun shelf(s: Shelf): List<Book> = all.filter { it.shelf == s }
 
+    /** Theme words a student might type, mapped to shelves: "saving" finds Save better, "loan" finds Credit. */
+    private val THEMES: Map<Shelf, List<String>> = mapOf(
+        Shelf.BASICS to listOf("money", "basic", "budget", "runway", "balance"),
+        Shelf.SAVE to listOf("sav", "goal", "emergency", "cushion"),
+        Shelf.SPEND to listOf("spend", "buy", "shop", "want", "need"),
+        Shelf.STUDENT to listOf("student", "hostel", "split", "friend", "stipend", "pg", "rent", "semester"),
+        Shelf.SAFETY to listOf("upi", "safe", "scam", "fraud", "otp", "fake"),
+        Shelf.CREDIT to listOf("credit", "loan", "emi", "borrow", "debt", "pay later", "score"),
+        Shelf.WORK to listOf("salary", "tax", "job", "pf", "pan", "payslip", "income"),
+        Shelf.INVEST to listOf("invest", "sip", "mutual", "stock", "fund", "interest"),
+    )
+
+    /** Books whose title, idea or theme matches what was typed. Title matches first. Blank finds nothing. */
+    fun search(query: String): List<Book> {
+        val words = query.lowercase().split(" ").filter { it.length >= 2 }
+        if (words.isEmpty()) return emptyList()
+        fun score(b: Book): Int = words.map { w ->
+            val theme = THEMES[b.shelf].orEmpty().any { t -> w.startsWith(t) || t.startsWith(w) }
+            when {
+                b.title.lowercase().contains(w) -> 3
+                theme || b.shelf.title.lowercase().contains(w) -> 2
+                b.idea.lowercase().contains(w) -> 1
+                else -> 0
+            }
+        }.sum()
+        return all.map { it to score(it) }.filter { it.second > 0 }.sortedByDescending { it.second }.map { it.first }
+    }
+
     /**
      * Up to three books picked from what actually happened: the Today lesson first, then ones that fit
      * the numbers. Unread books are preferred.

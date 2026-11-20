@@ -52,7 +52,7 @@ The downloadable version does not read SMS, on purpose. Add payments with **+** 
 sample students already have sample bank payments.
 
 **The app looks too dark or too light.**
-Profile → Settings → **Daybreak** (light) or **Night swim** (dark), or **Follow my phone**.
+Profile → Mood → **Daybreak** (light) or **Night swim** (dark), or **Follow my phone**.
 
 **Something else.**
 Uninstall Ruvo, install it again and pick a sample student. If the problem stays, note the phone model and what

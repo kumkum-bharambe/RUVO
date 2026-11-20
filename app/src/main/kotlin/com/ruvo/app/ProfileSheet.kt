@@ -145,7 +145,36 @@ fun ProfileSheet(
             }
         }
 
-        // Everything else lives in one place each: name, mood, sample students and privacy are in Settings.
+        // Mood and your data sit here, up front, rather than deep in Settings.
+        Spacer(Modifier.height(Space.md))
+        Eyebrow("Mood")
+        Spacer(Modifier.height(Space.xs))
+        val s = state.settings
+        Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
+            MoodCard("Daybreak", "Soft light, amber dawn glow", com.ruvo.design.Daybreak, s.theme == ThemeChoice.DAYBREAK.name, Modifier.weight(1f)) {
+                RuvoGraph.appScope.launch { RuvoGraph.repository.setTheme(ThemeChoice.DAYBREAK.name) }
+            }
+            MoodCard("Night swim", "True black, quiet glow", com.ruvo.design.NightSwim, s.theme == ThemeChoice.NIGHT_SWIM.name, Modifier.weight(1f)) {
+                RuvoGraph.appScope.launch { RuvoGraph.repository.setTheme(ThemeChoice.NIGHT_SWIM.name) }
+            }
+        }
+        Spacer(Modifier.height(Space.xs))
+        com.ruvo.design.Chip("Follow my phone", s.theme == ThemeChoice.SYSTEM.name, { RuvoGraph.appScope.launch { RuvoGraph.repository.setTheme(ThemeChoice.SYSTEM.name) } })
+
+        Spacer(Modifier.height(Space.md))
+        Eyebrow("Your data")
+        Spacer(Modifier.height(Space.xs))
+        if (state.isDemo) {
+            Text("Showing sample student ${state.persona?.name}. None of it is real.", style = Ruvo.type.body, color = c.inkSoft)
+            Spacer(Modifier.height(Space.xs))
+            Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
+                GhostButton("Switch", onPersonas, Modifier.weight(1f))
+                com.ruvo.design.PrimaryButton("Use my own", { RuvoGraph.appScope.launch { RuvoGraph.repository.deleteEverything() } }, Modifier.weight(1f))
+            }
+        } else {
+            GhostButton("Explore a sample student", onPersonas, Modifier.fillMaxWidth())
+        }
+        // Everything else lives in one place each: name, notifications and privacy are in Settings.
         Spacer(Modifier.height(Space.md))
         BigTile("Marketplace", MARKETPLACE_LINE, RuvoIcons.Store, Modifier.reveal(3)) { onDismiss(); onMarketplace() }
         Spacer(Modifier.height(Space.sm))

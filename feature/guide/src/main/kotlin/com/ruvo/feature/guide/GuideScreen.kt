@@ -44,6 +44,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ruvo.data.RuvoGraph
@@ -79,6 +80,7 @@ fun GuideScreen(a: GuideActions) {
     val read = state.settings.readBooks
     val total = Library.all.size
     val done = Library.all.count { it.id in read }
+    var query by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf("") }
     var readingOpen by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
 
     val scroll = rememberScrollState()
@@ -88,8 +90,25 @@ fun GuideScreen(a: GuideActions) {
         Column(Modifier.padding(horizontal = Space.gutter)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Eyebrow("Guide", Modifier.weight(1f).reveal(0))
-                // Adding a spend is one visible tap on every tab, not only by pulling the pet down.
-                com.ruvo.design.IconCircle(RuvoIcons.Plus, "Add a spend", a.openAdd, tint = Ruvo.colors.onBrand, background = Ruvo.colors.brand)
+            }
+            Spacer(Modifier.height(Space.xs))
+            // Search by title or by theme: saving, spending, money, UPI, loans, tax, investing.
+            com.ruvo.design.RuvoField(query, { query = it.take(40) }, "Search books, e.g. saving, spending, UPI")
+            val found = Library.search(query)
+            if (query.isNotBlank()) {
+                Spacer(Modifier.height(Space.sm))
+                Text(
+                    if (found.isEmpty()) "No books match \"${query.trim()}\". Try saving, spending, money, UPI, loans or tax." else "${found.size} ${if (found.size == 1) "book" else "books"} found",
+                    Modifier.semantics { liveRegion = androidx.compose.ui.semantics.LiveRegionMode.Polite },
+                    style = Ruvo.type.caption, color = c.inkSoft,
+                )
+                found.take(12).forEach { book ->
+                    Spacer(Modifier.height(Space.xs))
+                    RuvoCard(Modifier.fillMaxWidth(), onClick = { a.openBook(book.id) }, onClickLabel = "Open ${book.title}") {
+                        Text(book.title, style = Ruvo.type.bodyStrong, color = c.ink)
+                        Text("${book.shelf.title} · ${book.minutes} min${if (book.id in read) " · read" else ""}", style = Ruvo.type.caption, color = c.inkSoft)
+                    }
+                }
             }
             Spacer(Modifier.height(Space.xs))
 

@@ -147,8 +147,6 @@ fun GoalsScreen(startNewGoal: Boolean = false, onNewGoalShown: () -> Unit = {}, 
                         style = Ruvo.type.body, color = c.inkSoft,
                     )
                 }
-                // Adding a spend is one visible tap on every tab, not only by pulling the pet down.
-                com.ruvo.design.IconCircle(RuvoIcons.Plus, "Add a spend", onAdd, tint = c.onBrand, background = c.brand)
             }
         }
         item {

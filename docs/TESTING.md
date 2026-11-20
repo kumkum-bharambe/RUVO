@@ -30,7 +30,7 @@ today.
 | 21 | In a book, tap an underlined word | A "Money word" card explaining it |
 | 22 | Guide → **Marketplace** → **How to get it** on Spotify | The steps and an **Open Spotify** button (opens the browser or app) |
 | 23 | Tap the bookmark on an offer, then **Saved** | **Saved · 1**, and only that offer |
-| 24 | Profile (your initial) → **Settings** → **Night swim** | The whole app turns dark; **Daybreak** brings light back |
+| 24 | Profile (your initial) → Mood → **Night swim** | The whole app turns dark; **Daybreak** brings light back |
 | 25 | Settings → Tracking | "This shared version does not read SMS…" (no SMS switch) |
 | 26 | Close Ruvo fully and open it again | **Welcome back** with the PIN pad; the right PIN opens it, a wrong one is refused |
 | 27 | Turn on flight mode and use the app | Everything works; only Marketplace links and Hindi book translation need internet |
